@@ -10,6 +10,8 @@ export interface RoomManifest {
   name: string;
   version: string;
   description?: string;
+  /** 模板封面图，相对房间目录的路径（如 "cover.png"）或绝对 URL；缺省时 UI 回退渐变占位 */
+  cover?: string;
   author?: { name?: string };
   entry: {
     ui: string;

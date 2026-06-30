@@ -1,0 +1,277 @@
+<div id="app">
+  <style>
+    #app {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 16px;
+      color: #f3f4f6;
+      background: #0f5132;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    #app h1 { margin: 0 0 4px; font-size: 20px; }
+    #app .sub { color: #cbe6d4; font-size: 13px; margin: 0 0 12px; }
+    .players { display: flex; gap: 8px; margin-bottom: 12px; }
+    .pcard {
+      flex: 1; background: #134e2e; border: 2px solid transparent;
+      border-radius: 10px; padding: 8px 10px; font-size: 13px;
+    }
+    .pcard.turn { border-color: #fbbf24; box-shadow: 0 0 0 1px #fbbf24; }
+    .pcard .nm { font-weight: 700; }
+    .pcard .role { font-size: 12px; }
+    .role.landlord { color: #fbbf24; }
+    .role.farmer { color: #93c5fd; }
+    .badge { font-size: 11px; background: #065f46; border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+    .section-title { font-size: 12px; color: #cbe6d4; margin: 10px 0 4px; }
+    .table-area {
+      min-height: 78px; background: #0b3d26; border-radius: 10px;
+      padding: 10px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    }
+    .table-area .who { width: 100%; font-size: 12px; color: #cbe6d4; margin-bottom: 4px; }
+    .card {
+      display: inline-flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      width: 40px; height: 56px; background: #fff; color: #111;
+      border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.4);
+      font-weight: 800; font-size: 16px; user-select: none; padding-top: 3px;
+      box-sizing: border-box; position: relative;
+    }
+    .card.red { color: #dc2626; }
+    .card .s { font-size: 13px; font-weight: 600; }
+    .hand { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 0; min-height: 64px; }
+    .hand .card { cursor: pointer; transition: transform .08s; margin-right: -8px; }
+    .hand .card:last-child { margin-right: 0; }
+    .hand .card.sel { transform: translateY(-12px); box-shadow: 0 4px 8px rgba(0,0,0,.5); }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+    button {
+      font-size: 14px; font-weight: 700; padding: 8px 16px; border: none;
+      border-radius: 8px; cursor: pointer; background: #fbbf24; color: #111;
+    }
+    button.ghost { background: #134e2e; color: #f3f4f6; border: 1px solid #2f7a52; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .hint { font-size: 13px; color: #fde68a; }
+    .result {
+      background: #134e2e; border-radius: 10px; padding: 12px; margin-top: 10px; font-size: 14px;
+    }
+    .result h2 { margin: 0 0 6px; font-size: 18px; }
+    .log { font-size: 12px; color: #a7d8bb; margin-top: 10px; max-height: 70px; overflow-y: auto; }
+    .log div { padding: 1px 0; }
+  </style>
+
+  <h1>斗地主 🃏</h1>
+  <p class="sub" id="sub">等待玩家加入…</p>
+
+  <div class="players" id="players"></div>
+
+  <div class="section-title">底牌</div>
+  <div class="table-area" id="bottom" style="min-height:64px;"></div>
+
+  <div class="section-title">桌面</div>
+  <div class="table-area" id="table"></div>
+
+  <div class="section-title">我的手牌 <span id="handcount"></span></div>
+  <div class="hand" id="hand"></div>
+
+  <div class="controls" id="controls"></div>
+
+  <div id="result"></div>
+  <div class="log" id="log"></div>
+
+  <script>
+    const RANK_LABEL = {
+      11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '2', 16: '小王', 17: '大王',
+    };
+    function label(rank) { return RANK_LABEL[rank] || String(rank); }
+    function isRed(suit) { return suit === '♥' || suit === '♦'; }
+
+    const el = (id) => document.getElementById(id);
+    const subEl = el('sub'), playersEl = el('players'), bottomEl = el('bottom'),
+      tableEl = el('table'), handEl = el('hand'), handCountEl = el('handcount'),
+      controlsEl = el('controls'), resultEl = el('result'), logEl = el('log');
+
+    let myHand = [];          // 私密事件维护，不在 state 里
+    let selected = new Set(); // 选中的牌 id
+    let lastState = null;
+
+    function cardNode(card, opts) {
+      const d = document.createElement('div');
+      d.className = 'card' + (card.rank >= 16 ? ' red' : isRed(card.suit) ? ' red' : '');
+      if (card.rank >= 16) {
+        d.innerHTML = '<span>' + (card.rank === 17 ? '大' : '小') + '</span><span class="s">JOKER</span>';
+      } else {
+        d.innerHTML = '<span>' + label(card.rank) + '</span><span class="s">' + card.suit + '</span>';
+      }
+      if (opts && opts.selectable) {
+        if (selected.has(card.id)) d.classList.add('sel');
+        d.onclick = () => {
+          if (selected.has(card.id)) selected.delete(card.id);
+          else selected.add(card.id);
+          render(lastState);
+        };
+      }
+      return d;
+    }
+
+    function roleText(role) {
+      if (role === 'landlord') return '<span class="role landlord">地主</span>';
+      if (role === 'farmer') return '<span class="role farmer">农民</span>';
+      return '';
+    }
+
+    function render(state) {
+      if (!state) return;
+      lastState = state;
+      const me = parti.playerId;
+
+      // 玩家信息条（按座位顺序）
+      playersEl.innerHTML = '';
+      state.seats.forEach((pid) => {
+        const div = document.createElement('div');
+        div.className = 'pcard' + (state.turn && state.turn === pid ? ' turn' : '');
+        if (!pid || !state.players[pid]) {
+          div.innerHTML = '<div class="nm">空座位</div>';
+        } else {
+          const p = state.players[pid];
+          const bidTxt = state.phase === 'bidding' && p.bid !== null
+            ? '<span class="badge">' + (p.bid === 0 ? '不叫' : p.bid + '分') + '</span>' : '';
+          div.innerHTML =
+            '<div class="nm">' + p.name + (pid === me ? '（我）' : '') + '</div>' +
+            '<div class="role">' + (roleText(p.role) || '玩家') + bidTxt + '</div>' +
+            '<div>剩 ' + p.cardCount + ' 张 · 累计 ' + p.score + '</div>';
+        }
+        playersEl.appendChild(div);
+      });
+
+      // 副标题
+      if (state.phase === 'waiting') subEl.textContent = '等待玩家加入…（需要 3 人）';
+      else if (state.phase === 'bidding') subEl.textContent = '叫分阶段 · 当前最高 ' + state.bidScore + ' 分';
+      else if (state.phase === 'playing') subEl.textContent = '出牌阶段 · 倍数 ×' + state.multiplier;
+      else subEl.textContent = '本局结束';
+
+      // 底牌
+      bottomEl.innerHTML = '';
+      if (state.bottomCards) {
+        state.bottomCards.forEach((c) => bottomEl.appendChild(cardNode(c)));
+      } else {
+        bottomEl.innerHTML = '<span class="who">未亮（确定地主后翻开）</span>';
+      }
+
+      // 桌面
+      tableEl.innerHTML = '';
+      if (state.lastPlay) {
+        const by = state.players[state.lastPlay.by];
+        const who = document.createElement('div');
+        who.className = 'who';
+        who.textContent = (by ? by.name : '?') + ' 出牌：';
+        tableEl.appendChild(who);
+        state.lastPlay.cards.forEach((c) => tableEl.appendChild(cardNode(c)));
+      } else {
+        tableEl.innerHTML = '<span class="who">' +
+          (state.phase === 'playing' ? '自由出牌' : '—') + '</span>';
+      }
+
+      // 我的手牌
+      handEl.innerHTML = '';
+      // 清理已不在手里的选中项
+      const handIds = new Set(myHand.map((c) => c.id));
+      selected.forEach((id) => { if (!handIds.has(id)) selected.delete(id); });
+      myHand.forEach((c) => handEl.appendChild(cardNode(c, { selectable: state.phase === 'playing' })));
+      handCountEl.textContent = myHand.length ? '(' + myHand.length + ' 张)' : '';
+
+      renderControls(state, me);
+
+      // 结果
+      resultEl.innerHTML = '';
+      if (state.phase === 'finished' && state.result) {
+        const r = state.result;
+        const win = r.winnerRole === 'landlord' ? '地主获胜 🏆' : '农民获胜 🏆';
+        const myDelta = r.delta[me];
+        const mine = myDelta === undefined ? '' :
+          '<div>你本局 ' + (myDelta >= 0 ? '+' : '') + myDelta + ' 分</div>';
+        resultEl.innerHTML = '<div class="result"><h2>' + win + '</h2>' +
+          '<div>倍数 ×' + r.multiplier + '</div>' + mine + '</div>';
+      }
+
+      // 日志
+      logEl.innerHTML = (state.log || []).slice(-6).map((l) => '<div>' + l + '</div>').join('');
+    }
+
+    function renderControls(state, me) {
+      controlsEl.innerHTML = '';
+      const myTurn = state.turn === me;
+      const amSeated = !!(me && state.players[me]);
+
+      if (state.phase === 'bidding') {
+        if (myTurn) {
+          [0, 1, 2, 3].forEach((s) => {
+            const b = document.createElement('button');
+            b.className = s === 0 ? 'ghost' : '';
+            b.textContent = s === 0 ? '不叫' : s + ' 分';
+            b.disabled = s !== 0 && s <= state.bidScore;
+            b.onclick = () => parti.action('bid', { score: s });
+            controlsEl.appendChild(b);
+          });
+        } else {
+          addHint('等待其他玩家叫分…');
+        }
+      } else if (state.phase === 'playing') {
+        if (myTurn) {
+          const playBtn = document.createElement('button');
+          playBtn.textContent = '出牌';
+          playBtn.disabled = selected.size === 0;
+          playBtn.onclick = () => {
+            parti.action('play', { cardIds: Array.from(selected) });
+            selected.clear();
+          };
+          controlsEl.appendChild(playBtn);
+
+          const passBtn = document.createElement('button');
+          passBtn.className = 'ghost';
+          passBtn.textContent = '不出';
+          passBtn.disabled = state.lastPlay === null; // 自由出不能不出
+          passBtn.onclick = () => parti.action('pass');
+          controlsEl.appendChild(passBtn);
+
+          if (state.lastPlay === null) addHint('轮到你自由出牌');
+          else addHint('轮到你，需压过上一手或选择不出');
+        } else {
+          const cur = state.turn && state.players[state.turn];
+          addHint('等待 ' + (cur ? cur.name : '...') + ' 出牌…');
+        }
+      } else if (state.phase === 'finished') {
+        if (amSeated) {
+          const b = document.createElement('button');
+          b.textContent = '再来一局';
+          b.onclick = () => parti.action('restart');
+          controlsEl.appendChild(b);
+        }
+      } else {
+        addHint('等待满 3 人自动开局');
+      }
+    }
+
+    function addHint(text) {
+      const s = document.createElement('span');
+      s.className = 'hint';
+      s.textContent = text;
+      controlsEl.appendChild(s);
+    }
+
+    // 手牌只走私密事件（隐藏信息，不在 state 里）
+    parti.onEvent('game:hand', (p) => {
+      myHand = p.cards || [];
+      render(lastState);
+    });
+
+    parti.onEvent('game:bomb', (p) => {
+      parti.log('bomb/rocket by', p.by, p.type);
+    });
+    parti.onEvent('game:over', (p) => {
+      parti.log('game over:', p.winnerRole);
+    });
+    parti.onEvent('game:redeal', () => { myHand = []; });
+
+    parti.onState(render);
+    parti.ready();
+  </script>
+</div>

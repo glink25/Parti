@@ -19,22 +19,32 @@ export interface RoomEntry {
   cover?: string;
 }
 
-export const ROOMS: RoomEntry[] = [
-  {
-    id: 'counter',
-    name: '多人计数器',
-    description: '一起点击、一起累加，适合快速改造成轻量派对玩法。',
-    baseUrl: '/rooms/counter',
-    cover: '/rooms/counter/cover.png',
-  },
-  {
-    id: 'guess-word',
-    name: '猜词游戏',
-    description: '准备、猜词、决出赢家，一套完整的多人回合玩法。',
-    baseUrl: '/rooms/guess-word',
-    cover: '/rooms/guess-word/cover.png',
-  },
-];
+/**
+ * 内置模板注册表由 vite 插件 `virtual:room-registry` 在构建/开发期扫描 public/rooms/ 生成
+ * （见 apps/web/vite.config.ts）。新增模板只需在 public/rooms/ 放一个含 parti.room.json 的
+ * 目录，无需改代码。public 文件运行时挂在根路径，故 baseUrl = /rooms/<dir>。
+ */
+import { rooms as registry } from 'virtual:room-registry';
+
+/** 把 manifest.cover 解析成可直接用于 UI 的 URL（相对房间目录或绝对 URL）。 */
+function resolveCover(baseUrl: string, cover?: string): string | undefined {
+  if (!cover) return undefined;
+  if (/^(https?:)?\/\//.test(cover) || cover.startsWith('/')) return cover;
+  return `${baseUrl}/${cover}`;
+}
+
+export const ROOMS: RoomEntry[] = registry
+  .map(({ dir, manifest }) => {
+    const baseUrl = `/rooms/${dir}`;
+    return {
+      id: manifest.id ?? dir,
+      name: manifest.name ?? dir,
+      description: manifest.description ?? '',
+      baseUrl,
+      cover: resolveCover(baseUrl, manifest.cover),
+    };
+  })
+  .sort((a, b) => a.id.localeCompare(b.id));
 
 export function findRoom(id: string): RoomEntry | undefined {
   return ROOMS.find((r) => r.id === id);
