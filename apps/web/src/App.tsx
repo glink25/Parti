@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { GithubIcon } from '@/components/icons/GithubIcon.js';
+import { Button } from '@/components/ui/button.js';
 import { Lobby } from './pages/Lobby.js';
 import { LocalRoomView } from './pages/LocalRoomView.js';
 import { PeerRoomView } from './pages/PeerRoomView.js';
@@ -67,6 +69,21 @@ export function App() {
             <span>Parti</span>
           </a>
           <span className="hidden text-[13px] text-muted-foreground md:inline">和朋友一起创造，一起游玩</span>
+          <Button
+            asChild
+            variant="ghost"
+            size="icon-sm"
+            className="ml-auto shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <a
+              href="https://github.com/glink25/Parti"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="在 GitHub 上查看 Parti 源码"
+            >
+              <GithubIcon />
+            </a>
+          </Button>
         </header>
       )}
       <main
