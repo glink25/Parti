@@ -50,6 +50,8 @@ export type SystemMessageType =
   | 'sys:host-closed'
   | 'sys:resync-request'
   | 'sys:resume-ok'
+  | 'sys:package-request'
+  | 'sys:package-data'
   | 'sys:capabilities';
 
 /** 游戏消息类型 (§8.3) */
@@ -104,6 +106,19 @@ export interface ResumeOkPayload {
   playerId: string;
   /** 重连后房间内最新版本号 */
   stateVersion: number;
+}
+
+/**
+ * sys:package-data —— Host 把房间代码包分发给加入者 (GOAL §11.1 内容寻址)。
+ *
+ * 仅含纯数据（manifest + 文件文本），core 不依赖 room-packager。加入者收到后
+ * 自行重算 packageHash 校验内容一致，再走 sys:hello。MVP 无后端，房间文件
+ * 经此消息点对点下发，而非 fetch 静态 URL。
+ */
+export interface PackageDataPayload {
+  manifest: unknown;
+  /** 相对路径 -> 文本内容 */
+  files: Record<string, string>;
 }
 
 export type PlayerRole = 'host' | 'player' | 'spectator';

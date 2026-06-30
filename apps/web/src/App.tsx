@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Lobby } from './pages/Lobby.js';
 import { LocalRoomView } from './pages/LocalRoomView.js';
 import { PeerRoomView } from './pages/PeerRoomView.js';
+import { EditorView } from './pages/EditorView.js';
 import { clearRoomSession } from './lib/PeerRoomSession.js';
 
 /** 极简 hash 路由：#/ 大厅 / #/local/<roomId> 本地预览 / #/peer/... 联机 */
@@ -38,7 +39,9 @@ export function App() {
   const parts = route.split('/').filter(Boolean); // e.g. ['local','counter']
 
   let view;
-  if (parts[0] === 'local' && parts[1]) {
+  if (parts[0] === 'editor') {
+    view = <EditorView />;
+  } else if (parts[0] === 'local' && parts[1]) {
     view = <LocalRoomView roomId={parts[1]} />;
   } else if (parts[0] === 'peer') {
     view = <PeerRoomView />;

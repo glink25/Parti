@@ -19,6 +19,7 @@ import {
   type HelloPayload,
   type ReadyPayload,
   type RoomErrorPayload,
+  type PackageDataPayload,
   type RoomMessage,
   type SnapshotPayload,
   type WelcomePayload,
@@ -44,6 +45,12 @@ export interface HostRuntimeOptions {
   roomSource: string;
   /** 房间配置 / manifest */
   manifest?: unknown;
+  /**
+   * 房间包的全部文件（相对路径 -> 文本）。提供后，Host 会响应加入者的
+   * sys:package-request，把房间代码点对点下发（GOAL §11.1）。缺省（如本地
+   * 预览，各端已自带 package）时忽略取包请求。
+   */
+  packageFiles?: Record<string, string>;
   /** host 玩家展示名 */
   hostName?: string;
   /**
@@ -229,6 +236,9 @@ export class HostRuntime {
 
   private routeInbound(peerId: PeerId, message: RoomMessage): void {
     switch (message.type) {
+      case 'sys:package-request':
+        this.handlePackageRequest(peerId);
+        break;
       case 'sys:hello':
         this.handleHello(peerId, message.payload as HelloPayload);
         break;
@@ -251,6 +261,20 @@ export class HostRuntime {
       default:
         this.logs.emit([`[host] 未处理消息类型: ${message.type}`]);
     }
+  }
+
+  /**
+   * 加入者请求房间代码包 → 点对点下发 manifest + 全部文件（GOAL §11.1）。
+   * 早于 hello 即可处理（只读分发，无需玩家身份）。未携带 packageFiles 时忽略。
+   */
+  private handlePackageRequest(peerId: PeerId): void {
+    const files = this.opts.packageFiles;
+    if (!files) return;
+    const payload: PackageDataPayload = {
+      manifest: this.opts.manifest,
+      files,
+    };
+    this.sendToPeer(peerId, 'sys', 'sys:package-data', payload, peerId);
   }
 
   private handleHello(peerId: PeerId, hello: HelloPayload): void {

@@ -41,6 +41,20 @@ main { padding: 20px; }
   padding: 16px;
 }
 
+.lobby-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.editor-field { display: flex; flex-direction: column; gap: 6px; }
+.editor-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px;
+  resize: vertical;
+}
 .room-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 .room-card h3 { margin: 0 0 6px; }
 .room-card p { color: var(--muted); font-size: 13px; margin: 0 0 12px; }

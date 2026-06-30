@@ -82,6 +82,8 @@ export async function createPeerHost(pkg: RoomPackage): Promise<PeerHost> {
     worker: createWebWorkerHost(),
     roomSource: getWorkerSource(pkg),
     manifest: pkg.manifest,
+    // 透传全部文件，使 host 能响应加入者的 sys:package-request 点对点下发房间代码。
+    packageFiles: pkg.files,
     hostName: 'Host',
     store,
   });

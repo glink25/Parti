@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { HostRuntime } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
-import { loadPackageFromUrl, type RoomPackage } from '@parti/room-packager';
+import { type RoomPackage } from '@parti/room-packager';
 import { RoomFrame } from '../components/RoomFrame.js';
 import { DevTools } from '../components/DevTools.js';
 import { createHostLocalPort } from '@parti/client-sdk';
 import { createPeerHost, createPeerJoin } from '../lib/PeerRoomSession.js';
-import { findRoom } from '../lib/rooms.js';
+import { resolvePackage } from '../lib/rooms.js';
+import { fetchPackageOverPeer } from '../lib/fetchPackageOverPeer.js';
 
 /** 解析 #/peer/host/<roomId> 或 #/peer/join/<roomId>/<hostPeerId> */
 function parsePeerRoute(): { mode: 'host' | 'join'; roomId?: string; hostPeerId?: string } {
@@ -43,9 +44,7 @@ function PeerHostView({ roomId }: { roomId?: string }) {
     if (!roomId || started.current) return;
     started.current = true;
     (async () => {
-      const entry = findRoom(roomId);
-      if (!entry) throw new Error(`未知房间: ${roomId}`);
-      const pkg = await loadPackageFromUrl(entry.baseUrl);
+      const pkg = await resolvePackage(roomId);
       const peerHost = await createPeerHost(pkg);
       setState({
         host: peerHost.host,
@@ -100,9 +99,8 @@ function PeerJoinView({ roomId, hostPeerId }: { roomId?: string; hostPeerId?: st
     if (!roomId || !hostPeerId || started.current) return;
     started.current = true;
     (async () => {
-      const entry = findRoom(roomId);
-      if (!entry) throw new Error(`未知房间: ${roomId}`);
-      const pkg = await loadPackageFromUrl(entry.baseUrl);
+      // 加入者经 host 点对点取包（支持任意自定义房间），并内容校验 packageHash。
+      const pkg = await fetchPackageOverPeer(roomId, hostPeerId);
       // createPeerJoin 内置断线自动重连：UI 拿到稳定 port，无需感知重连。
       const join = createPeerJoin(pkg, hostPeerId, 'Guest', {
         onStatus: (s) => setStatus(s),
