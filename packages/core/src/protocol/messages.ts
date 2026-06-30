@@ -99,6 +99,10 @@ export interface HelloPayload {
     clientId?: string;
   };
   capabilities: Capabilities;
+  /** 可选准入凭据；Runtime 仅把它交给 admission controller，不传入 Worker。 */
+  admission?: {
+    credential?: string;
+  };
 }
 
 /** sys:resume-ok —— Host 确认玩家重连成功，回带其原 playerId。 */
@@ -119,6 +123,13 @@ export interface PackageDataPayload {
   manifest: unknown;
   /** 相对路径 -> 文本内容 */
   files: Record<string, string>;
+}
+
+/** sys:package-request —— 在下发房间代码前执行与正式加入相同的准入校验。 */
+export interface PackageRequestPayload {
+  partiVersion: string;
+  clientId?: string;
+  credential?: string;
 }
 
 export type PlayerRole = 'host' | 'player' | 'spectator';
@@ -179,6 +190,8 @@ export interface StatePatchPayload {
 /** 统一错误码 (§8.12) */
 export type RoomErrorCode =
   | 'ROOM_FULL'
+  | 'CREDENTIAL_REQUIRED'
+  | 'INVALID_CREDENTIAL'
   | 'VERSION_MISMATCH'
   | 'INVALID_ACTION'
   | 'BAD_PAYLOAD'
@@ -204,4 +217,22 @@ export interface KickPayload {
 /** sys:ready */
 export interface ReadyPayload {
   payload?: unknown;
+}
+
+/**
+ * 返回用于日志/调试的消息副本，递归隐藏所有名为 credential 的字段。
+ * 原消息仍用于协议处理，避免日志脱敏改变实际传输数据。
+ */
+export function redactRoomMessage(message: RoomMessage): RoomMessage {
+  return { ...message, payload: redactCredentials(message.payload) };
+}
+
+function redactCredentials(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactCredentials);
+  if (!value || typeof value !== 'object') return value;
+  const redacted: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    redacted[key] = key === 'credential' ? '[REDACTED]' : redactCredentials(child);
+  }
+  return redacted;
 }

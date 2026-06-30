@@ -23,6 +23,7 @@ export interface ReconnectingClientOptions {
   playerName: string;
   /** 稳定客户端身份 id（由入口层从 SessionStore 取得/生成）。 */
   clientId: string;
+  credential?: string;
   /** 连接状态变化回调（connecting / connected / reconnecting / closed）。 */
   onStatus?: (status: string) => void;
   /** 不可恢复错误（被踢、版本不一致等）回调，不再重连。 */
@@ -93,6 +94,9 @@ export class ReconnectingClient {
         transport,
         playerName: this.opts.playerName,
         clientId: this.opts.clientId,
+        ...(this.opts.credential !== undefined
+          ? { credential: this.opts.credential }
+          : {}),
       });
       this.transport = transport;
       this.bind(runtime);
@@ -128,6 +132,7 @@ export class ReconnectingClient {
           this.scheduleRetry();
         } else {
           this.opts.onFatal?.(`${e.code}: ${e.message}`);
+          this.cleanupRuntime();
         }
       }),
     );

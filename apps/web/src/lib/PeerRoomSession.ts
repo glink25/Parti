@@ -14,6 +14,7 @@ import {
   PARTI_VERSION,
   SessionStorageStore,
   generateId,
+  type RoomAdmissionController,
 } from '@parti/core';
 import { type RoomClientPort } from '@parti/client-sdk';
 import { PeerJSTransportAdapter } from '@parti/transport-peerjs';
@@ -24,17 +25,20 @@ import {
 } from '@parti/room-packager';
 import { createWebWorkerHost } from './roomWorker.js';
 import { ReconnectingClient } from './ReconnectingClient.js';
+import { clearHostRoomSettings } from './roomSettings.js';
 
 /**
  * 当前页面内活跃的房间会话清理器（host 或 client），key = roomId。
  * 用于「退出到大厅」时先销毁仍在运行的 runtime，再清除存储——
  * 避免存活的 host 在清除后又把状态重新写回 sessionStorage。
  */
-const activeDisposers = new Map<string, () => void>();
+const activeDisposers = new Map<string, Set<() => void>>();
 
-function registerDisposer(roomId: string, dispose: () => void): void {
-  activeDisposers.get(roomId)?.();
-  activeDisposers.set(roomId, dispose);
+export function registerRoomDisposer(roomId: string, dispose: () => void): () => void {
+  const disposers = activeDisposers.get(roomId) ?? new Set<() => void>();
+  disposers.add(dispose);
+  activeDisposers.set(roomId, disposers);
+  return () => disposers.delete(dispose);
 }
 
 /**
@@ -44,14 +48,15 @@ function registerDisposer(roomId: string, dispose: () => void): void {
  * （恢复与否完全依赖 sessionStorage 生命周期）。
  */
 export function clearRoomSession(roomId: string): void {
-  const dispose = activeDisposers.get(roomId);
-  if (dispose) {
+  const disposers = activeDisposers.get(roomId);
+  if (disposers) {
     activeDisposers.delete(roomId);
-    dispose();
+    for (const dispose of disposers) dispose();
   }
   const store = new SessionStorageStore();
   store.clearRoom(roomId);
   store.clearClientId(roomId);
+  clearHostRoomSettings(roomId);
 }
 
 export interface PeerHost {
@@ -62,7 +67,14 @@ export interface PeerHost {
   dispose(): void;
 }
 
-export async function createPeerHost(pkg: RoomPackage): Promise<PeerHost> {
+export interface PeerHostOptions {
+  admissionController?: RoomAdmissionController;
+}
+
+export async function createPeerHost(
+  pkg: RoomPackage,
+  options: PeerHostOptions = {},
+): Promise<PeerHost> {
   const store = new SessionStorageStore();
   const roomId = pkg.manifest.id;
   // 恢复与否完全交给 sessionStorage：刷新时记录仍在 → 恢复现场；关闭标签页或
@@ -86,6 +98,12 @@ export async function createPeerHost(pkg: RoomPackage): Promise<PeerHost> {
     packageFiles: pkg.files,
     hostName: 'Host',
     store,
+    ...(options.admissionController
+      ? { admissionController: options.admissionController }
+      : {}),
+    ...(pkg.manifest.room?.maxPlayers !== undefined
+      ? { maxPlayers: pkg.manifest.room.maxPlayers }
+      : {}),
   });
 
   // 刷新/关闭时主动销毁 peer，尽快释放稳定 id 供下次复用。
@@ -98,7 +116,7 @@ export async function createPeerHost(pkg: RoomPackage): Promise<PeerHost> {
     window.removeEventListener('beforeunload', onUnload);
     host.dispose();
   };
-  registerDisposer(roomId, dispose);
+  registerRoomDisposer(roomId, dispose);
 
   return {
     host,
@@ -125,6 +143,7 @@ export function createPeerJoin(
   hostPeerId: string,
   playerName: string,
   handlers: PeerJoinHandlers = {},
+  credential?: string,
 ): PeerJoin {
   const store = new SessionStorageStore();
   const roomId = pkg.manifest.id;
@@ -142,10 +161,11 @@ export function createPeerJoin(
     hostPeerId,
     playerName,
     clientId,
+    ...(credential !== undefined ? { credential } : {}),
     ...(handlers.onStatus ? { onStatus: handlers.onStatus } : {}),
     ...(handlers.onFatal ? { onFatal: handlers.onFatal } : {}),
   });
-  registerDisposer(roomId, () => client.dispose());
+  registerRoomDisposer(roomId, () => client.dispose());
 
   return { client, port: client.port, roomHtml: getRoomHtml(pkg) };
 }

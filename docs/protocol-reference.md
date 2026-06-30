@@ -47,6 +47,35 @@ sys:package-data     房主下发房间代码包
 sys:capabilities     能力协商
 ```
 
+### 准入握手
+
+加入者在下载 Package 和正式加入两个阶段都携带同一个 opaque credential。Runtime 不解释
+credential 的业务含义，只把它交给宿主页安装的 admission controller。
+
+```ts
+interface PackageRequestPayload {
+  partiVersion: string;
+  clientId?: string;
+  credential?: string;
+}
+
+interface HelloPayload {
+  partiVersion: string;
+  protocolVersion: number;
+  roomPackageHash: string;
+  player: { name?: string; avatar?: string; clientId?: string };
+  capabilities: Capabilities;
+  admission?: { credential?: string };
+}
+```
+
+顺序为：`sys:package-request` 准入 → `sys:package-data` → 校验 packageHash →
+`sys:hello` 再次准入 → `sys:welcome`。任一阶段失败均返回 `sys:error`，且不会创建玩家。
+宽限期内命中既有 `clientId` 的连接按重连处理，不重复要求凭据或新席位。
+
+credential 在 Host、Client 和 DevTools 消息日志中固定显示为 `[REDACTED]`，不得写入
+快照、错误详情或持久化玩家记录。
+
 ### 游戏消息 `game:*`
 
 ```txt
@@ -72,6 +101,8 @@ state:resync     重新同步指令 —— 保留
 | 码 | 含义 |
 | --- | --- |
 | `ROOM_FULL` | 房间已满 |
+| `CREDENTIAL_REQUIRED` | 房间要求准入凭据，但请求未提供 |
+| `INVALID_CREDENTIAL` | 准入凭据无效 |
 | `VERSION_MISMATCH` | 协议版本或房间包 hash 不一致 |
 | `INVALID_ACTION` | 未知 action 名 |
 | `BAD_PAYLOAD` | 消息 payload 非法 |

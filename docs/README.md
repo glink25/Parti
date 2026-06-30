@@ -26,6 +26,13 @@ my-room/
 | [manifest.md](./manifest.md) | `parti.room.json` 字段表 | 配置清单时查 |
 | [protocol-reference.md](./protocol-reference.md) | 底层协议消息 / 错误码（进阶、可选） | 一般无需阅读 |
 
+平台与 Runtime 集成文档：
+
+| 文档 | 内容 | 面向对象 |
+| --- | --- | --- |
+| [host-runtime.md](./host-runtime.md) | Host 准入控制器、容量状态和秘密边界 | 平台 / Transport 集成者 |
+| [lobby-service.md](./lobby-service.md) | 在线大厅 REST API、租约和部署要求 | 大厅后端实现者 |
+
 ## 推荐阅读路径
 
 **「我想尽快写出一个房间」**：

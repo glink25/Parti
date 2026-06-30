@@ -45,6 +45,9 @@ export class LocalRoomSession {
       roomSource: getWorkerSource(pkg),
       manifest: pkg.manifest,
       hostName: 'Host',
+      ...(pkg.manifest.room?.maxPlayers !== undefined
+        ? { maxPlayers: pkg.manifest.room.maxPlayers }
+        : {}),
     });
     await host.start();
     return new LocalRoomSession(pkg, host, adapter);

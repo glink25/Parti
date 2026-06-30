@@ -14,6 +14,7 @@ import {
   type RoomMessage,
   type SnapshotPayload,
   type WelcomePayload,
+  redactRoomMessage,
 } from '../protocol/messages.js';
 import { ClientStateCache } from '../state/sync.js';
 import type {
@@ -31,6 +32,8 @@ export interface ClientRuntimeOptions {
   playerName?: string;
   /** 稳定客户端身份 id（跨刷新/掉线），重连时凭此复用原玩家身份。 */
   clientId?: string;
+  /** 宿主层提供的 opaque 准入凭据，不会进入 Room Worker。 */
+  credential?: string;
 }
 
 export class ClientRuntime {
@@ -84,6 +87,9 @@ export class ClientRuntime {
         ...(this.opts.clientId ? { clientId: this.opts.clientId } : {}),
       },
       capabilities: { binary: false, compression: false, patch: false },
+      ...(this.opts.credential !== undefined
+        ? { admission: { credential: this.opts.credential } }
+        : {}),
     };
     this.send('sys', 'sys:hello', hello);
   }
@@ -114,7 +120,7 @@ export class ClientRuntime {
 
   private onMessage(tm: TransportMessage): void {
     const message = tm.data as RoomMessage;
-    this.messageLog.emit({ dir: 'in', message, at: Date.now() });
+    this.messageLog.emit({ dir: 'in', message: redactRoomMessage(message), at: Date.now() });
     switch (message.type) {
       case 'sys:welcome': {
         const welcome = message.payload as WelcomePayload;
@@ -178,7 +184,7 @@ export class ClientRuntime {
       payload,
     };
     this.transport.send({ data: message, meta: { reliable: true, ordered: true } });
-    this.messageLog.emit({ dir: 'out', message, at: Date.now() });
+    this.messageLog.emit({ dir: 'out', message: redactRoomMessage(message), at: Date.now() });
   }
 
   private setStatus(status: ConnectionStatus): void {

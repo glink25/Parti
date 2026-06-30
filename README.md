@@ -3,7 +3,7 @@
 一个面向 Web 的**多人互动房间 Runtime**。创作者用 HTML + `room.worker.js`
 快速创作房间，Parti Runtime 负责标准协议、状态同步、沙箱与可替换通信层。
 
-设计文档见 [`GOAL.md`](./GOAL.md)。本仓库是 **MVP 初版**（Phase 0 + 真实沙箱 + PeerJS）。
+设计文档见 [`GOAL.md`](./GOAL.md)。本仓库是 **MVP 初版**（Phase 0 + 真实沙箱 + PeerJS + 可选在线大厅）。
 
 **想写一个房间？** 看 [`docs/`](./docs/) 开发文档 —— 读完《快速开始》+《井字棋示例》
 即可写出一个可运行的多人房间。
@@ -25,6 +25,23 @@ pnpm build      # 构建 Web 应用
   三处同步增长，DevTools 显示 state / version / 消息日志。
 - **PeerJS 联机**：房主生成邀请链接，他人打开即真实 WebRTC 联机。同一 Room
   Package 在 Local 与 PeerJS 下运行，房间代码与协议零改动。
+- **在线大厅（可选）**：房间默认私密；配置大厅服务后，房主可把当前 PeerJS
+  房间公开到在线列表。大厅只保存短期租约和展示状态，不托管 Worker 或房间密码。
+
+### 大厅服务配置
+
+复制 [`.env.example`](./.env.example) 或在部署环境设置：
+
+```bash
+VITE_LOBBY_SERVICE_URL=https://lobby.example.com
+```
+
+未配置或服务不可用时，创建和链接邀请仍然正常，公开开关会保持私密并提示错误。
+大厅服务 REST 接口、租约和 CORS 规则见 [`docs/lobby-service.md`](./docs/lobby-service.md)。
+
+联机房间可设置 4 位数字密码。密码由房主 `HostRuntime` 在 Package 下载和正式加入
+两个阶段校验，不上传大厅，也不会传给 `room.worker.js`。分享链接可以在 Hash 查询参数
+中携带密码，便于一键加入。
 
 ## 架构（Monorepo）
 
@@ -36,7 +53,7 @@ packages/
   transport-local/   内存模拟多人（测试/预览）
   transport-peerjs/  PeerJS / WebRTC 适配器
   room-packager/     manifest 校验 + 内容寻址 packageHash
-apps/web/            Vite + React SPA：大厅 / 运行时 / DevTools
+apps/web/            Vite + React SPA：在线大厅 / 房间管理 / 运行时 / DevTools
 apps/web/public/rooms/   官方示例房间包（counter / guess-word）
 ```
 
@@ -51,6 +68,9 @@ iframe UI (client-sdk) → 宿主页 host-bridge → ClientRuntime/HostRuntime
 
 核心原则（GOAL §20）：Runtime First、Protocol Stable、User Code Untrusted、
 Host Replaceable、Actions Over Messages、Snapshot First。
+
+平台接入 Host 准入控制器和权威容量状态时，参见
+[`docs/host-runtime.md`](./docs/host-runtime.md)。
 
 ## 写一个房间
 

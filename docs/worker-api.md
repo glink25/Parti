@@ -62,6 +62,10 @@ export default defineRoom({
   恢复 / 重连时做额外处理（比如重置某个计时器）才实现它们。详见仓库 README 的
   「房间重连与持久化」小节。
 - `onCreate` 与 `onRestore` 二选一触发：全新房间走 `onCreate`，快照恢复走 `onRestore`。
+- 平台准入（密码、票据、容量）发生在 `onJoin` **之前**。校验失败的连接不会生成
+  `RoomPlayer`，也不会触发任何 Worker 生命周期钩子。
+- `room.worker.js` 无法读取加入 credential、大厅租约、房间可见性或房主设置的运行实例
+  标题。这些属于宿主页和 `HostRuntime` 的平台层数据。
 
 ## 3. `RoomContext`（`ctx`）
 

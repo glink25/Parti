@@ -14,6 +14,8 @@ import {
   createMessage,
   type ClientTransportSession,
   type PackageDataPayload,
+  type PackageRequestPayload,
+  type RoomErrorPayload,
   type RoomMessage,
 } from '@parti/core';
 import { PeerJSTransportAdapter } from '@parti/transport-peerjs';
@@ -24,6 +26,7 @@ const PACKAGE_FETCH_TIMEOUT_MS = 15_000;
 export async function fetchPackageOverPeer(
   roomId: string,
   hostPeerId: string,
+  options: { clientId?: string; credential?: string } = {},
 ): Promise<RoomPackage> {
   const adapter = new PeerJSTransportAdapter();
   const transport = await adapter.joinRoom({
@@ -32,7 +35,7 @@ export async function fetchPackageOverPeer(
   });
 
   try {
-    const data = await requestPackageData(transport, roomId);
+    const data = await requestPackageData(transport, roomId, options);
     // 重算并校验 packageHash（内容寻址：host 谎报文件会被 hash 比对拒绝）。
     return await createPackage({ manifest: data.manifest, files: data.files });
   } finally {
@@ -43,6 +46,7 @@ export async function fetchPackageOverPeer(
 function requestPackageData(
   transport: ClientTransportSession,
   roomId: string,
+  options: { clientId?: string; credential?: string },
 ): Promise<PackageDataPayload> {
   return new Promise<PackageDataPayload>((resolve, reject) => {
     const seq = new SeqCounter();
@@ -58,10 +62,17 @@ function requestPackageData(
 
     transport.onMessage((tm) => {
       const message = tm.data as RoomMessage;
-      if (message.type !== 'sys:package-data' || settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(message.payload as PackageDataPayload);
+      if (settled) return;
+      if (message.type === 'sys:package-data') {
+        settled = true;
+        clearTimeout(timer);
+        resolve(message.payload as PackageDataPayload);
+      } else if (message.type === 'sys:error') {
+        settled = true;
+        clearTimeout(timer);
+        const error = message.payload as RoomErrorPayload;
+        reject(Object.assign(new Error(error.message), { code: error.code }));
+      }
     });
 
     transport.onDisconnect((reason) => {
@@ -71,6 +82,11 @@ function requestPackageData(
       reject(new Error(reason ?? '与房主的连接已断开，未能取得房间代码包'));
     });
 
+    const payload: PackageRequestPayload = {
+      partiVersion: PARTI_VERSION,
+      ...(options.clientId ? { clientId: options.clientId } : {}),
+      ...(options.credential !== undefined ? { credential: options.credential } : {}),
+    };
     const request: RoomMessage = createMessage({
       roomId,
       from: transport.selfId,
@@ -78,7 +94,7 @@ function requestPackageData(
       seq: seq.next(),
       channel: 'sys',
       type: 'sys:package-request',
-      payload: { partiVersion: PARTI_VERSION },
+      payload,
     });
     transport.send({ data: request, meta: { reliable: true, ordered: true } });
   });

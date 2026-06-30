@@ -22,6 +22,7 @@ export * from './session/SessionStore.js';
 
 // Runtime
 export * from './runtime/types.js';
+export * from './runtime/admission.js';
 export * from './runtime/worker-host.js';
 export { HostRuntime } from './runtime/HostRuntime.js';
 export type { HostRuntimeOptions } from './runtime/HostRuntime.js';

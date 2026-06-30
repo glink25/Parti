@@ -72,6 +72,7 @@ button, .btn {
 }
 button.secondary, .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.disabled { opacity: 0.5; pointer-events: none; }
 
 .room-stage {
   display: grid;
@@ -150,3 +151,24 @@ pre.state {
 .invite { display: flex; gap: 6px; margin: 10px 0; }
 .invite input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 7px 9px; font-size: 12px; }
 .loading { color: var(--muted); padding: 40px; text-align: center; }
+
+.section-title { margin-top: 22px; }
+.online-rooms { margin-bottom: 24px; }
+.room-title-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.badge { color: var(--accent); background: #20334f; border-radius: 999px; padding: 2px 7px; font-size: 11px; }
+.host-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.single-room { grid-template-columns: 1fr; max-width: 480px; }
+.room-settings { max-width: 520px; display: flex; flex-direction: column; gap: 12px; }
+.room-settings h2 { margin: 0; }
+.room-settings label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12px; }
+.room-settings input, .password-form input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 8px 9px;
+}
+.room-settings.compact { max-width: none; }
+.check-line { flex-direction: row !important; align-items: center; }
+.inline-field { display: flex; gap: 7px; }
+.inline-field input { flex: 1; min-width: 0; }
+.password-form { max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+.password-form h2 { margin: 0; }
+@media (max-width: 800px) { .host-grid { grid-template-columns: 1fr; } }

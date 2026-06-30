@@ -17,12 +17,14 @@ import {
   type ActionPayload,
   type EventPayload,
   type HelloPayload,
+  type PackageRequestPayload,
   type ReadyPayload,
   type RoomErrorPayload,
   type PackageDataPayload,
   type RoomMessage,
   type SnapshotPayload,
   type WelcomePayload,
+  redactRoomMessage,
 } from '../protocol/messages.js';
 import { StateSyncEngine } from '../state/sync.js';
 import type { SessionStore } from '../session/SessionStore.js';
@@ -34,6 +36,10 @@ import type {
 import { Emitter } from '../util/emitter.js';
 import type { RoomWorkerHost } from './worker-host.js';
 import type { MessageLogEntry } from './types.js';
+import type {
+  RoomAdmissionController,
+  RoomAdmissionStatus,
+} from './admission.js';
 
 export interface HostRuntimeOptions {
   roomId: string;
@@ -62,6 +68,10 @@ export interface HostRuntimeOptions {
   hostPlayerId?: string;
   /** 玩家掉线后的保留宽限期（毫秒），期满才真正离开。默认 30000。 */
   graceMs?: number;
+  /** 新玩家准入控制器。凭据不会传给 Room Worker。 */
+  admissionController?: RoomAdmissionController;
+  /** 房间总容量，包含房主；缺省表示不限制。 */
+  maxPlayers?: number;
 }
 
 const DEFAULT_GRACE_MS = 30_000;
@@ -81,12 +91,14 @@ export class HostRuntime {
   private lastPersistedVersion = -1;
   /** 是否已销毁；销毁后忽略一切入站/断线事件，避免把已清除的会话写回。 */
   private disposed = false;
+  private admissionController?: RoomAdmissionController;
 
   private hostPlayer!: Player;
 
   // DevTools / 本地 host UI 订阅点
   readonly messageLog = new Emitter<MessageLogEntry>();
   readonly playersChanged = new Emitter<Player[]>();
+  readonly admissionStatusChanged = new Emitter<RoomAdmissionStatus>();
   readonly logs = new Emitter<unknown[]>();
   readonly errors = new Emitter<RoomErrorPayload>();
   /** host 自身 UI 的 state / event 流（不走 transport） */
@@ -98,6 +110,7 @@ export class HostRuntime {
     this.roomId = options.roomId;
     this.transport = options.transport;
     this.worker = options.worker;
+    this.admissionController = options.admissionController;
   }
 
   get connectionInfo(): string {
@@ -114,6 +127,28 @@ export class HostRuntime {
 
   currentSnapshot(): SnapshotPayload {
     return this.sync.currentSnapshot();
+  }
+
+  setAdmissionController(controller?: RoomAdmissionController): void {
+    this.admissionController = controller;
+    this.admissionStatusChanged.emit(this.getAdmissionStatus());
+  }
+
+  getAdmissionStatus(): RoomAdmissionStatus {
+    const players = this.players.list();
+    const activePlayers = players.filter((p) => p.status !== 'offline').length;
+    const reservedPlayers = players.length;
+    const configured = this.opts.maxPlayers;
+    const maxPlayers =
+      typeof configured === 'number' && Number.isFinite(configured) && configured > 0
+        ? Math.floor(configured)
+        : null;
+    return {
+      activePlayers,
+      reservedPlayers,
+      maxPlayers,
+      joinable: maxPlayers === null || reservedPlayers < maxPlayers,
+    };
   }
 
   async start(): Promise<void> {
@@ -191,7 +226,7 @@ export class HostRuntime {
     this.transport.onDisconnect((peerId, reason) => this.onDisconnect(peerId, reason));
 
     this.persist();
-    this.playersChanged.emit(this.players.list());
+    this.emitPlayersChanged();
   }
 
   // --- host 本地 UI 入口（host-bridge 调用，不经 transport） ---
@@ -199,7 +234,7 @@ export class HostRuntime {
   localReady(): void {
     this.players.setStatus(this.hostPlayer.id, 'ready');
     this.worker.ready(this.hostPlayer);
-    this.playersChanged.emit(this.players.list());
+    this.emitPlayersChanged();
   }
 
   submitLocalAction(action: string, payload: unknown): void {
@@ -217,7 +252,7 @@ export class HostRuntime {
   private onTransportMessage(peerId: PeerId, tm: TransportMessage): void {
     if (this.disposed) return;
     const message = tm.data as RoomMessage;
-    this.messageLog.emit({ dir: 'in', message, at: Date.now() });
+    this.messageLog.emit({ dir: 'in', message: redactRoomMessage(message), at: Date.now() });
     try {
       this.routeInbound(peerId, message);
     } catch (err) {
@@ -237,7 +272,7 @@ export class HostRuntime {
   private routeInbound(peerId: PeerId, message: RoomMessage): void {
     switch (message.type) {
       case 'sys:package-request':
-        this.handlePackageRequest(peerId);
+        this.handlePackageRequest(peerId, message.payload as PackageRequestPayload);
         break;
       case 'sys:hello':
         this.handleHello(peerId, message.payload as HelloPayload);
@@ -267,9 +302,10 @@ export class HostRuntime {
    * 加入者请求房间代码包 → 点对点下发 manifest + 全部文件（GOAL §11.1）。
    * 早于 hello 即可处理（只读分发，无需玩家身份）。未携带 packageFiles 时忽略。
    */
-  private handlePackageRequest(peerId: PeerId): void {
+  private handlePackageRequest(peerId: PeerId, request: PackageRequestPayload): void {
     const files = this.opts.packageFiles;
     if (!files) return;
+    this.assertAdmission('package', peerId, request.clientId, request.credential);
     const payload: PackageDataPayload = {
       manifest: this.opts.manifest,
       files,
@@ -310,9 +346,11 @@ export class HostRuntime {
         name: returning.name,
       });
       this.persist();
-      this.playersChanged.emit(this.players.list());
+      this.emitPlayersChanged();
       return;
     }
+
+    this.assertAdmission('join', peerId, clientId, hello.admission?.credential);
 
     const player = this.players.add({
       id: generateId('player'),
@@ -329,7 +367,7 @@ export class HostRuntime {
     this.worker.join(player);
     this.broadcastEvent('player:joined', { id: player.id, name: player.name });
     this.persist();
-    this.playersChanged.emit(this.players.list());
+    this.emitPlayersChanged();
   }
 
   /** 向某 peer 下发 sys:welcome + 当前 state:snapshot（首次加入 / 重连共用）。 */
@@ -360,7 +398,7 @@ export class HostRuntime {
     if (!player) return;
     this.players.setStatus(player.id, 'ready');
     this.worker.ready(player);
-    this.playersChanged.emit(this.players.list());
+    this.emitPlayersChanged();
   }
 
   private handleAction(peerId: PeerId, action: ActionPayload): void {
@@ -385,7 +423,7 @@ export class HostRuntime {
     this.broadcastEvent('player:offline', { id: player.id });
     this.scheduleGrace(player.id);
     this.persist();
-    this.playersChanged.emit(this.players.list());
+    this.emitPlayersChanged();
   }
 
   /** 为离线玩家启动宽限期定时器；期满仍未重连则真正离开。 */
@@ -400,7 +438,7 @@ export class HostRuntime {
       this.players.remove(playerId);
       this.broadcastEvent('player:left', { id: playerId });
       this.persist();
-      this.playersChanged.emit(this.players.list());
+      this.emitPlayersChanged();
     }, ms);
     this.graceTimers.set(playerId, handle);
   }
@@ -478,7 +516,7 @@ export class HostRuntime {
     this.cancelGrace(playerId);
     this.players.remove(playerId);
     this.persist();
-    this.playersChanged.emit(this.players.list());
+    this.emitPlayersChanged();
   }
 
   // --- 出站工具 ---
@@ -529,7 +567,37 @@ export class HostRuntime {
       payload,
     });
     this.transport.send(peerId, { data: message, meta: { reliable: true, ordered: true } });
-    this.messageLog.emit({ dir: 'out', message, at: Date.now() });
+    this.messageLog.emit({ dir: 'out', message: redactRoomMessage(message), at: Date.now() });
+  }
+
+  private assertAdmission(
+    phase: 'package' | 'join',
+    peerId: PeerId,
+    clientId?: string,
+    credential?: string,
+  ): void {
+    // 宽限期内的稳定身份已在首次加入时通过准入，不重复要求凭据和席位。
+    if (clientId && this.players.getByClient(clientId)) return;
+
+    if (!this.getAdmissionStatus().joinable) {
+      throw new RoomError('ROOM_FULL', '房间已满', { recoverable: false });
+    }
+
+    const decision = this.admissionController?.authorize({
+      roomId: this.roomId,
+      phase,
+      peerId,
+      ...(clientId ? { clientId } : {}),
+      ...(credential !== undefined ? { credential } : {}),
+    });
+    if (decision && !decision.allowed) {
+      throw new RoomError(decision.code, decision.message, { recoverable: false });
+    }
+  }
+
+  private emitPlayersChanged(): void {
+    this.playersChanged.emit(this.players.list());
+    this.admissionStatusChanged.emit(this.getAdmissionStatus());
   }
 
   private emitError(error: RoomErrorPayload): void {
@@ -544,6 +612,7 @@ export class HostRuntime {
     this.transport.close();
     this.messageLog.clear();
     this.playersChanged.clear();
+    this.admissionStatusChanged.clear();
     this.logs.clear();
     this.errors.clear();
     this.localState.clear();

@@ -21,7 +21,7 @@ Runtime 加载房间时会先校验它（校验失败抛 `ManifestError`）。
 | `description` | `string` | | 房间描述。 |
 | `author` | `{ name?: string }` | | 作者信息。 |
 | `room.minPlayers` | `number` | | 最少玩家数。 |
-| `room.maxPlayers` | `number` | | 最多玩家数。 |
+| `room.maxPlayers` | `number` | | 最多玩家数，由 Host Runtime 强制执行，包含房主。 |
 | `room.allowSpectators` | `boolean` | | 是否允许观众。 |
 | `sync.mode` | `'snapshot' \| 'patch'` | | 同步模式，默认 `'snapshot'`。当前仅 `snapshot` 真正生效。 |
 | `sync.snapshotInterval` | `number` | | 快照间隔（保留字段）。 |
@@ -41,6 +41,15 @@ Runtime 加载房间时会先校验它（校验失败抛 `ManifestError`）。
 - `entry` 必须同时包含字符串类型的 `ui` 与 `worker`。
 
 其余字段不校验，但建议如实声明。
+
+`room.maxPlayers` 的容量计算包含房主和断线宽限期内的保留席位。达到上限后，Runtime
+会以 `ROOM_FULL` 拒绝新玩家；已有身份的宽限期重连不会占用新席位。
+
+## Package 元信息与运行实例设置
+
+manifest 描述可复用的 Room Package。每次联机运行的标题、是否公开、加入密码和大厅
+租约属于**运行实例设置**，不应写入 `parti.room.json`。这样同一个 Package 可以同时由
+多个房主创建不同标题、可见性和准入规则的在线房间。
 
 ## ⚠️ 只有 entry 里声明的文件才会被加载
 

@@ -5,3 +5,4 @@ dist
 .vite
 coverage
 .claude
+.pnpm-store
