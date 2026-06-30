@@ -1,0 +1,138 @@
+<div class="wrap">
+  <div class="board">
+    <h1>多人贪吃蛇</h1>
+    <p class="status"><span id="status">连接中…</span></p>
+    <canvas id="canvas" width="480" height="480"></canvas>
+    <div class="pad">
+      <button data-dir="up" class="key">↑</button>
+      <div class="pad-row">
+        <button data-dir="left" class="key">←</button>
+        <button data-dir="down" class="key">↓</button>
+        <button data-dir="right" class="key">→</button>
+      </div>
+    </div>
+    <p class="hint">方向键 / WASD 控制，撞墙撞身会重生</p>
+  </div>
+
+  <div class="side">
+    <h2>排行榜</h2>
+    <ol id="rank"></ol>
+  </div>
+
+  <style>
+    * { box-sizing: border-box; }
+    .wrap {
+      font-family: system-ui, sans-serif; color: #e5e7eb; background: #0f172a;
+      padding: 16px; display: flex; gap: 20px; flex-wrap: wrap;
+    }
+    h1 { margin: 0 0 4px; font-size: 20px; }
+    h2 { margin: 0 0 8px; font-size: 16px; color: #94a3b8; }
+    .status { margin: 0 0 10px; font-size: 14px; min-height: 18px; }
+    canvas {
+      background: #1e293b; border-radius: 8px; display: block;
+      width: 480px; max-width: 90vw; height: auto; aspect-ratio: 1;
+      touch-action: none;
+    }
+    .pad { margin-top: 12px; display: flex; flex-direction: column;
+           align-items: center; gap: 6px; }
+    .pad-row { display: flex; gap: 6px; }
+    .key {
+      width: 56px; height: 44px; font-size: 20px; cursor: pointer;
+      border: none; border-radius: 8px; background: #334155; color: #e5e7eb;
+    }
+    .key:active { background: #475569; }
+    .hint { color: #64748b; font-size: 12px; margin: 10px 0 0; }
+    .side { min-width: 180px; }
+    #rank { margin: 0; padding-left: 22px; line-height: 1.7; font-size: 14px; }
+    #rank li.me { font-weight: 700; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+           margin-right: 6px; vertical-align: middle; }
+    .dead { color: #94a3b8; }
+  </style>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const g = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const rankEl = document.getElementById('rank');
+
+    function send(dir) { parti.action('turn', { dir }); }
+
+    // 键盘
+    const KEYS = {
+      ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+      w: 'up', s: 'down', a: 'left', d: 'right',
+      W: 'up', S: 'down', A: 'left', D: 'right',
+    };
+    window.addEventListener('keydown', (e) => {
+      const dir = KEYS[e.key];
+      if (dir) { e.preventDefault(); send(dir); }
+    });
+    // 屏幕按钮
+    document.querySelectorAll('.key').forEach((b) => {
+      b.onclick = () => send(b.dataset.dir);
+    });
+
+    function render(state) {
+      const cols = state.cols, rows = state.rows;
+      const cw = canvas.width / cols, ch = canvas.height / rows;
+
+      // 背景
+      g.fillStyle = '#1e293b';
+      g.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 食物
+      g.fillStyle = '#f43f5e';
+      for (const f of state.food) {
+        g.beginPath();
+        g.arc((f.x + 0.5) * cw, (f.y + 0.5) * ch, Math.min(cw, ch) * 0.35, 0, 7);
+        g.fill();
+      }
+
+      // 蛇
+      for (const id in state.snakes) {
+        const s = state.snakes[id];
+        if (!s.alive) continue;
+        s.body.forEach((seg, i) => {
+          g.fillStyle = s.color;
+          g.globalAlpha = i === 0 ? 1 : 0.85;
+          const pad = i === 0 ? 0.5 : 1;
+          g.fillRect(seg.x * cw + pad, seg.y * ch + pad, cw - pad * 2, ch - pad * 2);
+        });
+        g.globalAlpha = 1;
+        // 头部描边
+        const h = s.body[0];
+        g.strokeStyle = '#f8fafc';
+        g.lineWidth = 1.5;
+        g.strokeRect(h.x * cw + 1, h.y * ch + 1, cw - 2, ch - 2);
+      }
+
+      // 状态行
+      const me = state.snakes[parti.playerId];
+      if (!me) {
+        statusEl.textContent = '观战中…';
+      } else if (me.alive) {
+        statusEl.textContent = '存活 · 得分 ' + me.score;
+      } else {
+        statusEl.textContent = '已撞毁，重生中… · 得分 ' + me.score;
+      }
+
+      // 排行榜
+      const rows2 = Object.entries(state.snakes)
+        .sort((a, b) => b[1].score - a[1].score);
+      rankEl.innerHTML = '';
+      for (const [id, s] of rows2) {
+        const li = document.createElement('li');
+        if (id === parti.playerId) li.className = 'me';
+        const dot = '<span class="dot" style="background:' + s.color + '"></span>';
+        const name = (s.name || '玩家') + (id === parti.playerId ? '（你）' : '');
+        li.innerHTML = dot + name + ' — ' + s.score +
+          (s.alive ? '' : ' <span class="dead">(重生中)</span>');
+        rankEl.appendChild(li);
+      }
+    }
+
+    parti.onState(render);
+    parti.ready();
+  </script>
+</div>
