@@ -8,7 +8,7 @@ let idCounter = 0;
 
 /** 生成消息唯一 ID。优先 crypto.randomUUID，回退到计数器。 */
 export function generateId(prefix = 'msg'): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `${prefix}_${crypto.randomUUID()}`;
   }
   idCounter += 1;

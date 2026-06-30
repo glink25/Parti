@@ -6,6 +6,10 @@ import type {
   RoomErrorPayload,
   SnapshotPayload,
 } from '@parti/core';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
+import { Card } from '@/components/ui/card.js';
+import { Input } from '@/components/ui/input.js';
 
 /** 房间调试面板 (GOAL.md §15.1) —— 订阅 HostRuntime 的事件总线。 */
 export function DevTools({
@@ -56,7 +60,7 @@ export function DevTools({
   };
 
   return (
-    <div className="devtools">
+    <Card className="devtools">
       <h3>DevTools</h3>
       <div className="meta-line">
         transport: <b>{transportName}</b> · packageHash:{' '}
@@ -65,7 +69,7 @@ export function DevTools({
       </div>
 
       <div className="dev-grid">
-        <div className="dev-section">
+        <Card className="dev-section">
           <h4>玩家 ({players.length})</h4>
           <ul className="players">
             {players.map((p) => (
@@ -73,33 +77,33 @@ export function DevTools({
                 <span>
                   {p.name} {p.role === 'host' ? '👑' : ''}
                 </span>
-                <span className={`status ${p.status}`}>{p.status}</span>
+                <Badge variant={p.status === 'offline' ? 'destructive' : 'secondary'}>{p.status}</Badge>
               </li>
             ))}
           </ul>
 
           <h4 style={{ marginTop: 14 }}>手动发送 action（以 host 身份）</h4>
           <div className="manual">
-            <input
+            <Input
               value={action}
               onChange={(e) => setAction(e.target.value)}
               placeholder="action"
             />
-            <input
+            <Input
               value={payload}
               onChange={(e) => setPayload(e.target.value)}
               placeholder="payload JSON"
             />
-            <button onClick={sendManual}>发送</button>
+            <Button onClick={sendManual}>发送</Button>
           </div>
-        </div>
+        </Card>
 
-        <div className="dev-section">
+        <Card className="dev-section">
           <h4>当前 State (v{snapshot.version})</h4>
           <pre className="state">{JSON.stringify(snapshot.state, null, 2)}</pre>
-        </div>
+        </Card>
 
-        <div className="dev-section">
+        <Card className="dev-section">
           <h4>消息日志</h4>
           <div className="log">
             {log.map((e, i) => (
@@ -114,9 +118,9 @@ export function DevTools({
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
-        <div className="dev-section">
+        <Card className="dev-section">
           <h4>Worker / 错误日志</h4>
           <div className="log">
             {errors.map((e, i) => (
@@ -130,8 +134,8 @@ export function DevTools({
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
-    </div>
+    </Card>
   );
 }

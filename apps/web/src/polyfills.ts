@@ -6,7 +6,7 @@
  *
  * 这里用 webcrypto-liner 的纯 JS 实现按需补齐 `crypto.subtle`：
  * - 安全上下文 / localhost 下原生 subtle 存在，此处为 no-op，保留原生实现；
- * - 仅补 `subtle`，不替换整个 crypto，保留原生 `randomUUID` / `getRandomValues`。
+ * - crypto 不存在时替换整个实现；仅缺 subtle 时只补 subtle。
  *
  * 注意：必须在任何用到 `crypto.subtle` 的代码之前执行，故在 main.tsx 最顶部 import。
  * 必须用 module 构建（见 vite.config.ts 的 alias），shim 产物不自包含会同样失败。

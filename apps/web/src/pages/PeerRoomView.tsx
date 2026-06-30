@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CopyIcon, Settings2Icon, WandSparklesIcon } from 'lucide-react';
 import type { HostRuntime, RoomAdmissionStatus } from '@parti/core';
 import { SessionStorageStore } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
@@ -27,6 +28,12 @@ import {
   type LobbyRoomInput,
 } from '../lib/lobbyApi.js';
 import { buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes.js';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.js';
+import { Input } from '@/components/ui/input.js';
+import { Label } from '@/components/ui/label.js';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -44,9 +51,6 @@ export function PeerRoomView() {
 
 function PeerHostView({ roomId }: { roomId?: string }) {
   const [pkg, setPkg] = useState<RoomPackage | null>(null);
-  const [settings, setSettings] = useState<HostRoomSettings | null>(() =>
-    roomId ? loadHostRoomSettings(roomId) : null,
-  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,74 +62,12 @@ function PeerHostView({ roomId }: { roomId?: string }) {
 
   if (error) return <RoomError message={error} />;
   if (!roomId || !pkg) return <div className="loading">正在加载房间…</div>;
-  if (!settings) {
-    return (
-      <HostSetupForm
-        defaultTitle={pkg.manifest.name}
-        onSubmit={(next) => {
-          saveHostRoomSettings(roomId, next);
-          setSettings(next);
-        }}
-      />
-    );
-  }
-  return <PeerHostSession pkg={pkg} initialSettings={settings} />;
-}
-
-function HostSetupForm({
-  defaultTitle,
-  onSubmit,
-}: {
-  defaultTitle: string;
-  onSubmit: (settings: HostRoomSettings) => void;
-}) {
-  const [title, setTitle] = useState(defaultTitle);
-  const [protectedRoom, setProtectedRoom] = useState(false);
-  const [password, setPassword] = useState('');
-
-  return (
-    <form
-      className="card room-settings"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!title.trim()) return;
-        if (protectedRoom && !/^\d{4}$/.test(password)) return;
-        onSubmit({ title: title.trim(), password: protectedRoom ? password : '', isPublic: false });
-      }}
-    >
-      <h2>创建联机房间</h2>
-      <label>
-        房间标题
-        <input value={title} maxLength={80} required onChange={(event) => setTitle(event.target.value)} />
-      </label>
-      <label className="check-line">
-        <input
-          type="checkbox"
-          checked={protectedRoom}
-          onChange={(event) => setProtectedRoom(event.target.checked)}
-        />
-        需要 4 位数字密码
-      </label>
-      {protectedRoom && (
-        <div className="inline-field">
-          <input
-            value={password}
-            inputMode="numeric"
-            pattern="\d{4}"
-            maxLength={4}
-            placeholder="0000"
-            required
-            onChange={(event) => setPassword(event.target.value.replace(/\D/g, '').slice(0, 4))}
-          />
-          <button type="button" className="secondary" onClick={() => setPassword(generateRoomPassword())}>
-            自动生成
-          </button>
-        </div>
-      )}
-      <p className="meta-line">房间创建后默认为私密，可在房主面板中公开到大厅。</p>
-      <button type="submit">创建房间</button>
-    </form>
-  );
+  const initialSettings = loadHostRoomSettings(roomId) ?? {
+    title: pkg.manifest.name,
+    password: '',
+    isPublic: false,
+  };
+  return <PeerHostSession pkg={pkg} initialSettings={initialSettings} />;
 }
 
 function PeerHostSession({
@@ -147,6 +89,8 @@ function PeerHostSession({
   const settingsRef = useRef(settings);
   const [admission, setAdmission] = useState<RoomAdmissionStatus | null>(null);
   const [lobbyStatus, setLobbyStatus] = useState(initialSettings.isPublic ? '正在恢复公开状态…' : '私密');
+  const [copied, setCopied] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
   const started = useRef(false);
@@ -154,6 +98,7 @@ function PeerHostSession({
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    saveHostRoomSettings(roomId, initialSettings);
     createPeerHost(pkg, {
       admissionController: createPasswordAdmissionController(initialSettings.password),
     })
@@ -182,7 +127,7 @@ function PeerHostSession({
           settingsRef.current = privateSettings;
           setSettings(privateSettings);
           saveHostRoomSettings(roomId, privateSettings);
-          setLobbyStatus('未配置大厅服务，已保持私密');
+          setLobbyStatus('大厅暂时不可用，房间已保持私密');
         }
         peerHost.host.admissionStatusChanged.on((status) => {
           setAdmission(status);
@@ -215,7 +160,7 @@ function PeerHostSession({
     }
     const baseUrl = lobbyServiceUrl();
     if (!baseUrl) {
-      setLobbyStatus('未配置 VITE_LOBBY_SERVICE_URL，房间仍为私密');
+      setLobbyStatus('大厅暂时不可用，房间仍为私密');
       return;
     }
     const publisher = publisherRef.current ?? new LobbyPublisher(roomId, new LobbyClient(baseUrl), setLobbyStatus);
@@ -230,7 +175,8 @@ function PeerHostSession({
   }
 
   if (error) return <RoomError message={error} />;
-  if (!state || !admission) return <div className="loading">正在创建 PeerJS 房间…</div>;
+  if (!state || !admission) return <div className="loading">正在准备房间…</div>;
+  const activeAdmission = admission;
 
   const inviteUrl = buildInviteUrl(
     location.origin,
@@ -239,68 +185,130 @@ function PeerHostSession({
     state.hostPeerId,
     settings.password,
   );
-  return (
-    <div>
-      <h2>{settings.title.trim() || pkg.manifest.name}</h2>
-      <div className="host-grid">
-        <div className="card">
-          <p className="meta-line">邀请链接{settings.password ? '已包含房间密码' : ''}：</p>
+
+  function copyInvite(): void {
+    void navigator.clipboard?.writeText(inviteUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  function inviteCard(): React.ReactNode {
+    return (
+      <Card className="invite-card gap-3">
+        <CardHeader>
+          <span className="control-label">邀请朋友</span>
+          <CardTitle className="text-lg">一起加入房间</CardTitle>
+          <CardDescription>{settings.password ? '链接中已包含房间密码，可以直接分享。' : '复制链接，邀请朋友现在加入。'}</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="invite">
-            <input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
-            <button onClick={() => navigator.clipboard?.writeText(inviteUrl)}>复制</button>
+            <Input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
+            <Button type="button" onClick={copyInvite}><CopyIcon data-icon="inline-start" />{copied ? '已复制' : '复制'}</Button>
           </div>
-          <p className="meta-line">
-            在线 {admission.activePlayers} · 占位 {admission.reservedPlayers}
-            {admission.maxPlayers === null ? ' · 不限人数' : ` / ${admission.maxPlayers}`}
-            {' · '}{admission.joinable ? '允许加入' : '房间已满'}
-          </p>
-        </div>
-        <div className="card room-settings compact">
-          <label>
-            房间标题
-            <input value={settings.title} maxLength={80} onChange={(event) => applySettings({ ...settings, title: event.target.value })} />
-          </label>
-          <label>
-            4 位密码（留空为无密码）
-            <div className="inline-field">
-              <input
-                value={passwordDraft}
-                inputMode="numeric"
-                maxLength={4}
-                onChange={(event) => {
-                  const value = event.target.value.replace(/\D/g, '').slice(0, 4);
-                  setPasswordDraft(value);
-                  if (value === '' || value.length === 4) {
-                    applySettings({ ...settings, password: value });
-                  }
-                }}
-                onBlur={() => {
-                  if (passwordDraft !== '' && !/^\d{4}$/.test(passwordDraft)) {
-                    setPasswordDraft(settings.password);
-                  }
-                }}
-              />
-              <button type="button" className="secondary" onClick={() => {
-                const value = generateRoomPassword();
+          <div className="join-status"><span className={activeAdmission.joinable ? 'available' : 'full'} />{activeAdmission.joinable ? '当前可加入' : '房间人数已满'}</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  function settingsCard(): React.ReactNode {
+    return (
+      <Card className="room-settings compact gap-4">
+        <CardHeader className="control-card-title">
+          <div><span className="control-label">房间设置</span><CardTitle className="mt-1 text-lg">管理房间</CardTitle></div>
+          <Badge variant={settings.isPublic ? 'default' : 'secondary'}>{settings.isPublic ? '公开' : '私密'}</Badge>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+        <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
+          房间标题
+          <Input value={settings.title} maxLength={80} onChange={(event) => applySettings({ ...settings, title: event.target.value })} />
+        </Label>
+        <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
+          4 位密码（留空为无密码）
+          <div className="inline-field">
+            <Input
+              value={passwordDraft}
+              inputMode="numeric"
+              maxLength={4}
+              onChange={(event) => {
+                const value = event.target.value.replace(/\D/g, '').slice(0, 4);
                 setPasswordDraft(value);
-                applySettings({ ...settings, password: value });
-              }}>
-                生成
-              </button>
-            </div>
-          </label>
-          <div className="room-actions">
-            <button className={settings.isPublic ? 'secondary' : ''} onClick={() => void togglePublic()}>
-              {settings.isPublic ? '设为私密' : '公开到大厅'}
-            </button>
-            <span className="meta-line">{lobbyStatus}</span>
+                if (value === '' || value.length === 4) {
+                  applySettings({ ...settings, password: value });
+                }
+              }}
+              onBlur={() => {
+                if (passwordDraft !== '' && !/^\d{4}$/.test(passwordDraft)) {
+                  setPasswordDraft(settings.password);
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={() => {
+              const value = generateRoomPassword();
+              setPasswordDraft(value);
+              applySettings({ ...settings, password: value });
+            }}>
+              <WandSparklesIcon data-icon="inline-start" />生成
+            </Button>
           </div>
+        </Label>
+        <div className="room-actions">
+          <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} onClick={() => void togglePublic()}>
+            {settings.isPublic ? '设为私密' : '公开到大厅'}
+          </Button>
+        </div>
+        <span className="setting-status">{lobbyStatus}</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="page-shell host-page">
+      <div className="room-page-heading">
+        <div>
+          <a className="back-link" href="#/">← 退出房间</a>
+          <span className="eyebrow">YOUR ROOM</span>
+          <h1>{settings.title.trim() || pkg.manifest.name}</h1>
+        </div>
+        <div className="room-heading-actions">
+          <div className="room-presence">
+            <span className="live-dot" />
+            <b>{admission.activePlayers}</b> 人在线
+            {admission.maxPlayers !== null && <span> / {admission.maxPlayers}</span>}
+          </div>
+          <Sheet open={controlsOpen} onOpenChange={setControlsOpen}>
+            <SheetTrigger asChild>
+              <Button type="button" variant="outline" className="room-controls-button">
+                <Settings2Icon data-icon="inline-start" />房间设置
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
+              <SheetHeader className="border-b px-5 py-4 text-left">
+                <SheetTitle>房间设置</SheetTitle>
+                <SheetDescription>邀请朋友加入，或调整标题、密码和公开状态。</SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-3 overflow-y-auto px-4 pb-5 sm:grid-cols-2">
+                {inviteCard()}
+                {settingsCard()}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
-      <div className="room-stage single-room">
-        <RoomFrame html={state.roomHtml} port={state.port} label="Host (你)" role="host" />
+
+      <div className="host-layout">
+        <div className="game-column">
+          <div className="room-stage single-room">
+            <RoomFrame html={state.roomHtml} port={state.port} label="房主画面" role="房主" expandable />
+          </div>
+        </div>
+        <aside className="host-sidebar">
+          {inviteCard()}
+          {settingsCard()}
+        </aside>
       </div>
-      <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />
+      {import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />}
     </div>
   );
 }
@@ -373,41 +381,44 @@ function PeerJoinView({
 
   if (needsPassword) {
     return (
-      <form
-        className="card password-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!/^\d{4}$/.test(passwordInput)) return;
-          setState(null);
-          setCredential(passwordInput);
-          setAttempt((value) => value + 1);
-        }}
-      >
-        <h2>输入房间密码</h2>
-        {error && <p className="error">{error}</p>}
-        <input
-          autoFocus
-          value={passwordInput}
-          inputMode="numeric"
-          pattern="\d{4}"
-          maxLength={4}
-          placeholder="4 位数字密码"
-          onChange={(event) => setPasswordInput(event.target.value.replace(/\D/g, '').slice(0, 4))}
-        />
-        <button type="submit">加入房间</button>
-      </form>
+      <div className="player-gate">
+        <form
+          className="w-full max-w-[380px]"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!/^\d{4}$/.test(passwordInput)) return;
+            setState(null);
+            setCredential(passwordInput);
+            setAttempt((value) => value + 1);
+          }}
+        >
+        <Card className="password-form">
+          <span className="player-gate-mark">P</span>
+          <h2>输入房间密码</h2>
+          <p className="meta-line">这个房间需要密码才能加入。</p>
+          {error && <p className="error">{error}</p>}
+          <Input
+            autoFocus
+            aria-label="4 位房间密码"
+            value={passwordInput}
+            inputMode="numeric"
+            pattern="\d{4}"
+            maxLength={4}
+            placeholder="4 位数字密码"
+            onChange={(event) => setPasswordInput(event.target.value.replace(/\D/g, '').slice(0, 4))}
+          />
+          <Button type="submit">加入房间</Button>
+        </Card>
+        </form>
+      </div>
     );
   }
   if (error) return <RoomError message={error} />;
-  if (!state) return <div className="loading">正在连接房主（{status}）…</div>;
+  if (!state) return <div className="player-gate"><span className="player-gate-mark">P</span><div className="loading">正在加入房间…</div></div>;
 
   return (
-    <div>
-      <h2>PeerJS 房间（玩家）</h2>
-      <p className="meta-line">连接状态：{status}</p>
-      <div className="room-stage single-room">
-        <RoomFrame html={state.roomHtml} port={state.port} label="你" role="player" />
-      </div>
+    <div className="player-session" data-connection-status={status}>
+      <RoomFrame html={state.roomHtml} port={state.port} label="房间画面" role="玩家" immersive />
     </div>
   );
 }
@@ -431,5 +442,8 @@ function lobbyInput(
 }
 
 function RoomError({ message }: { message: string }) {
-  return <div className="card error">出错：{message} · <a href="#/">返回</a></div>;
+  const friendlyMessage = /peer|connect|network|socket/i.test(message)
+    ? '暂时无法连接房主，请确认房间仍在进行并稍后重试。'
+    : message;
+  return <div className="player-gate"><Card className="error error-card"><h2>暂时无法进入房间</h2><p>{friendlyMessage}</p><Button asChild variant="outline"><a href="#/">返回大厅</a></Button></Card></div>;
 }

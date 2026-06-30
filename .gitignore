@@ -6,3 +6,4 @@ dist
 coverage
 .claude
 .pnpm-store
+.env

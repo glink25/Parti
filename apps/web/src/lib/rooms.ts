@@ -15,20 +15,24 @@ export interface RoomEntry {
   description: string;
   /** 静态包 baseUrl */
   baseUrl: string;
+  /** 模板封面图（缺失时 UI 回退渐变占位） */
+  cover?: string;
 }
 
 export const ROOMS: RoomEntry[] = [
   {
     id: 'counter',
     name: '多人计数器',
-    description: '验证 action / snapshot / broadcast / 多玩家加入 (§22.1)',
+    description: '一起点击、一起累加，适合快速改造成轻量派对玩法。',
     baseUrl: '/rooms/counter',
+    cover: '/rooms/counter/cover.png',
   },
   {
     id: 'guess-word',
     name: '猜词游戏',
-    description: '验证 ready / phase / 玩家输入 / 胜负判断 / event (§22.2)',
+    description: '准备、猜词、决出赢家，一套完整的多人回合玩法。',
     baseUrl: '/rooms/guess-word',
+    cover: '/rooms/guess-word/cover.png',
   },
 ];
 

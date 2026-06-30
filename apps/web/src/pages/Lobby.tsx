@@ -1,26 +1,23 @@
 import { useEffect, useState } from 'react';
-import { ROOMS } from '../lib/rooms.js';
-import {
-  deleteCustomRoom,
-  listCustomRooms,
-  type CustomRoomEntry,
-} from '../lib/customRooms.js';
+import { CloudIcon, PlusIcon, SparklesIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.js';
 import {
   LobbyClient,
   lobbyServiceUrl,
   type LobbyRoom,
 } from '../lib/lobbyApi.js';
 
-/** 大厅：列出官方示例 + 用户自定义房间，提供本地预览 / PeerJS 联机 / 新建入口 (§15.2)。 */
+/** 面向玩家的在线大厅。创作草稿与开发预览不在这里展示。 */
 export function Lobby() {
-  const [custom, setCustom] = useState<CustomRoomEntry[]>(() => listCustomRooms());
   const [online, setOnline] = useState<LobbyRoom[]>([]);
-  const [onlineStatus, setOnlineStatus] = useState('');
+  const [onlineStatus, setOnlineStatus] = useState<'loading' | 'ready' | 'offline'>('loading');
 
   useEffect(() => {
     const baseUrl = lobbyServiceUrl();
     if (!baseUrl) {
-      setOnlineStatus('未配置大厅服务，仍可创建私密房间并通过链接邀请。');
+      setOnlineStatus('offline');
       return;
     }
     const client = new LobbyClient(baseUrl);
@@ -29,106 +26,74 @@ export function Lobby() {
         .listRooms()
         .then((rooms) => {
           setOnline(rooms);
-          setOnlineStatus('');
+          setOnlineStatus('ready');
         })
-        .catch(() => setOnlineStatus('大厅服务暂时不可用，稍后会自动重试。'));
+        .catch(() => setOnlineStatus('offline'));
     };
     refresh();
     const timer = setInterval(refresh, 10_000);
     return () => clearInterval(timer);
   }, []);
 
-  function onDelete(id: string): void {
-    deleteCustomRoom(id);
-    setCustom(listCustomRooms());
-  }
-
   return (
-    <div>
-      <div className="lobby-head">
-        <h2>房间大厅</h2>
-        <a className="btn" href="#/editor">
-          + 新建房间
-        </a>
-      </div>
-      <p className="meta-line">
-        每个房间是一个动态加载的 Room Package（HTML + room.worker.js），运行在
-        Parti Runtime 中。房间逻辑仍由房主浏览器运行；大厅服务只保存在线目录与租约，
-        加入者经房主点对点取得房间代码并完成准入校验。
-      </p>
+    <div className="page-shell lobby-page">
+      <section className="lobby-hero">
+        <div>
+          <span className="eyebrow">PARTI ONLINE</span>
+          <h1>在线大厅</h1>
+          <p>发现正在进行的房间，或者创建一个属于你们的欢乐现场。</p>
+        </div>
+        <Button asChild size="lg" className="h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15">
+          <a href="#/editor"><PlusIcon data-icon="inline-start" />创建联机房间</a>
+        </Button>
+      </section>
 
-      <h3 className="meta-line section-title">在线房间</h3>
-      {onlineStatus && <p className="meta-line">{onlineStatus}</p>}
-      {online.length === 0 && !onlineStatus && <p className="meta-line">当前没有公开房间。</p>}
+      <div className="section-heading">
+        <div>
+          <span className="live-dot" />
+          <h2>正在进行</h2>
+        </div>
+        {onlineStatus === 'ready' && <span>{online.length} 个房间</span>}
+      </div>
+
+      {onlineStatus === 'loading' && <div className="empty-state">正在寻找可加入的房间…</div>}
+      {onlineStatus === 'offline' && (
+        <Card className="empty-state">
+          <CloudIcon className="size-12 rounded-2xl bg-secondary p-3 text-primary-bright" aria-hidden="true" />
+          <h3>大厅暂时无法连接</h3>
+          <p>你仍然可以创建房间，通过邀请链接和朋友一起玩。</p>
+        </Card>
+      )}
+      {online.length === 0 && onlineStatus === 'ready' && (
+        <Card className="empty-state">
+          <SparklesIcon className="size-12 rounded-2xl bg-secondary p-3 text-primary-bright" aria-hidden="true" />
+          <h3>等待第一场派对</h3>
+          <p>这里还没有公开房间，创建一个房间邀请朋友加入吧。</p>
+          <Button asChild variant="outline"><a href="#/editor">创建房间</a></Button>
+        </Card>
+      )}
       {online.length > 0 && (
         <div className="room-list online-rooms">
           {online.map((room) => (
-            <div className="card room-card" key={room.listingId}>
-              <div className="room-title-line">
-                <h3>{room.title}</h3>
-                {room.credentialRequired && <span className="badge">需密码</span>}
-              </div>
-              <p>{room.packageName}</p>
-              <p>
-                {room.playerCount}{room.maxPlayers === null ? ' 人在线' : ` / ${room.maxPlayers} 人`}
-                {' · '}{room.joinable ? '可加入' : '已满'}
-              </p>
-              <div className="room-actions">
-                <a
-                  className={`btn${room.joinable ? '' : ' disabled'}`}
-                  href={room.joinable ? `#/peer/join/${encodeURIComponent(room.roomId)}/${encodeURIComponent(room.hostPeerId)}` : undefined}
-                  aria-disabled={!room.joinable}
-                >
-                  加入房间
-                </a>
-              </div>
-            </div>
+            <Card className="room-card gap-3 py-5" key={room.listingId}>
+              <CardHeader className="room-title-line px-5">
+                <div><CardTitle className="text-lg">{room.title}</CardTitle><CardDescription className="mt-1">{room.packageName}</CardDescription></div>
+                {room.credentialRequired && <Badge variant="secondary">需密码</Badge>}
+              </CardHeader>
+              <CardContent className="px-5" />
+              <CardFooter className="room-card-footer mx-5 px-0 pb-0">
+                <span className="player-count">
+                  <span aria-hidden="true">●</span> {room.playerCount}
+                  {room.maxPlayers === null ? ' 人在线' : ` / ${room.maxPlayers} 人`}
+                </span>
+                <Button asChild={room.joinable} disabled={!room.joinable}>
+                  {room.joinable ? <a href={`#/peer/join/${encodeURIComponent(room.roomId)}/${encodeURIComponent(room.hostPeerId)}`}>加入房间</a> : <span>房间已满</span>}
+                </Button>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       )}
-
-      {custom.length > 0 && (
-        <>
-          <h3 className="meta-line">我的房间</h3>
-          <div className="room-list">
-            {custom.map((room) => (
-              <div className="card room-card" key={room.id}>
-                <h3>{room.name}</h3>
-                <p>{room.description}</p>
-                <div className="room-actions">
-                  <a className="btn" href={`#/local/${room.id}`}>
-                    本地预览 (Host+2 玩家)
-                  </a>
-                  <a className="btn secondary" href={`#/peer/host/${room.id}`}>
-                    PeerJS 联机
-                  </a>
-                  <button className="btn secondary" onClick={() => onDelete(room.id)}>
-                    删除
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <h3 className="meta-line">官方示例</h3>
-      <div className="room-list">
-        {ROOMS.map((room) => (
-          <div className="card room-card" key={room.id}>
-            <h3>{room.name}</h3>
-            <p>{room.description}</p>
-            <div className="room-actions">
-              <a className="btn" href={`#/local/${room.id}`}>
-                本地预览 (Host+2 玩家)
-              </a>
-              <a className="btn secondary" href={`#/peer/host/${room.id}`}>
-                PeerJS 联机
-              </a>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

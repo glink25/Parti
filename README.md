@@ -3,7 +3,8 @@
 一个面向 Web 的**多人互动房间 Runtime**。创作者用 HTML + `room.worker.js`
 快速创作房间，Parti Runtime 负责标准协议、状态同步、沙箱与可替换通信层。
 
-设计文档见 [`GOAL.md`](./GOAL.md)。本仓库是 **MVP 初版**（Phase 0 + 真实沙箱 + PeerJS + 可选在线大厅）。
+设计文档见 [`GOAL.md`](./GOAL.md)。当前版本提供完整的在线大厅、房间创作、邀请加入、
+状态同步与断线恢复体验。
 
 **想写一个房间？** 看 [`docs/`](./docs/) 开发文档 —— 读完《快速开始》+《井字棋示例》
 即可写出一个可运行的多人房间。
@@ -18,22 +19,19 @@ pnpm typecheck  # 全量类型检查
 pnpm build      # 构建 Web 应用
 ```
 
-打开应用后：
+打开应用后，可以从在线大厅加入正在进行的房间，也可以选择空白房间或官方模板进行
+创作。点击“创建联机房间”会直接进入房主页面；房主可以分享邀请链接、设置密码，或将
+房间公开到大厅。
 
-- **本地预览 (Host+2 玩家)**：单页内用内存 transport 起 1 个 Host + 2 个虚拟玩家，
-  每人一个沙箱 iframe，房间逻辑跑在真实 Web Worker。点击任一 iframe 的 `+1`，
-  三处同步增长，DevTools 显示 state / version / 消息日志。
-- **PeerJS 联机**：房主生成邀请链接，他人打开即真实 WebRTC 联机。同一 Room
-  Package 在 Local 与 PeerJS 下运行，房间代码与协议零改动。
-- **在线大厅（可选）**：房间默认私密；配置大厅服务后，房主可把当前 PeerJS
-  房间公开到在线列表。大厅只保存短期租约和展示状态，不托管 Worker 或房间密码。
+本地预览和 DevTools 仅在 `pnpm dev` 启动的开发环境中显示，生产构建不会暴露这些入口。
+底层联机适配器、沙箱和房间协议的技术说明见后续架构章节。
 
 ### 大厅服务配置
 
 复制 [`.env.example`](./.env.example) 或在部署环境设置：
 
 ```bash
-VITE_LOBBY_SERVICE_URL=https://lobby.example.com
+VITE_LOBBY_SERVICE_URL=https://<project-ref>.supabase.co/functions/v1/parti-lobby
 ```
 
 未配置或服务不可用时，创建和链接邀请仍然正常，公开开关会保持私密并提示错误。

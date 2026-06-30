@@ -5,6 +5,8 @@ import { RoomFrame } from '../components/RoomFrame.js';
 import { DevTools } from '../components/DevTools.js';
 import { LocalRoomSession } from '../lib/LocalRoomSession.js';
 import { resolvePackage } from '../lib/rooms.js';
+import { Button } from '@/components/ui/button.js';
+import { Card } from '@/components/ui/card.js';
 
 interface Seat {
   label: string;
@@ -58,9 +60,7 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
 
   if (error) {
     return (
-      <div className="card error">
-        加载失败：{error} · <a href="#/">返回大厅</a>
-      </div>
+      <Card className="mx-auto max-w-lg p-6 text-destructive">加载失败：{error}<Button asChild variant="outline"><a href="#/">返回大厅</a></Button></Card>
     );
   }
   if (!loaded) {
@@ -68,13 +68,11 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
   }
 
   return (
-    <div>
-      <h2>
-        本地多人预览 · {loaded.pkg.manifest.name}{' '}
-        <a className="meta-line" href="#/" style={{ fontSize: 13 }}>
-          ← 返回大厅
-        </a>
-      </h2>
+    <div className="page-shell">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold">本地多人预览 · {loaded.pkg.manifest.name}</h2>
+        <Button asChild variant="outline"><a href="#/">← 返回大厅</a></Button>
+      </div>
       <div className="room-stage">
         {loaded.seats.map((seat) => (
           <RoomFrame
