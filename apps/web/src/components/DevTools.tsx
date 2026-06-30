@@ -60,20 +60,20 @@ export function DevTools({
   };
 
   return (
-    <Card className="devtools">
-      <h3>DevTools</h3>
-      <div className="meta-line">
+    <Card className="mt-[18px] rounded-[16px] border-border bg-surface p-4">
+      <h3 className="mb-2.5 text-sm font-semibold">DevTools</h3>
+      <div className="my-1 text-[11px] text-muted-foreground">
         transport: <b>{transportName}</b> · packageHash:{' '}
         <code>{packageHash.slice(0, 12)}…</code> · stateVersion:{' '}
         <b>{snapshot.version}</b> · hash: <code>{snapshot.stateHash}</code>
       </div>
 
-      <div className="dev-grid">
-        <Card className="dev-section">
-          <h4>玩家 ({players.length})</h4>
-          <ul className="players">
+      <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
+        <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">玩家 ({players.length})</h4>
+          <ul className="m-0 list-none p-0">
             {players.map((p) => (
-              <li key={p.id}>
+              <li key={p.id} className="flex justify-between border-b border-dashed border-border py-1 text-[11px]">
                 <span>
                   {p.name} {p.role === 'host' ? '👑' : ''}
                 </span>
@@ -82,14 +82,16 @@ export function DevTools({
             ))}
           </ul>
 
-          <h4 style={{ marginTop: 14 }}>手动发送 action（以 host 身份）</h4>
-          <div className="manual">
+          <h4 className="mt-3.5 mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">手动发送 action（以 host 身份）</h4>
+          <div className="mt-2 flex gap-1.5">
             <Input
+              className="min-w-0 flex-1 text-[10px]"
               value={action}
               onChange={(e) => setAction(e.target.value)}
               placeholder="action"
             />
             <Input
+              className="min-w-0 flex-1 text-[10px]"
               value={payload}
               onChange={(e) => setPayload(e.target.value)}
               placeholder="payload JSON"
@@ -98,21 +100,21 @@ export function DevTools({
           </div>
         </Card>
 
-        <Card className="dev-section">
-          <h4>当前 State (v{snapshot.version})</h4>
-          <pre className="state">{JSON.stringify(snapshot.state, null, 2)}</pre>
+        <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">当前 State (v{snapshot.version})</h4>
+          <pre className="m-0 max-h-[220px] overflow-auto font-mono text-[11px] text-success">{JSON.stringify(snapshot.state, null, 2)}</pre>
         </Card>
 
-        <Card className="dev-section">
-          <h4>消息日志</h4>
-          <div className="log">
+        <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">消息日志</h4>
+          <div className="flex max-h-[220px] flex-col-reverse overflow-auto font-mono text-[10px]">
             {log.map((e, i) => (
-              <div className="log-row" key={i}>
-                <span className={e.dir === 'in' ? 'dir-in' : 'dir-out'}>
+              <div className="border-b border-dashed border-border py-0.5" key={i}>
+                <span className={e.dir === 'in' ? 'text-primary-bright' : 'text-success'}>
                   {e.dir === 'in' ? '⬅ in ' : '➡ out'}
                 </span>{' '}
-                <span className="type">{e.message.type}</span>{' '}
-                <span className="meta">
+                <span>{e.message.type}</span>{' '}
+                <span className="text-muted-foreground">
                   seq={e.message.seq} {e.message.channel}
                 </span>
               </div>
@@ -120,16 +122,16 @@ export function DevTools({
           </div>
         </Card>
 
-        <Card className="dev-section">
-          <h4>Worker / 错误日志</h4>
-          <div className="log">
+        <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">Worker / 错误日志</h4>
+          <div className="flex max-h-[220px] flex-col-reverse overflow-auto font-mono text-[10px]">
             {errors.map((e, i) => (
-              <div className="log-row error" key={`e${i}`}>
+              <div className="border-b border-dashed border-border py-0.5 text-danger" key={`e${i}`}>
                 ✖ {e.code}: {e.message}
               </div>
             ))}
             {logs.map((l, i) => (
-              <div className="log-row" key={`l${i}`}>
+              <div className="border-b border-dashed border-border py-0.5" key={`l${i}`}>
                 · {l}
               </div>
             ))}

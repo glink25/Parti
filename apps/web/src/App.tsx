@@ -55,17 +55,29 @@ export function App() {
   }
 
   return (
-    <div className={`app${isPlayerRoute ? ' player-app' : ''}`}>
+    <div>
       {!isPlayerRoute && (
-        <header className="topbar border-border/80 bg-card/85">
-          <a className="brand outline-none focus-visible:ring-3 focus-visible:ring-ring/50" href="#/" aria-label="返回 Parti 大厅">
-            <span className="brand-mark bg-primary text-primary-foreground">P</span>
+        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-card/85 px-[18px] backdrop-blur-lg md:h-[72px] md:px-[max(1.5rem,calc((100vw-1240px)/2))]">
+          <a
+            className="inline-flex items-center gap-2.5 rounded-md text-xl font-extrabold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            href="#/"
+            aria-label="返回 Parti 大厅"
+          >
+            <span className="grid size-[34px] place-items-center rounded-[11px] bg-primary font-black text-primary-foreground shadow-[0_8px_24px_rgba(201,151,0,0.2)]">P</span>
             <span>Parti</span>
           </a>
-          <span className="tagline">和朋友一起创造，一起游玩</span>
+          <span className="hidden text-[13px] text-muted-foreground md:inline">和朋友一起创造，一起游玩</span>
         </header>
       )}
-      <main>{view}</main>
+      <main
+        className={
+          isPlayerRoute
+            ? 'min-h-[100dvh]'
+            : 'min-h-[calc(100vh-62px)] px-4 pt-7 pb-12 md:min-h-[calc(100vh-72px)] md:px-6 md:pt-12 md:pb-[72px]'
+        }
+      >
+        {view}
+      </main>
     </div>
   );
 }

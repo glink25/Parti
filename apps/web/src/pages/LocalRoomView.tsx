@@ -64,16 +64,16 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
     );
   }
   if (!loaded) {
-    return <div className="loading">正在加载 Room Package 并启动 Runtime…</div>;
+    return <div className="p-[22px] text-center text-[13px] text-muted-foreground">正在加载 Room Package 并启动 Runtime…</div>;
   }
 
   return (
-    <div className="page-shell">
+    <div className="mx-auto w-[min(1240px,100%)]">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">本地多人预览 · {loaded.pkg.manifest.name}</h2>
         <Button asChild variant="outline"><a href="#/">← 返回大厅</a></Button>
       </div>
-      <div className="room-stage">
+      <div className="mb-4 grid grid-cols-3 gap-3.5 max-lg:grid-cols-2 max-md:grid-cols-1">
         {loaded.seats.map((seat) => (
           <RoomFrame
             key={seat.label}

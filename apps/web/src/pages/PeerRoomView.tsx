@@ -34,6 +34,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input.js';
 import { Label } from '@/components/ui/label.js';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet.js';
+import { cn } from '@/lib/utils.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -61,7 +62,7 @@ function PeerHostView({ roomId }: { roomId?: string }) {
   }, [roomId]);
 
   if (error) return <RoomError message={error} />;
-  if (!roomId || !pkg) return <div className="loading">正在加载房间…</div>;
+  if (!roomId || !pkg) return <div className="p-[22px] text-center text-[13px] text-muted-foreground">正在加载房间…</div>;
   const initialSettings = loadHostRoomSettings(roomId) ?? {
     title: pkg.manifest.name,
     password: '',
@@ -175,7 +176,7 @@ function PeerHostSession({
   }
 
   if (error) return <RoomError message={error} />;
-  if (!state || !admission) return <div className="loading">正在准备房间…</div>;
+  if (!state || !admission) return <div className="p-[22px] text-center text-[13px] text-muted-foreground">正在准备房间…</div>;
   const activeAdmission = admission;
 
   const inviteUrl = buildInviteUrl(
@@ -194,18 +195,18 @@ function PeerHostSession({
 
   function inviteCard(): React.ReactNode {
     return (
-      <Card className="invite-card gap-3">
+      <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
         <CardHeader>
-          <span className="control-label">邀请朋友</span>
+          <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">邀请朋友</span>
           <CardTitle className="text-lg">一起加入房间</CardTitle>
           <CardDescription>{settings.password ? '链接中已包含房间密码，可以直接分享。' : '复制链接，邀请朋友现在加入。'}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="invite">
-            <Input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
+          <div className="flex gap-[7px]">
+            <Input className="min-w-0 flex-1" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
             <Button type="button" onClick={copyInvite}><CopyIcon data-icon="inline-start" />{copied ? '已复制' : '复制'}</Button>
           </div>
-          <div className="join-status"><span className={activeAdmission.joinable ? 'available' : 'full'} />{activeAdmission.joinable ? '当前可加入' : '房间人数已满'}</div>
+          <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground"><span className={cn('size-1.5 rounded-full', activeAdmission.joinable ? 'bg-success' : 'bg-danger')} />{activeAdmission.joinable ? '当前可加入' : '房间人数已满'}</div>
         </CardContent>
       </Card>
     );
@@ -213,9 +214,9 @@ function PeerHostSession({
 
   function settingsCard(): React.ReactNode {
     return (
-      <Card className="room-settings compact gap-4">
-        <CardHeader className="control-card-title">
-          <div><span className="control-label">房间设置</span><CardTitle className="mt-1 text-lg">管理房间</CardTitle></div>
+      <Card className="gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
+        <CardHeader className="flex items-start justify-between gap-3">
+          <div><span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">房间设置</span><CardTitle className="mt-1 text-lg">管理房间</CardTitle></div>
           <Badge variant={settings.isPublic ? 'default' : 'secondary'}>{settings.isPublic ? '公开' : '私密'}</Badge>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -225,8 +226,9 @@ function PeerHostSession({
         </Label>
         <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
           4 位密码（留空为无密码）
-          <div className="inline-field">
+          <div className="flex gap-[7px]">
             <Input
+              className="min-w-0 flex-1"
               value={passwordDraft}
               inputMode="numeric"
               maxLength={4}
@@ -252,34 +254,34 @@ function PeerHostSession({
             </Button>
           </div>
         </Label>
-        <div className="room-actions">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} onClick={() => void togglePublic()}>
             {settings.isPublic ? '设为私密' : '公开到大厅'}
           </Button>
         </div>
-        <span className="setting-status">{lobbyStatus}</span>
+        <span className="text-[10px] text-muted-foreground">{lobbyStatus}</span>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="page-shell host-page">
-      <div className="room-page-heading">
+    <div className="mx-auto w-[min(1240px,100%)]">
+      <div className="mb-6 flex items-end justify-between gap-6 max-md:flex-col max-md:items-start max-md:gap-3.5">
         <div>
-          <a className="back-link" href="#/">← 退出房间</a>
-          <span className="eyebrow">YOUR ROOM</span>
-          <h1>{settings.title.trim() || pkg.manifest.name}</h1>
+          <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">← 退出房间</a>
+          <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">YOUR ROOM</span>
+          <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">{settings.title.trim() || pkg.manifest.name}</h1>
         </div>
-        <div className="room-heading-actions">
-          <div className="room-presence">
-            <span className="live-dot" />
-            <b>{admission.activePlayers}</b> 人在线
+        <div className="flex items-center gap-2.5 max-md:w-full max-md:justify-between">
+          <div className="flex items-center gap-[7px] rounded-full border border-border bg-surface px-3.5 py-2 text-xs text-muted-foreground max-md:self-start">
+            <span className="size-2 rounded-full bg-success shadow-[0_0_0_5px_rgba(81,219,147,0.11)]" />
+            <b className="text-foreground">{admission.activePlayers}</b> 人在线
             {admission.maxPlayers !== null && <span> / {admission.maxPlayers}</span>}
           </div>
           <Sheet open={controlsOpen} onOpenChange={setControlsOpen}>
             <SheetTrigger asChild>
-              <Button type="button" variant="outline" className="room-controls-button">
+              <Button type="button" variant="outline" className="hidden min-h-11 max-md:inline-flex">
                 <Settings2Icon data-icon="inline-start" />房间设置
               </Button>
             </SheetTrigger>
@@ -297,13 +299,13 @@ function PeerHostSession({
         </div>
       </div>
 
-      <div className="host-layout">
-        <div className="game-column">
-          <div className="room-stage single-room">
-            <RoomFrame html={state.roomHtml} port={state.port} label="房主画面" role="房主" expandable />
+      <div className="grid grid-cols-[minmax(0,1fr)_330px] items-start gap-[18px] max-lg:grid-cols-1">
+        <div>
+          <div className="grid grid-cols-1">
+            <RoomFrame html={state.roomHtml} port={state.port} label="房主画面" role="房主" expandable className="min-h-[min(68vh,720px)] max-lg:min-h-[58vh] max-md:min-h-[62dvh]" />
           </div>
         </div>
-        <aside className="host-sidebar">
+        <aside className="flex flex-col gap-3.5 max-lg:grid max-lg:grid-cols-2 max-md:hidden">
           {inviteCard()}
           {settingsCard()}
         </aside>
@@ -379,9 +381,12 @@ function PeerJoinView({
       });
   }, [attempt, credential, hostPeerId, roomId]);
 
+  const playerGate = 'flex min-h-[100dvh] flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,211,55,0.25),transparent_34rem)] p-6';
+  const gateMark = 'mb-2.5 grid size-12 place-items-center rounded-[15px] bg-primary text-[20px] font-black text-primary-foreground shadow-[0_8px_24px_rgba(201,151,0,0.2)]';
+
   if (needsPassword) {
     return (
-      <div className="player-gate">
+      <div className={playerGate}>
         <form
           className="w-full max-w-[380px]"
           onSubmit={(event) => {
@@ -392,11 +397,11 @@ function PeerJoinView({
             setAttempt((value) => value + 1);
           }}
         >
-        <Card className="password-form">
-          <span className="player-gate-mark">P</span>
-          <h2>输入房间密码</h2>
-          <p className="meta-line">这个房间需要密码才能加入。</p>
-          {error && <p className="error">{error}</p>}
+        <Card className="flex w-full flex-col gap-3.5 rounded-[20px] border-border bg-surface p-[26px] shadow-soft">
+          <span className={gateMark}>P</span>
+          <h2 className="text-xl font-semibold">输入房间密码</h2>
+          <p className="my-1 text-[11px] text-muted-foreground">这个房间需要密码才能加入。</p>
+          {error && <p className="text-danger">{error}</p>}
           <Input
             autoFocus
             aria-label="4 位房间密码"
@@ -414,10 +419,10 @@ function PeerJoinView({
     );
   }
   if (error) return <RoomError message={error} />;
-  if (!state) return <div className="player-gate"><span className="player-gate-mark">P</span><div className="loading">正在加入房间…</div></div>;
+  if (!state) return <div className={playerGate}><span className={gateMark}>P</span><div className="p-[22px] text-center text-[13px] text-muted-foreground">正在加入房间…</div></div>;
 
   return (
-    <div className="player-session" data-connection-status={status}>
+    <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-black" data-connection-status={status}>
       <RoomFrame html={state.roomHtml} port={state.port} label="房间画面" role="玩家" immersive />
     </div>
   );
@@ -445,5 +450,13 @@ function RoomError({ message }: { message: string }) {
   const friendlyMessage = /peer|connect|network|socket/i.test(message)
     ? '暂时无法连接房主，请确认房间仍在进行并稍后重试。'
     : message;
-  return <div className="player-gate"><Card className="error error-card"><h2>暂时无法进入房间</h2><p>{friendlyMessage}</p><Button asChild variant="outline"><a href="#/">返回大厅</a></Button></Card></div>;
+  return (
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,211,55,0.25),transparent_34rem)] p-6">
+      <Card className="w-[min(440px,100%)] gap-3 p-[26px] text-center">
+        <h2 className="text-xl font-semibold">暂时无法进入房间</h2>
+        <p className="leading-[1.6] text-muted-foreground">{friendlyMessage}</p>
+        <Button asChild variant="outline"><a href="#/">返回大厅</a></Button>
+      </Card>
+    </div>
+  );
 }

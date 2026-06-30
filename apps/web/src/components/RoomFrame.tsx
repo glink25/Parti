@@ -6,6 +6,7 @@ import {
   type RoomClientPort,
 } from '@parti/client-sdk';
 import { Button } from '@/components/ui/button.js';
+import { cn } from '@/lib/utils.js';
 
 /**
  * 一个沙箱 iframe + UISandboxBridge。Room UI 运行在 sandbox="allow-scripts"
@@ -19,6 +20,7 @@ export function RoomFrame({
   expandable = false,
   immersive = false,
   onLog,
+  className,
 }: {
   html: string;
   port: RoomClientPort;
@@ -27,6 +29,7 @@ export function RoomFrame({
   expandable?: boolean;
   immersive?: boolean;
   onLog?: (args: unknown[]) => void;
+  className?: string;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -55,18 +58,30 @@ export function RoomFrame({
   }, [expanded]);
 
   return (
-    <div className={`frame${expanded ? ' expanded' : ''}${immersive ? ' immersive' : ''}`}>
+    <div
+      className={cn(
+        'flex min-h-[300px] flex-col overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_22px_65px_rgba(91,72,15,0.12)]',
+        expanded && 'fixed inset-0 z-[200] h-[100dvh] w-[100dvw] min-h-0 rounded-none border-0',
+        immersive && 'h-[100dvh] w-[100dvw] min-h-0 rounded-none border-0 shadow-none',
+        className,
+      )}
+    >
       {!immersive && (
-        <div className="frame-label">
+        <div
+          className={cn(
+            'flex min-h-[48px] items-center justify-between gap-3 border-b border-border bg-surface py-[7px] pr-[9px] pl-4 text-[11px] font-bold text-muted-foreground',
+            expanded && 'bg-card/95',
+          )}
+        >
           <span>{label}</span>
-          <div className="frame-tools">
-            <span className="role">{role}</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-[9px] font-semibold text-muted-foreground">{role}</span>
             {expandable && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="expand-button"
+                className="h-8 rounded-lg border-border bg-surface-3 px-2.5 text-[10px] text-foreground shadow-none"
                 aria-label={expanded ? '退出全屏展示' : '全屏展示房间'}
                 title={expanded ? '退出全屏（Esc）' : '全屏展示'}
                 onClick={() => setExpanded((value) => !value)}
@@ -78,7 +93,7 @@ export function RoomFrame({
           </div>
         </div>
       )}
-      <iframe ref={ref} srcDoc={roomDocument} sandbox="allow-scripts" title={label} />
+      <iframe ref={ref} srcDoc={roomDocument} sandbox="allow-scripts" title={label} className="w-full flex-1 border-0 bg-white" />
     </div>
   );
 }
