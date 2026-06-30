@@ -1,0 +1,24 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "counter",
+  "name": "多人计数器",
+  "version": "0.1.0",
+  "description": "一个简单的多人计数器，验证 action / snapshot / broadcast。",
+  "author": { "name": "Parti" },
+  "entry": {
+    "ui": "index.html",
+    "worker": "room.worker.js"
+  },
+  "room": {
+    "minPlayers": 1,
+    "maxPlayers": 8
+  },
+  "sync": {
+    "mode": "snapshot"
+  },
+  "permissions": {
+    "network": false,
+    "storage": "session"
+  }
+}

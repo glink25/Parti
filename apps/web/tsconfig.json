@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["vite/client"],
+    "noEmit": false
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/worker-sdk" },
+    { "path": "../../packages/client-sdk" },
+    { "path": "../../packages/transport-local" },
+    { "path": "../../packages/transport-peerjs" },
+    { "path": "../../packages/room-packager" }
+  ]
+}

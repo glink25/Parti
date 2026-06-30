@@ -1,0 +1,138 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-2: #1f232c;
+  --border: #2a2f3a;
+  --text: #e6e9ef;
+  --muted: #8b93a3;
+  --accent: #6ea8fe;
+  --accent-2: #51cf66;
+  --danger: #ff6b6b;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a { color: var(--accent); text-decoration: none; }
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.brand { font-weight: 700; font-size: 20px; color: var(--text); }
+.tagline { color: var(--muted); font-size: 13px; }
+
+main { padding: 20px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.room-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.room-card h3 { margin: 0 0 6px; }
+.room-card p { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.room-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+button, .btn {
+  background: var(--accent);
+  color: #08101f;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+}
+button.secondary, .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.room-stage {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1100px) { .room-stage { grid-template-columns: 1fr 1fr; } }
+
+.frame {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+}
+.frame-label {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+.frame-label .role { color: var(--muted); font-weight: 500; }
+.frame iframe { border: 0; width: 100%; flex: 1; background: #fff; }
+
+.devtools {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.devtools h3 { margin: 0 0 10px; font-size: 14px; }
+.dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .dev-grid { grid-template-columns: 1fr; } }
+.dev-section { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.dev-section h4 { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+pre.state {
+  margin: 0;
+  font-size: 12px;
+  max-height: 220px;
+  overflow: auto;
+  color: var(--accent-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.log-row { padding: 2px 0; border-bottom: 1px dashed var(--border); }
+.log-row .dir-in { color: var(--accent); }
+.log-row .dir-out { color: var(--accent-2); }
+.log-row .type { color: var(--text); }
+.log-row .meta { color: var(--muted); }
+
+.players { list-style: none; padding: 0; margin: 0; }
+.players li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+.status { font-size: 11px; padding: 1px 6px; border-radius: 999px; }
+.status.connected { background: #243; color: var(--accent-2); }
+.status.ready { background: #234; color: var(--accent); }
+.status.offline { background: #422; color: var(--danger); }
+
+.manual { display: flex; gap: 6px; margin-top: 8px; }
+.manual input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+
+.meta-line { color: var(--muted); font-size: 12px; margin: 4px 0; }
+.error { color: var(--danger); }
+.invite { display: flex; gap: 6px; margin: 10px 0; }
+.invite input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 7px 9px; font-size: 12px; }
+.loading { color: var(--muted); padding: 40px; text-align: center; }

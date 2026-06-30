@@ -1,0 +1,16 @@
+{
+  "name": "@parti/worker-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker-entry": "./src/worker-entry.ts"
+  },
+  "dependencies": {
+    "@parti/core": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  }
+}

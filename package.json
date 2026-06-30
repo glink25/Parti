@@ -1,0 +1,23 @@
+{
+  "name": "parti",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Parti — Web 多人互动房间 Runtime",
+  "scripts": {
+    "dev": "pnpm --filter @parti/web dev --host",
+    "build": "pnpm --filter @parti/web build",
+    "preview": "pnpm --filter @parti/web preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "packageManager": "pnpm@10.15.1"
+}

@@ -1,0 +1,19 @@
+/**
+ * iframe(Room UI) ↔ 宿主页(host-bridge) 的 postMessage 协议 (GOAL.md §10.3)。
+ * Room UI 不直接触网，只通过这层与 Runtime 通信。
+ */
+
+/** iframe -> 宿主页 */
+export type UiToHost =
+  | { __parti: true; type: 'hello' }
+  | { __parti: true; type: 'action'; action: string; payload: unknown }
+  | { __parti: true; type: 'ready' }
+  | { __parti: true; type: 'leave' }
+  | { __parti: true; type: 'log'; args: unknown[] };
+
+/** 宿主页 -> iframe */
+export type HostToUi =
+  | { __parti: true; type: 'init'; playerId: string; state: unknown }
+  | { __parti: true; type: 'state'; state: unknown }
+  | { __parti: true; type: 'event'; event: string; payload: unknown }
+  | { __parti: true; type: 'error'; code: string; message: string };

@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/worker-sdk" },
+    { "path": "./packages/client-sdk" },
+    { "path": "./packages/transport-local" },
+    { "path": "./packages/transport-peerjs" },
+    { "path": "./packages/room-packager" },
+    { "path": "./apps/web" }
+  ]
+}

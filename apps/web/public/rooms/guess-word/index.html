@@ -1,0 +1,80 @@
+<div style="font-family: system-ui, sans-serif; padding: 16px; color: #111;">
+  <h1 style="margin: 0 0 4px; font-size: 20px;">猜词游戏</h1>
+  <p style="margin: 0 0 10px; color: #666; font-size: 13px;">你是 <b id="me">…</b></p>
+
+  <div id="phase-waiting">
+    <p style="font-size: 13px;">所有人点击 <b>准备</b> 后开始。</p>
+    <button id="ready">准备</button>
+    <ul id="players" style="margin: 10px 0 0; padding-left: 18px; font-size: 13px;"></ul>
+  </div>
+
+  <div id="phase-playing" style="display:none;">
+    <p style="font-size: 14px;">提示：<b id="hint"></b></p>
+    <div style="display:flex; gap:6px;">
+      <input id="guess" placeholder="输入你的猜测" style="flex:1; padding:6px 8px; font-size:14px;" />
+      <button id="submit">猜！</button>
+    </div>
+    <p id="flash" style="height:18px; color:#c33; font-size:13px; margin:8px 0 0;"></p>
+  </div>
+
+  <div id="phase-finished" style="display:none;">
+    <h2 id="result" style="font-size:18px; color:#2a8;"></h2>
+    <button id="restart">再来一局</button>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const show = (id, on) => ($(id).style.display = on ? '' : 'none');
+
+    let myId = null;
+
+    function render(state) {
+      myId = parti.playerId;
+      $('me').textContent = myId || '…';
+      show('phase-waiting', state.phase === 'waiting');
+      show('phase-playing', state.phase === 'playing');
+      show('phase-finished', state.phase === 'finished');
+
+      const players = state.players || {};
+      $('players').innerHTML = '';
+      for (const [id, p] of Object.entries(players)) {
+        const li = document.createElement('li');
+        li.textContent =
+          p.name + (id === myId ? '（你）' : '') +
+          ' — ' + (p.ready ? '✅ 已准备' : '… 未准备') +
+          ' · 得分 ' + p.score;
+        $('players').appendChild(li);
+      }
+
+      if (state.phase === 'playing') $('hint').textContent = state.hint || '';
+      if (state.phase === 'finished') {
+        const winner = players[state.winner];
+        const name = winner ? winner.name : state.winner;
+        $('result').textContent =
+          (state.winner === myId ? '🎉 你赢了！' : '获胜者：' + name);
+      }
+    }
+
+    parti.onState(render);
+
+    parti.onEvent('guess:wrong', (p) => {
+      if (p.playerId === myId) {
+        $('flash').textContent = '“' + p.text + '” 不对，再试试';
+        setTimeout(() => ($('flash').textContent = ''), 900);
+      }
+    });
+
+    $('ready').onclick = () => parti.action('ready');
+    $('submit').onclick = () => {
+      const v = $('guess').value;
+      $('guess').value = '';
+      parti.action('guess', { text: v });
+    };
+    $('guess').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('submit').click();
+    });
+    $('restart').onclick = () => parti.action('restart');
+
+    parti.ready();
+  </script>
+</div>

@@ -1,0 +1,46 @@
+<div style="font-family: system-ui, sans-serif; padding: 16px; color: #111;">
+  <h1 style="margin: 0 0 4px; font-size: 20px;">多人计数器</h1>
+  <p style="margin: 0 0 12px; color: #666; font-size: 13px;">
+    你是 <b id="me">…</b>
+  </p>
+
+  <div style="font-size: 48px; font-weight: 700; margin: 8px 0;" id="count">0</div>
+
+  <button id="inc" style="font-size: 16px; padding: 8px 16px; cursor: pointer;">
+    +1
+  </button>
+
+  <h3 style="margin: 16px 0 6px; font-size: 13px; color: #666;">各玩家点击次数</h3>
+  <ul id="clicks" style="margin: 0; padding-left: 18px; font-size: 13px;"></ul>
+
+  <p id="flash" style="color: #2a8; height: 18px; font-size: 13px; margin: 8px 0 0;"></p>
+
+  <script>
+    const countEl = document.getElementById('count');
+    const clicksEl = document.getElementById('clicks');
+    const meEl = document.getElementById('me');
+    const flashEl = document.getElementById('flash');
+
+    parti.onState((state) => {
+      countEl.textContent = String(state.count);
+      meEl.textContent = parti.playerId || '…';
+      clicksEl.innerHTML = '';
+      for (const [id, n] of Object.entries(state.clicks || {})) {
+        const li = document.createElement('li');
+        const tag = id === parti.playerId ? '（你）' : '';
+        li.textContent = id.slice(0, 12) + tag + ': ' + n;
+        clicksEl.appendChild(li);
+      }
+    });
+
+    parti.onEvent('counter:incremented', (p) => {
+      flashEl.textContent = '计数 → ' + p.count;
+      setTimeout(() => (flashEl.textContent = ''), 600);
+    });
+
+    document.getElementById('inc').onclick = () => parti.action('increment');
+
+    // 进入房间即标记 ready（计数器无需等待）
+    parti.ready();
+  </script>
+</div>

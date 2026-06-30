@@ -1,0 +1,16 @@
+{
+  "name": "@parti/transport-peerjs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@parti/core": "workspace:*",
+    "peerjs": "^1.5.4"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  }
+}
