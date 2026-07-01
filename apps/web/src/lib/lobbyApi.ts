@@ -1,3 +1,11 @@
+export type LobbyJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | LobbyJsonValue[]
+  | { [key: string]: LobbyJsonValue };
+
 export interface LobbyRoom {
   listingId: string;
   roomId: string;
@@ -8,6 +16,7 @@ export interface LobbyRoom {
   maxPlayers: number | null;
   joinable: boolean;
   credentialRequired: boolean;
+  metadata?: Record<string, LobbyJsonValue>;
   createdAt: number;
   updatedAt: number;
   expiresAt: number;
@@ -92,7 +101,14 @@ export class LobbyClient {
       },
     });
     if (!response.ok) {
-      throw new LobbyHttpError(`大厅服务请求失败 (${response.status})`, response.status);
+      let message = `大厅服务请求失败 (${response.status})`;
+      try {
+        const body = (await response.json()) as { error?: { message?: string } };
+        if (body.error?.message) message = body.error.message;
+      } catch {
+        // 服务端未返回结构化 JSON 时保留状态码信息。
+      }
+      throw new LobbyHttpError(message, response.status);
     }
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;

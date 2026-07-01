@@ -9,3 +9,4 @@ coverage
 .env
 .agents
 skills-lock.json
+supabase

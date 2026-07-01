@@ -41,3 +41,16 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
 
   return legacyCopy(text);
 }
+
+/** 从剪贴板读取文本；安全上下文优先 Clipboard API，失败时返回 null。 */
+export async function readTextFromClipboard(): Promise<string | null> {
+  if (typeof window === 'undefined' || !window.isSecureContext || !navigator.clipboard?.readText) {
+    return null;
+  }
+  try {
+    const text = await navigator.clipboard.readText();
+    return text || null;
+  } catch {
+    return null;
+  }
+}

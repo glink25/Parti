@@ -6,7 +6,7 @@ import {
   type LobbyLease,
   type LobbyRoomInput,
 } from './lobbyApi.js';
-import { buildInviteUrl, parsePeerRoute } from './peerRoutes.js';
+import { buildInviteUrl, parseInviteInput, parsePeerRoute } from './peerRoutes.js';
 
 const input: LobbyRoomInput = {
   roomId: 'counter',
@@ -71,6 +71,31 @@ describe('peer routes', () => {
       hostPeerId: 'peer/one',
       credential: '0123',
     });
+  });
+
+  it('parses invite input from full URL, hash, and path', () => {
+    const expected = '/peer/join/room%20id/peer%2Fone?password=0123';
+    expect(parseInviteInput('https://parti.test/app/#/peer/join/room%20id/peer%2Fone?password=0123')).toBe(expected);
+    expect(parseInviteInput('#/peer/join/room%20id/peer%2Fone?password=0123')).toBe(expected);
+    expect(parseInviteInput('/peer/join/counter/peer%2Fabc')).toBe('/peer/join/counter/peer%2Fabc');
+  });
+
+  it('returns null for invalid invite input', () => {
+    expect(parseInviteInput('')).toBeNull();
+    expect(parseInviteInput('https://example.com/')).toBeNull();
+    expect(parseInviteInput('#/peer/join/room-only')).toBeNull();
+    expect(parseInviteInput('#/editor')).toBeNull();
+    expect(parseInviteInput('这不是一个有效的邀请链接')).toBeNull();
+  });
+
+  it('extracts invite URL from surrounding share text', () => {
+    const expected = '/peer/join/room%20id/peer%2Fone?password=0123';
+    const url = 'https://parti.test/app/#/peer/join/room%20id/peer%2Fone?password=0123';
+    expect(parseInviteInput(`快来加入：${url}`)).toBe(expected);
+    expect(parseInviteInput(`邀请链接：${url}。`)).toBe(expected);
+    expect(parseInviteInput(`Join us ${url} now`)).toBe(expected);
+    expect(parseInviteInput(`链接 /peer/join/counter/peer%2Fabc 在这里`)).toBe('/peer/join/counter/peer%2Fabc');
+    expect(parseInviteInput(`复制此链接 #/peer/join/counter/peer%2Fabc 加入`)).toBe('/peer/join/counter/peer%2Fabc');
   });
 });
 

@@ -26,6 +26,7 @@ interface LobbyRoomInput {
   maxPlayers: number | null;
   joinable: boolean;
   credentialRequired: boolean;
+  metadata?: Record<string, JsonValue>;
 }
 ```
 
@@ -41,6 +42,11 @@ interface LobbyRoom extends LobbyRoomInput {
 ```
 
 时间字段使用 Unix 毫秒时间戳。
+
+`metadata` 是面向未来展示能力的扩展命名空间。服务端将其作为 JSON 对象原样保存和返回，
+因此增加大厅展示字段不需要修改数据库。它最大为 8 KiB、最多嵌套 4 层，且不得包含
+`password`、`credential`、`token`、`authorization`、`secret` 等敏感键名。未知顶层字段仍会
+被拒绝，以免与租约及服务端字段冲突。
 
 ## API
 
@@ -100,8 +106,9 @@ Header 同 PATCH。成功返回 204。浏览器异常关闭可能无法发送 DE
 
 ## 校验与错误
 
+- 请求体最大为 12 KiB。
 - `title` 必须为去除首尾空白后的非空字符串，最长 80 字符。
-- `roomId`、`hostPeerId`、`packageName` 必须为非空字符串。
+- `roomId` 最长 128 字符，`hostPeerId` 最长 256 字符，`packageName` 最长 120 字符。
 - 人数必须为非负整数；`maxPlayers` 为正整数或 `null`。
 - 令牌缺失或错误返回 401，条目不存在/过期返回 404，字段错误返回 422。
 - 可选速率限制返回 429，暂时故障返回 5xx。

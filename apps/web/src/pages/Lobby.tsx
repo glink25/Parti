@@ -4,11 +4,14 @@ import { CloudIcon, PlusIcon, SparklesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.js';
+import { JoinLinkInput } from '@/components/JoinLinkInput.js';
+import { ScanJoinButton } from '@/components/ScanJoinButton.js';
 import {
   LobbyClient,
   lobbyServiceUrl,
   type LobbyRoom,
 } from '../lib/lobbyApi.js';
+import { buildJoinHashRoute, navigateToPeerJoin } from '../lib/peerRoutes.js';
 
 /** 面向玩家的在线大厅。创作草稿与开发预览不在这里展示。 */
 export function Lobby() {
@@ -56,9 +59,15 @@ export function Lobby() {
             <FormattedMessage id="lobby.hero.description" />
           </p>
         </div>
-        <Button asChild size="lg" className="relative h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
-          <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
-        </Button>
+        <div className="relative flex flex-col gap-4 max-md:w-full">
+          <div className="flex items-start gap-2 max-md:w-full">
+            <JoinLinkInput />
+            <ScanJoinButton />
+          </div>
+          <Button asChild size="lg" className="h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
+            <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
+          </Button>
+        </div>
       </section>
 
       <div className="mb-[18px] flex items-center justify-between">
@@ -86,7 +95,6 @@ export function Lobby() {
           <SparklesIcon className="size-12 rounded-2xl bg-secondary p-3 text-primary-bright" aria-hidden="true" />
           <h3 className="mt-3 mb-[7px] text-[19px] font-semibold text-foreground"><FormattedMessage id="lobby.empty.title" /></h3>
           <p className="mb-[18px]"><FormattedMessage id="lobby.empty.description" /></p>
-          <Button asChild variant="outline"><a href="#/editor"><FormattedMessage id="lobby.empty.createRoom" /></a></Button>
         </Card>
       )}
       {online.length > 0 && (
@@ -107,13 +115,17 @@ export function Lobby() {
                     ? intl.formatMessage({ id: 'lobby.room.playersOnline' }, { count: room.playerCount })
                     : intl.formatMessage({ id: 'lobby.room.playersCapacity' }, { current: room.playerCount, max: room.maxPlayers })}
                 </span>
-                <Button asChild={room.joinable} disabled={!room.joinable}>
+                <Button
+                  disabled={!room.joinable}
+                  onClick={() => {
+                    if (!room.joinable) return;
+                    navigateToPeerJoin(buildJoinHashRoute(room.roomId, room.hostPeerId));
+                  }}
+                >
                   {room.joinable ? (
-                    <a href={`#/peer/join/${encodeURIComponent(room.roomId)}/${encodeURIComponent(room.hostPeerId)}`}>
-                      <FormattedMessage id="lobby.room.join" />
-                    </a>
+                    <FormattedMessage id="lobby.room.join" />
                   ) : (
-                    <span><FormattedMessage id="lobby.room.full" /></span>
+                    <FormattedMessage id="lobby.room.full" />
                   )}
                 </Button>
               </CardFooter>

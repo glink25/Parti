@@ -40,7 +40,18 @@
     "hero": {
       "title": "Online lobby",
       "description": "Discover rooms in progress, or create a fun space for your group.",
-      "createRoom": "Create online room"
+      "createRoom": "Create online room",
+      "joinPlaceholder": "Paste room invite link",
+      "joinSubmitAria": "Enter room",
+      "pasteJoinAria": "Paste invite link",
+      "scanJoinAria": "Scan QR code to join"
+    },
+    "join": {
+      "invalidLink": "This does not look like a valid room invite link.",
+      "scanSheetTitle": "Scan to join",
+      "scanSheetDescription": "Point your camera at the invite QR code to join the room.",
+      "cameraDenied": "Camera access was denied. Check your browser permissions.",
+      "scanFailed": "Could not start the scanner. Please try again."
     },
     "live": {
       "title": "Live now",

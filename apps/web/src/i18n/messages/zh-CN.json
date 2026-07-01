@@ -40,7 +40,18 @@
     "hero": {
       "title": "在线大厅",
       "description": "发现正在进行的房间，或者创建一个属于你们的欢乐现场。",
-      "createRoom": "创建联机房间"
+      "createRoom": "创建联机房间",
+      "joinPlaceholder": "粘贴房间邀请链接",
+      "joinSubmitAria": "进入房间",
+      "pasteJoinAria": "粘贴邀请链接",
+      "scanJoinAria": "扫码加入房间"
+    },
+    "join": {
+      "invalidLink": "无法识别为有效的房间邀请链接",
+      "scanSheetTitle": "扫码加入",
+      "scanSheetDescription": "将邀请二维码对准摄像头即可加入房间。",
+      "cameraDenied": "无法访问摄像头，请检查浏览器权限。",
+      "scanFailed": "无法启动扫码，请稍后重试。"
     },
     "live": {
       "title": "正在进行",
