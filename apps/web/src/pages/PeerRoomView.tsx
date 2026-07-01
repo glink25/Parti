@@ -48,6 +48,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.js';
+import type { ReplayRecordingController } from '../replays/recorder.js';
+import { ENABLE_REPLAYS } from '../lib/featureFlags.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -79,10 +81,15 @@ function PeerHostView({ roomId }: { roomId?: string }) {
   if (!roomId || !pkg) {
     return <div className="p-[22px] text-center text-[13px] text-muted-foreground"><FormattedMessage id="peer.loading.room" /></div>;
   }
-  const initialSettings = loadHostRoomSettings(roomId) ?? {
+  const storedSettings = loadHostRoomSettings(roomId);
+  const initialSettings = storedSettings ? {
+    ...storedSettings,
+    replayEnabled: ENABLE_REPLAYS && storedSettings.replayEnabled,
+  } : {
     title: pkg.manifest.name,
     password: '',
     isPublic: false,
+    replayEnabled: false,
   };
   return <PeerHostSession pkg={pkg} initialSettings={initialSettings} />;
 }
@@ -102,6 +109,8 @@ function PeerHostSession({
     roomHtml: string;
     hostPeerId: string;
     port: RoomClientPort;
+    basePort: RoomClientPort;
+    portVersion: number;
   } | null>(null);
   const [settings, setSettings] = useState(initialSettings);
   const [passwordDraft, setPasswordDraft] = useState(initialSettings.password);
@@ -117,6 +126,9 @@ function PeerHostSession({
   const { fullscreen, setFullscreen } = usePageFullscreen();
   const localUser = loadLocalUser(undefined, locale);
   const [error, setError] = useState<string | null>(null);
+  const [replayBusy, setReplayBusy] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const recordingRef = useRef<ReplayRecordingController | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
   const started = useRef(false);
 
@@ -128,11 +140,14 @@ function PeerHostSession({
       admissionController: createPasswordAdmissionController(initialSettings.password),
     })
       .then((peerHost) => {
+        const basePort = createHostLocalPort(peerHost.host);
         setState({
           host: peerHost.host,
           roomHtml: peerHost.roomHtml,
           hostPeerId: peerHost.hostPeerId,
-          port: createHostLocalPort(peerHost.host),
+          port: basePort,
+          basePort,
+          portVersion: 0,
         });
         setAdmission(peerHost.host.getAdmissionStatus());
         const baseUrl = lobbyServiceUrl();
@@ -168,6 +183,69 @@ function PeerHostSession({
       .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));
   }, [initialSettings, pkg, roomId]);
 
+  useEffect(() => {
+    if (!ENABLE_REPLAYS || !state || !settings.replayEnabled || recordingRef.current) return;
+    let cancelled = false;
+    setReplayBusy(true);
+    setReplayError(null);
+    import('../replays/recorder.js')
+      .then(({ startReplayRecording }) => startReplayRecording({
+        host: state.host,
+        port: state.basePort,
+        pkg,
+        title: settings.title.trim() || pkg.manifest.name,
+        onError: (reason) => {
+          setReplayError(reason.message);
+          setSettings((current) => {
+            const next = { ...current, replayEnabled: false };
+            saveHostRoomSettings(roomId, next);
+            return next;
+          });
+        },
+      }))
+      .then((controller) => {
+        if (cancelled) {
+          void controller.stop();
+          return;
+        }
+        recordingRef.current = controller;
+        setState((current) => current ? { ...current, port: controller.port, portVersion: current.portVersion + 1 } : current);
+      })
+      .catch((reason) => {
+        setReplayError(reason instanceof Error ? reason.message : String(reason));
+        setSettings((current) => {
+          const next = { ...current, replayEnabled: false };
+          saveHostRoomSettings(roomId, next);
+          return next;
+        });
+      })
+      .finally(() => setReplayBusy(false));
+    return () => { cancelled = true; };
+  }, [pkg, settings.replayEnabled, state?.host]);
+
+  useEffect(() => {
+    if (settings.replayEnabled || !recordingRef.current) return;
+    const controller = recordingRef.current;
+    recordingRef.current = null;
+    setState((current) => current ? { ...current, port: current.basePort, portVersion: current.portVersion + 1 } : current);
+    setReplayBusy(true);
+    void controller.stop()
+      .catch((reason) => setReplayError(reason instanceof Error ? reason.message : String(reason)))
+      .finally(() => setReplayBusy(false));
+  }, [settings.replayEnabled]);
+
+  useEffect(() => {
+    const finishWhenLeavingRoom = () => {
+      const parts = window.location.hash.replace(/^#/, '').split('/').filter(Boolean);
+      if (parts[0] === 'peer' && parts[2] === roomId) return;
+      const controller = recordingRef.current;
+      recordingRef.current = null;
+      if (controller) void controller.stop();
+    };
+    window.addEventListener('hashchange', finishWhenLeavingRoom);
+    return () => window.removeEventListener('hashchange', finishWhenLeavingRoom);
+  }, [roomId]);
+
   function applySettings(next: HostRoomSettings): void {
     if (!state || (next.password && !/^\d{4}$/.test(next.password))) return;
     settingsRef.current = next;
@@ -182,6 +260,15 @@ function PeerHostSession({
   function updatePasswordDraft(value: string): void {
     setPasswordDraft(value);
     if (value === '' || value.length === 4) applySettings({ ...settings, password: value });
+  }
+
+  function toggleReplay(): void {
+    if (!ENABLE_REPLAYS) return;
+    const next = { ...settings, replayEnabled: !settings.replayEnabled };
+    setReplayError(null);
+    settingsRef.current = next;
+    setSettings(next);
+    saveHostRoomSettings(roomId, next);
   }
 
   async function togglePublic(): Promise<void> {
@@ -245,6 +332,9 @@ function PeerHostSession({
     onPasswordDraftChange: updatePasswordDraft,
     onApplySettings: applySettings,
     onTogglePublic: () => void togglePublic(),
+    replayBusy,
+    replayError,
+    onToggleReplay: toggleReplay,
   };
 
   return (
@@ -281,6 +371,7 @@ function PeerHostSession({
         <div>
           <div className="grid grid-cols-1">
             <RoomFrame
+              key={state.portVersion}
               html={state.roomHtml}
               port={state.port}
               label={intl.formatMessage({ id: 'peer.host.hostView' })}
@@ -457,7 +548,7 @@ function PeerJoinView({
   }
 
   const shareControlsProps: RoomControlsProps = {
-    settings: { title: state.roomTitle, password: credential, isPublic: false },
+    settings: { title: state.roomTitle, password: credential, isPublic: false, replayEnabled: false },
     passwordDraft: credential,
     admission: { activePlayers: 0, reservedPlayers: 0, maxPlayers: null, joinable: true },
     lobbyStatus: 'private',
@@ -469,6 +560,9 @@ function PeerJoinView({
     onPasswordDraftChange: () => {},
     onApplySettings: () => {},
     onTogglePublic: () => {},
+    replayBusy: false,
+    replayError: null,
+    onToggleReplay: () => {},
   };
 
   return (

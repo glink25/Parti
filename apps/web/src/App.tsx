@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { GithubIcon } from '@/components/icons/GithubIcon.js';
 import { Logo } from '@/components/Logo.js';
@@ -12,6 +12,11 @@ import { loadLocalUser } from './lib/localUser.js';
 import { UserSettings } from './components/UserSettings.js';
 import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen.js';
 import { useLocale } from './i18n/LocaleProvider.js';
+import { ENABLE_REPLAYS } from './lib/featureFlags.js';
+
+const ReplayPage = ENABLE_REPLAYS
+  ? lazy(() => import('./replays/ReplayPage.js'))
+  : null;
 
 /** 极简 hash 路由：#/ 大厅 / #/editor 创作 / #/peer/... 联机。 */
 function useHashRoute(): string {
@@ -68,6 +73,8 @@ function AppLayout() {
     view = <LocalRoomView roomId={parts[1]} />;
   } else if (parts[0] === 'peer') {
     view = <PeerRoomView />;
+  } else if (ReplayPage && parts[0] === 'replays') {
+    view = <Suspense fallback={null}><ReplayPage /></Suspense>;
   } else {
     view = <Lobby />;
   }

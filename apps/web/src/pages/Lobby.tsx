@@ -12,6 +12,7 @@ import {
   type LobbyRoom,
 } from '../lib/lobbyApi.js';
 import { buildJoinHashRoute, navigateToPeerJoin } from '../lib/peerRoutes.js';
+import { ENABLE_REPLAYS } from '../lib/featureFlags.js';
 
 /** 面向玩家的在线大厅。创作草稿与开发预览不在这里展示。 */
 export function Lobby() {
@@ -67,6 +68,7 @@ export function Lobby() {
           <Button asChild size="lg" className="h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
             <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
           </Button>
+          {ENABLE_REPLAYS && <Button asChild variant="outline" className="max-md:w-full"><a href="#/replays"><FormattedMessage id="replays.nav" /></a></Button>}
         </div>
       </section>
 

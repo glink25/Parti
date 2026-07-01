@@ -218,6 +218,11 @@
       "generate": "Generate",
       "makePrivate": "Make private",
       "makePublic": "List in lobby",
+      "replayTitle": "Save this replay",
+      "replayDescription": "Starts from the current state and stays on this device.",
+      "replayOn": "Recording",
+      "replayOff": "Off",
+      "replayLoading": "Working…",
       "sheetTitle": "Room settings",
       "sheetDescription": "Invite friends or adjust title, password, and visibility."
     },
@@ -232,6 +237,30 @@
       "exitAria": "Exit fullscreen",
       "exitTitle": "Exit fullscreen (Esc)"
     }
+  },
+  "replays": {
+    "nav": "My replays",
+    "title": "Local replays",
+    "description": "Host replays stored only in this browser.",
+    "empty": "No saved replays yet. Enable recording in room settings to create one.",
+    "back": "← Back to lobby",
+    "open": "View replay",
+    "delete": "Delete",
+    "loading": "Loading replay…",
+    "missing": "This replay could not be found or has been deleted.",
+    "interrupted": "Interrupted",
+    "completed": "Completed",
+    "recording": "Recording",
+    "previous": "Previous",
+    "next": "Next",
+    "play": "Play",
+    "pause": "Pause",
+    "step": "Step {current} / {total}",
+    "snapshot": "State snapshot v{version}",
+    "action": "Player {player} ran {action}",
+    "event": "Event {event}",
+    "players": "Player list changed",
+    "message": "System message {type}"
   },
   "local": {
     "loadFailed": "Load failed: {error}",

@@ -1,4 +1,4 @@
-import { CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
+import { CircleIcon, CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
 import type { HostRoomSettings } from '@/lib/roomSettings.js';
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label.js';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet.js';
 import { cn } from '@/lib/utils.js';
 import { useMediaQuery } from '@/hooks/useMediaQuery.js';
+import { ENABLE_REPLAYS } from '@/lib/featureFlags.js';
 
 export type RoomControlsProps = {
   settings: HostRoomSettings;
@@ -27,6 +28,9 @@ export type RoomControlsProps = {
   onPasswordDraftChange: (value: string) => void;
   onApplySettings: (settings: HostRoomSettings) => void;
   onTogglePublic: () => void;
+  replayBusy: boolean;
+  replayError: string | null;
+  onToggleReplay: () => void;
 };
 
 function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControlsProps; showAdmissionStatus?: boolean }) {
@@ -68,7 +72,7 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
 
 function SettingsCard({ props }: { props: RoomControlsProps }) {
   const intl = useIntl();
-  const { settings, passwordDraft, lobbyStatus, lobbyError, onPasswordDraftChange, onApplySettings, onTogglePublic } = props;
+  const { settings, passwordDraft, lobbyStatus, lobbyError, replayBusy, replayError, onPasswordDraftChange, onApplySettings, onTogglePublic, onToggleReplay } = props;
   return (
     <Card className="gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
       <CardHeader className="flex items-start justify-between gap-3">
@@ -101,6 +105,19 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
             <FormattedMessage id={settings.isPublic ? 'peer.settings.makePrivate' : 'peer.settings.makePublic'} />
           </Button>
         </div>
+        {ENABLE_REPLAYS && <div className="rounded-xl border border-border bg-background/55 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-foreground"><FormattedMessage id="peer.settings.replayTitle" /></div>
+              <div className="mt-1 text-[10px] leading-relaxed text-muted-foreground"><FormattedMessage id="peer.settings.replayDescription" /></div>
+            </div>
+            <Button type="button" variant={settings.replayEnabled ? 'default' : 'outline'} disabled={replayBusy} onClick={onToggleReplay}>
+              <CircleIcon className={settings.replayEnabled ? 'fill-current' : ''} data-icon="inline-start" />
+              <FormattedMessage id={replayBusy ? 'peer.settings.replayLoading' : settings.replayEnabled ? 'peer.settings.replayOn' : 'peer.settings.replayOff'} />
+            </Button>
+          </div>
+          {replayError && <div className="mt-2 text-[10px] text-destructive">{replayError}</div>}
+        </div>}
         <span className="text-[10px] text-muted-foreground">
           {formatLobbyStatus(intl, lobbyStatus)}
           {lobbyError ? ` · ${lobbyError}` : ''}

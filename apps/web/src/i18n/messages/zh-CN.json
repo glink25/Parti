@@ -218,6 +218,11 @@
       "generate": "生成",
       "makePrivate": "设为私密",
       "makePublic": "公开到大厅",
+      "replayTitle": "保存本场回放",
+      "replayDescription": "开启后从当前状态开始，仅保存在这台设备。",
+      "replayOn": "录制中",
+      "replayOff": "已关闭",
+      "replayLoading": "处理中…",
       "sheetTitle": "房间设置",
       "sheetDescription": "邀请朋友加入，或调整标题、密码和公开状态。"
     },
@@ -232,6 +237,30 @@
       "exitAria": "退出全屏展示",
       "exitTitle": "退出全屏（Esc）"
     }
+  },
+  "replays": {
+    "nav": "我的回放",
+    "title": "本地回放",
+    "description": "仅保存在当前浏览器中的房主回放。",
+    "empty": "还没有保存的回放。在房间设置中开启录制后，这里会出现记录。",
+    "back": "← 返回大厅",
+    "open": "查看回放",
+    "delete": "删除",
+    "loading": "正在加载回放…",
+    "missing": "找不到这条回放，或者它已被删除。",
+    "interrupted": "中断",
+    "completed": "已完成",
+    "recording": "录制中",
+    "previous": "上一步",
+    "next": "下一步",
+    "play": "播放",
+    "pause": "暂停",
+    "step": "步骤 {current} / {total}",
+    "snapshot": "状态快照 v{version}",
+    "action": "玩家 {player} 执行 {action}",
+    "event": "事件 {event}",
+    "players": "玩家列表变化",
+    "message": "系统消息 {type}"
   },
   "local": {
     "loadFailed": "加载失败：{error}",

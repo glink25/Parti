@@ -4,6 +4,7 @@ export interface HostRoomSettings {
   title: string;
   password: string;
   isPublic: boolean;
+  replayEnabled: boolean;
 }
 
 const PREFIX = 'parti:host-settings:';
@@ -11,7 +12,10 @@ const PREFIX = 'parti:host-settings:';
 export function loadHostRoomSettings(roomId: string): HostRoomSettings | null {
   try {
     const raw = sessionStorage.getItem(PREFIX + roomId);
-    return raw ? (JSON.parse(raw) as HostRoomSettings) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<HostRoomSettings>;
+    if (typeof parsed.title !== 'string' || typeof parsed.password !== 'string' || typeof parsed.isPublic !== 'boolean') return null;
+    return { ...parsed, replayEnabled: parsed.replayEnabled === true } as HostRoomSettings;
   } catch {
     return null;
   }
