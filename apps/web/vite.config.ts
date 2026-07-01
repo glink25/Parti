@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -52,8 +52,25 @@ function roomRegistryPlugin(): Plugin {
   };
 }
 
+/** 从 GA_MEASUREMENT_SNIPPET 环境变量注入 head 内 analytics 片段，源码中不包含 GA 代码。 */
+function gaSnippetPlugin(): Plugin {
+  let snippet = '';
+
+  return {
+    name: 'parti-ga-snippet',
+    config(_, { mode }) {
+      const env = loadEnv(mode, __dirname, '');
+      snippet = env.GA_MEASUREMENT_SNIPPET?.trim() ?? '';
+    },
+    transformIndexHtml(html) {
+      if (!snippet) return html;
+      return html.replace('</head>', `  ${snippet}\n</head>`);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [roomRegistryPlugin(), react(), tailwindcss()],
+  plugins: [roomRegistryPlugin(), gaSnippetPlugin(), react(), tailwindcss()],
   server: { port: 5173 },
   resolve: {
     alias: [
