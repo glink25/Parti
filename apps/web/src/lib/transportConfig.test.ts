@@ -45,12 +45,12 @@ describe('transport profiles', () => {
     expect(getSelectedTransportProfile(storage, {}).id).toBe(BUILTIN_PEERJS_ID);
   });
 
-  it('parses PeerServer URL and rejects unsafe services', () => {
+  it('parses PeerServer URL and rejects unsafe services', async () => {
     expect(peerOptionsFromServerUrl('https://peer.example.com:9443/peerjs/')).toEqual({
       host: 'peer.example.com', port: 9443, path: '/peerjs', secure: true,
     });
     expect(() => validateTransportConfig({ adapter: 'peerjs', serverUrl: 'http://evil.test' })).toThrow();
-    const adapter = createTransportAdapter({ adapter: 'peerjs', serverUrl: 'https://peer.example.com:9443/peerjs' });
+    const adapter = await createTransportAdapter({ adapter: 'peerjs', serverUrl: 'https://peer.example.com:9443/peerjs' });
     expect((adapter as unknown as { opts: { peerOptions: unknown } }).opts.peerOptions).toEqual({
       host: 'peer.example.com', port: 9443, path: '/peerjs', secure: true,
     });

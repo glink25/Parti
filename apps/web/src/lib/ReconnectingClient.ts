@@ -83,7 +83,7 @@ export class ReconnectingClient {
     this.cleanupRuntime();
     this.opts.onStatus?.(this.attempt === 0 ? 'connecting' : 'reconnecting');
     try {
-      const adapter = createTransportAdapter(this.opts.transportConfig);
+      const adapter = await createTransportAdapter(this.opts.transportConfig);
       const transport = await adapter.joinRoom({
         roomId: this.opts.roomId,
         hostConnectionInfo: this.opts.hostPeerId,

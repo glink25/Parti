@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import QRCode from 'qrcode';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +39,7 @@ function drawRoundedRect(
 }
 
 async function drawInviteQr(canvas: HTMLCanvasElement, inviteUrl: string): Promise<void> {
+  const { default: QRCode } = await import('qrcode');
   await QRCode.toCanvas(canvas, inviteUrl, {
     width: QR_SIZE,
     margin: 1,

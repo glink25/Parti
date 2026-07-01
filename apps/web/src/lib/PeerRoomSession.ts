@@ -84,7 +84,7 @@ export async function createPeerHost(
   // 退出到大厅（已 clearRoomSession）后记录不在 → 全新房间。
   // 复用上次的稳定 host peer id（即邀请码），使刷新后邀请链接不变。
   const restored = store.loadRoom(roomId);
-  const adapter = createTransportAdapter(options.transportConfig);
+  const adapter = await createTransportAdapter(options.transportConfig);
   const transport = await adapter.createHost({
     roomId,
     ...(restored?.hostPeerId ? { hostId: restored.hostPeerId } : {}),

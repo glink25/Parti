@@ -33,7 +33,7 @@ export async function fetchPackageOverPeer(
   hostPeerId: string,
   options: { clientId?: string; credential?: string; transportConfig?: TransportConfig } = {},
 ): Promise<RoomPackage> {
-  const adapter = createTransportAdapter(options.transportConfig ?? { adapter: 'peerjs' });
+  const adapter = await createTransportAdapter(options.transportConfig ?? { adapter: 'peerjs' });
   const transport = await adapter.joinRoom({
     roomId,
     hostConnectionInfo: hostPeerId,

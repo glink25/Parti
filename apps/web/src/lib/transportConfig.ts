@@ -1,6 +1,4 @@
 import type { TransportAdapter } from '@parti/core';
-import { CommonTransportAdapter, SupabaseRealtimeProvider } from '@parti/transport-common';
-import { PeerJSTransportAdapter } from '@parti/transport-peerjs';
 import { createUuid } from './ids.js';
 
 export type TransportConfig =
@@ -185,10 +183,12 @@ export function configuredTransport(): TransportConfig {
   return getSelectedTransportProfile().config;
 }
 
-export function createTransportAdapter(config: TransportConfig): TransportAdapter {
+export async function createTransportAdapter(config: TransportConfig): Promise<TransportAdapter> {
   const valid = validateTransportConfig(config);
   if (valid.adapter === 'peerjs') {
+    const { PeerJSTransportAdapter } = await import('@parti/transport-peerjs');
     return new PeerJSTransportAdapter(valid.serverUrl ? { peerOptions: peerOptionsFromServerUrl(valid.serverUrl) } : {});
   }
+  const { CommonTransportAdapter, SupabaseRealtimeProvider } = await import('@parti/transport-common');
   return new CommonTransportAdapter(new SupabaseRealtimeProvider({ url: valid.url, publishableKey: valid.publishableKey }));
 }

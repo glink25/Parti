@@ -1,7 +1,6 @@
 /**
  * 从 ZIP 文件或 GitHub 地址导入房间模版。
  */
-import JSZip from 'jszip';
 import { createPackage, decodeText, validateManifest, type RoomPackageInput } from '@parti/room-packager';
 import { saveImportedTemplate } from './templates.js';
 
@@ -62,6 +61,7 @@ export async function buildPackageInputFromFiles(
 
 /** 从 ZIP 导入：自动剥离可能的一层包裹文件夹。返回保存后的模版 id。 */
 export async function importRoomFromZip(file: File): Promise<string> {
+  const { default: JSZip } = await import('jszip');
   const zip = await JSZip.loadAsync(file);
   const entries = Object.values(zip.files).filter((e) => !e.dir);
 

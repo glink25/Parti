@@ -4,16 +4,15 @@ import { GithubIcon } from '@/components/icons/GithubIcon.js';
 import { Logo } from '@/components/Logo.js';
 import { Button } from '@/components/ui/button.js';
 import { Lobby } from './pages/Lobby.js';
-import { LocalRoomView } from './pages/LocalRoomView.js';
-import { PeerRoomView } from './pages/PeerRoomView.js';
-import { EditorView } from './pages/EditorView.js';
-import { clearRoomSession } from './lib/PeerRoomSession.js';
 import { loadLocalUser } from './lib/localUser.js';
 import { UserSettings } from './components/UserSettings.js';
 import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen.js';
 import { useLocale } from './i18n/LocaleProvider.js';
 import { ENABLE_REPLAYS } from './lib/featureFlags.js';
 
+const EditorView = lazy(() => import('./pages/EditorView.js').then((module) => ({ default: module.EditorView })));
+const LocalRoomView = lazy(() => import('./pages/LocalRoomView.js').then((module) => ({ default: module.LocalRoomView })));
+const PeerRoomView = lazy(() => import('./pages/PeerRoomView.js').then((module) => ({ default: module.PeerRoomView })));
 const ReplayPage = ENABLE_REPLAYS
   ? lazy(() => import('./replays/ReplayPage.js'))
   : null;
@@ -57,7 +56,9 @@ function AppLayout() {
   useEffect(() => {
     const cur = peerRoomIdOf(hash);
     const prev = prevPeerRoom.current;
-    if (prev && prev !== cur) clearRoomSession(prev);
+    if (prev && prev !== cur) {
+      void import('./lib/PeerRoomSession.js').then(({ clearRoomSession }) => clearRoomSession(prev));
+    }
     prevPeerRoom.current = cur;
   }, [hash]);
 
@@ -74,7 +75,7 @@ function AppLayout() {
   } else if (parts[0] === 'peer' || parts[0] === 'online') {
     view = <PeerRoomView />;
   } else if (ReplayPage && parts[0] === 'replays') {
-    view = <Suspense fallback={null}><ReplayPage /></Suspense>;
+    view = <ReplayPage />;
   } else {
     view = <Lobby />;
   }
@@ -120,7 +121,7 @@ function AppLayout() {
             : 'min-h-[calc(100vh-62px)] px-4 pt-7 pb-12 md:min-h-[calc(100vh-72px)] md:px-6 md:pt-12 md:pb-[72px]'
         }
       >
-        {view}
+        <Suspense fallback={null}>{view}</Suspense>
       </main>
     </div>
   );
