@@ -125,7 +125,25 @@ export default defineRoom({
 就这样——三个文件，一个可联机的多人计数器。完整 API 见
 [worker-api.md](./worker-api.md) 与 [client-api.md](./client-api.md)。
 
-## 4. 怎么运行 / 调试
+## 4. UI 最佳实践：避开右上角胶囊
+
+房主进入**沉浸全屏**时，Parti 会在 iframe 右上角叠加胶囊（设置 + 退出），遮挡并拦截该区域的点击。房间 UI 无法感知胶囊是否存在，请始终预留右上角安全区。
+
+```css
+html, body {
+  margin: 0;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding-top: calc(56px + env(safe-area-inset-top, 0px));
+  padding-right: calc(88px + env(safe-area-inset-right, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+```
+
+交互控件放左上或底部，避免 `position: fixed; top: 0; right: 0` 钉关键按钮。
+
+## 5. 怎么运行 / 调试
 
 在仓库里：
 
@@ -163,8 +181,9 @@ apps/web/public/rooms/my-room/
 > ⚠️ **只有在 `parti.room.json` 的 `entry` 里声明过的文件才会被加载**。加了
 > `style.css` / `client.js` 也要写进 `entry.style` / `entry.client`，否则不会被 fetch。
 
-## 5. 下一步
+## 6. 下一步
 
 - 想要一个比计数器更完整、带回合 / 胜负判断的范例 → [示例：井字棋](./example-tic-tac-toe.md)
 - 逻辑侧能用的全部能力 → [worker-api.md](./worker-api.md)
 - UI 侧能用的全部能力 → [client-api.md](./client-api.md)
+- 全屏布局与右上角胶囊避让 → 见上文 [§4 UI 最佳实践](#4-ui-最佳实践避开右上角胶囊)

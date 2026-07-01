@@ -1,0 +1,19 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "chat",
+  "name": "多人聊天",
+  "version": "0.1.0",
+  "description": "实时多人文字聊天，支持加入/离开系统提示与消息历史同步。",
+  "author": { "name": "Parti" },
+  "entry": {
+    "ui": "index.html",
+    "worker": "room.worker.js"
+  },
+  "room": { "minPlayers": 1, "maxPlayers": 16 },
+  "sync": { "mode": "snapshot" },
+  "permissions": { "network": false, "storage": "session" },
+  "actions": {
+    "send": { "payload": "{ text: string }" }
+  }
+}

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #111;
+    background: #f5f5f5;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header {
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .header .online {
+    font-size: 13px;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .msg-system {
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    padding: 4px 0;
+  }
+
+  .msg-chat {
+    display: flex;
+    flex-direction: column;
+    max-width: 75%;
+  }
+
+  .msg-chat.mine {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  .msg-chat.theirs {
+    align-self: flex-start;
+    align-items: flex-start;
+  }
+
+  .msg-meta {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 2px;
+  }
+
+  .msg-bubble {
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  .msg-chat.mine .msg-bubble {
+    background: #2563eb;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-chat.theirs .msg-bubble {
+    background: #fff;
+    color: #111;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+  }
+
+  .composer {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #fff;
+    border-top: 1px solid #e0e0e0;
+    flex-shrink: 0;
+  }
+
+  #input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  #input:focus {
+    border-color: #2563eb;
+  }
+
+  #send {
+    padding: 10px 20px;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #send:hover {
+    background: #1d4ed8;
+  }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>多人聊天</h1>
+    <div class="online" id="online">在线 0 人</div>
+  </div>
+
+  <div id="messages"></div>
+
+  <div class="composer">
+    <input id="input" type="text" placeholder="输入消息，按 Enter 发送" maxlength="500" />
+    <button id="send">发送</button>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const onlineEl = document.getElementById('online');
+    const inputEl = document.getElementById('input');
+    const sendEl = document.getElementById('send');
+
+    function formatTime(ts) {
+      const d = new Date(ts);
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return h + ':' + m;
+    }
+
+    function renderMessages(state) {
+      messagesEl.innerHTML = '';
+
+      for (const msg of state.messages) {
+        if (msg.type === 'system') {
+          const el = document.createElement('div');
+          el.className = 'msg-system';
+          el.textContent = msg.text;
+          messagesEl.appendChild(el);
+          continue;
+        }
+
+        const isMine = msg.authorId === parti.playerId;
+        const wrap = document.createElement('div');
+        wrap.className = 'msg-chat ' + (isMine ? 'mine' : 'theirs');
+
+        const meta = document.createElement('div');
+        meta.className = 'msg-meta';
+        meta.textContent = (isMine ? '我' : msg.authorName) + ' · ' + formatTime(msg.ts);
+        wrap.appendChild(meta);
+
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble';
+        bubble.textContent = msg.text;
+        wrap.appendChild(bubble);
+
+        messagesEl.appendChild(wrap);
+      }
+
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    parti.onState((state) => {
+      const count = Object.keys(state.players).length;
+      onlineEl.textContent = '在线 ' + count + ' 人';
+      renderMessages(state);
+    });
+
+    function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+      parti.action('send', { text });
+      inputEl.value = '';
+    }
+
+    sendEl.onclick = sendMessage;
+    inputEl.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+
+    parti.ready();
+  </script>
+</body>
+</html>
