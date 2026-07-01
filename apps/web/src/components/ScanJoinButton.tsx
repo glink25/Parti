@@ -1,7 +1,14 @@
-import { Component, lazy, Suspense, useState, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import { ScanQrCodeIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
 import {
   Sheet,
   SheetContent,
@@ -9,6 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet.js';
+import { useMediaQuery } from '@/hooks/useMediaQuery.js';
 
 const JoinRoomQrScanner = lazy(() => import('./JoinRoomQrScanner.js'));
 
@@ -30,15 +38,39 @@ class QrScannerErrorBoundary extends Component<
 
 export function ScanJoinButton() {
   const intl = useIntl();
+  const mobile = useMediaQuery('(max-width: 767px)');
   const [open, setOpen] = useState(false);
   const [boundaryKey, setBoundaryKey] = useState(0);
 
-  function handleOpenChange(next: boolean): void {
+  const handleOpenChange = useCallback((next: boolean): void => {
     setOpen(next);
     if (next) setBoundaryKey((key) => key + 1);
-  }
+  }, []);
+
+  const handleSuccess = useCallback(() => setOpen(false), []);
 
   const scanFailedMessage = intl.formatMessage({ id: 'lobby.join.scanFailed' });
+  const title = intl.formatMessage({ id: 'lobby.join.scanSheetTitle' });
+  const description = intl.formatMessage({ id: 'lobby.join.scanSheetDescription' });
+
+  const scannerBody = open ? (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
+          …
+        </div>
+      }
+    >
+      <QrScannerErrorBoundary
+        key={boundaryKey}
+        fallback={
+          <p className="py-8 text-center text-sm text-danger">{scanFailedMessage}</p>
+        }
+      >
+        <JoinRoomQrScanner onSuccess={handleSuccess} />
+      </QrScannerErrorBoundary>
+    </Suspense>
+  ) : null;
 
   return (
     <>
@@ -52,34 +84,27 @@ export function ScanJoinButton() {
       >
         <ScanQrCodeIcon className="size-5" />
       </Button>
-      <Sheet open={open} onOpenChange={handleOpenChange}>
-        <SheetContent side="bottom" className="rounded-t-[22px]">
-          <SheetHeader>
-            <SheetTitle>{intl.formatMessage({ id: 'lobby.join.scanSheetTitle' })}</SheetTitle>
-            <SheetDescription>
-              {intl.formatMessage({ id: 'lobby.join.scanSheetDescription' })}
-            </SheetDescription>
-          </SheetHeader>
-          {open ? (
-            <Suspense
-              fallback={
-                <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
-                  …
-                </div>
-              }
-            >
-              <QrScannerErrorBoundary
-                key={boundaryKey}
-                fallback={
-                  <p className="py-8 text-center text-sm text-danger">{scanFailedMessage}</p>
-                }
-              >
-                <JoinRoomQrScanner onSuccess={() => setOpen(false)} />
-              </QrScannerErrorBoundary>
-            </Suspense>
-          ) : null}
-        </SheetContent>
-      </Sheet>
+      {mobile ? (
+        <Sheet open={open} onOpenChange={handleOpenChange}>
+          <SheetContent side="bottom" className="max-h-[85dvh] rounded-t-[22px]">
+            <SheetHeader>
+              <SheetTitle>{title}</SheetTitle>
+              <SheetDescription>{description}</SheetDescription>
+            </SheetHeader>
+            {scannerBody}
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>{description}</DialogDescription>
+            </DialogHeader>
+            {scannerBody}
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

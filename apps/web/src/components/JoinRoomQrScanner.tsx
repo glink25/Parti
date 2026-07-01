@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { useIntl } from 'react-intl';
+import { useIntl, type IntlShape } from 'react-intl';
 import { navigateToPeerJoin, parseInviteInput } from '../lib/peerRoutes.js';
 
 type ScannerLike = {
@@ -20,12 +20,25 @@ async function stopScannerIfRunning(
   }
 }
 
+function computeQrboxSize(
+  viewfinderWidth: number,
+  viewfinderHeight: number,
+): { width: number; height: number } {
+  const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+  return { width: size || 250, height: size || 250 };
+}
+
 export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => void }) {
   const intl = useIntl();
   const elementId = useId().replace(/:/g, '');
   const scannerRef = useRef<ScannerLike | null>(null);
   const handledRef = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
+  const intlRef = useRef<IntlShape>(intl);
   const [error, setError] = useState<string | null>(null);
+
+  onSuccessRef.current = onSuccess;
+  intlRef.current = intl;
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +54,7 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
 
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 10, qrbox: computeQrboxSize },
           (decodedText) => {
             if (handledRef.current || cancelled) return;
             const route = parseInviteInput(decodedText);
@@ -52,7 +65,7 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
               await stopScannerIfRunning(scanner, Html5QrcodeScannerState);
               scannerRef.current = null;
               if (cancelled) return;
-              onSuccess?.();
+              onSuccessRef.current?.();
               navigateToPeerJoin(route);
             })();
           },
@@ -67,8 +80,8 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
         scannerRef.current = null;
         if (cancelled) return;
         const message = reason instanceof Error && /denied|permission/i.test(reason.message)
-          ? intl.formatMessage({ id: 'lobby.join.cameraDenied' })
-          : intl.formatMessage({ id: 'lobby.join.scanFailed' });
+          ? intlRef.current.formatMessage({ id: 'lobby.join.cameraDenied' })
+          : intlRef.current.formatMessage({ id: 'lobby.join.scanFailed' });
         setError(message);
       }
     }
@@ -84,14 +97,17 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
         stopScannerIfRunning(active, Html5QrcodeScannerState),
       );
     };
-  }, [elementId, intl, onSuccess]);
+  }, [elementId]);
 
   return (
     <div className="flex flex-col gap-3">
       {error ? (
         <p className="text-center text-sm text-danger">{error}</p>
       ) : (
-        <div id={elementId} className="overflow-hidden rounded-xl [&_video]:rounded-xl" />
+        <div
+          id={elementId}
+          className="mx-auto aspect-square w-full max-w-[min(100%,320px)] overflow-hidden rounded-xl [&_video]:size-full [&_video]:object-cover [&_video]:rounded-xl"
+        />
       )}
     </div>
   );

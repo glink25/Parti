@@ -1,85 +1,62 @@
 # Parti
 
-一个面向 Web 的**多人互动房间 Runtime**。创作者用 HTML + `room.worker.js`
-快速创作房间，Parti Runtime 负责标准协议、状态同步、沙箱与可替换通信层。
+[English](./README.en.md) | **简体中文**
 
-当前版本提供完整的在线大厅、房间创作、邀请加入、状态同步与断线恢复体验。
+**和朋友一起创造，一起游玩。**
 
-**想写一个房间？** 看 [`docs/`](./docs/) 开发文档 —— 读完《快速开始》+《井字棋示例》
-即可写出一个可运行的多人房间。
+Parti 是一个用于创建和游玩多人互动房间的 Web 平台与 Runtime。你可以从模板开始、导入自己的房间代码，随后通过链接或二维码邀请朋友加入；房间创作者只需编写 HTML 和 JavaScript，状态同步、网络连接、沙箱与断线恢复由 Runtime 处理。
 
-## 快速开始
+| 我想…… | 从这里开始 |
+| --- | --- |
+| 体验 Parti | [打开线上版本](https://parti.linkai.work/)，浏览大厅、创建房间并邀请朋友 |
+| 创建一个房间 | 阅读[房间开发快速开始](./docs/getting-started.md)，或从[完整井字棋示例](./docs/example-tic-tac-toe.md)开始 |
+| 参与开发 | 查看[本地开发](#本地开发)和[项目结构](#项目结构) |
 
-```bash
-pnpm install
-pnpm dev        # 启动 Web 应用 (http://localhost:5173)
-pnpm test       # 运行协议/runtime 单测
-pnpm typecheck  # 全量类型检查
-pnpm build      # 构建 Web 应用
+## Parti 能做什么
+
+- **创建与导入**：使用空白房间或内置模板开始，在编辑器中修改房间文件，也可以从 ZIP 或 GitHub 导入房间包。
+- **即时联机**：房主在浏览器中创建房间，通过 WebRTC 与玩家连接；房间代码可由房主点对点分发。
+- **轻松邀请**：支持邀请链接、二维码、4 位数字密码，以及可选的公开在线大厅。
+- **专注玩法**：创作者只提交 action、更新权威 state；Runtime 负责协议、完整状态快照与事件广播。
+- **隔离运行**：房间 UI 运行在沙箱 iframe 中，权威逻辑运行在房主的 Web Worker 中。
+- **从中断中恢复**：房主刷新可恢复现场，玩家刷新或短暂掉线可回到原有身份和座位。
+- **开箱即玩**：仓库内置多人聊天、计数器、猜词、贪吃蛇和斗地主等房间。
+
+Parti 采用 **Host Authoritative** 模型：玩家只发送操作意图，房主浏览器中的 Worker 维护唯一权威状态并将结果同步给所有玩家。创作者无需直接处理 WebRTC、`postMessage`、序列号或确认机制。
+
+## 创建一个房间
+
+一个最小 Parti 房间只有三个文件：
+
+```text
+my-room/
+  parti.room.json   # 元信息、入口与权限
+  index.html        # 沙箱中的房间 UI
+  room.worker.js    # 房主 Worker 中的权威逻辑
 ```
 
-打开应用后，可以从在线大厅加入正在进行的房间，也可以选择空白房间或官方模板进行
-创作。点击“创建联机房间”会直接进入房主页面；房主可以分享邀请链接、设置密码，或将
-房间公开到大厅。
+`parti.room.json`：
 
-首次打开 Parti 时，Web 应用会生成一个随机用户名和稳定用户 ID，并保存在浏览器的
-`localStorage` 中。大厅右上角的用户设置可以修改用户名（ID 始终不变）；创建、加入或
-重连房间时，Runtime 会自动把这份身份注入玩家对象。改名从下一次握手开始生效，已有
-房间代码无需修改；只有需要主动展示身份时，才需读取 `player.name` / `player.clientId`。
-
-本地预览和 DevTools 仅在 `pnpm dev` 启动的开发环境中显示，生产构建不会暴露这些入口。
-底层联机适配器、沙箱和房间协议的技术说明见后续架构章节。
-
-### 大厅服务配置
-
-复制 [`.env.example`](./.env.example) 或在部署环境设置：
-
-```bash
-VITE_LOBBY_SERVICE_URL=https://<project-ref>.supabase.co/functions/v1/parti-lobby
+```json
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "counter",
+  "name": "多人计数器",
+  "version": "0.1.0",
+  "entry": {
+    "ui": "index.html",
+    "worker": "room.worker.js"
+  },
+  "room": { "minPlayers": 1, "maxPlayers": 8 },
+  "sync": { "mode": "snapshot" },
+  "permissions": { "network": false, "storage": "session" }
+}
 ```
 
-未配置或服务不可用时，创建和链接邀请仍然正常，公开开关会保持私密并提示错误。
-大厅服务 REST 接口、租约和 CORS 规则见 [`docs/lobby-service.md`](./docs/lobby-service.md)。
-
-联机房间可设置 4 位数字密码。密码由房主 `HostRuntime` 在 Package 下载和正式加入
-两个阶段校验，不上传大厅，也不会传给 `room.worker.js`。分享链接可以在 Hash 查询参数
-中携带密码，便于一键加入。
-
-## 架构（Monorepo）
-
-```
-packages/
-  core/              @parti/core   —— 标准协议 + Runtime 引擎（最核心）
-  worker-sdk/        @parti/worker-sdk —— defineRoom + RoomEngine + Worker 宿主
-  client-sdk/        @parti/client-sdk —— iframe 内 parti.* + 宿主页沙箱桥
-  transport-local/   内存模拟多人（测试/预览）
-  transport-peerjs/  PeerJS / WebRTC 适配器
-  room-packager/     manifest 校验 + 内容寻址 packageHash
-apps/web/            Vite + React SPA：在线大厅 / 房间管理 / 运行时 / DevTools
-apps/web/public/rooms/   官方示例房间包（counter / guess-word）
-```
-
-### 关键数据流
-
-```
-iframe UI (client-sdk) → 宿主页 host-bridge → ClientRuntime/HostRuntime
-  → TransportAdapter → HostRuntime → Web Worker(room.worker.js)
-  → 权威 state 变更 → StateSyncEngine → state:snapshot 广播
-  → 各端 → iframe UI 渲染
-```
-
-核心原则（GOAL §20）：Runtime First、Protocol Stable、User Code Untrusted、
-Host Replaceable、Actions Over Messages、Snapshot First。
-
-平台接入 Host 准入控制器和权威容量状态时，参见
-[`docs/host-runtime.md`](./docs/host-runtime.md)。
-
-## 写一个房间
-
-`parti.room.json` + `index.html` + `room.worker.js`：
+`room.worker.js`：
 
 ```js
-// room.worker.js
 import { defineRoom } from '@parti/worker-sdk';
 
 export default defineRoom({
@@ -87,40 +64,94 @@ export default defineRoom({
     return { count: 0 };
   },
   actions: {
-    increment(ctx, { player }) {
+    increment(ctx) {
       ctx.state.count += 1;
-      ctx.broadcast('counter:incremented', { count: ctx.state.count });
     },
   },
 });
 ```
 
+`index.html`：
+
 ```html
-<!-- index.html -->
-<button id="inc">+1</button>
+<button id="increment">+1</button>
+<strong id="count">0</strong>
+
 <script>
-  parti.onState((s) => (document.title = s.count));
-  document.getElementById('inc').onclick = () => parti.action('increment');
+  parti.onState((state) => {
+    document.getElementById('count').textContent = String(state.count);
+  });
+  document.getElementById('increment').onclick = () => {
+    parti.action('increment');
+  };
   parti.ready();
 </script>
 ```
 
-创作者不接触 seq / ack / transport / postMessage / snapshot —— Runtime 全部代办。
+将三个文件放入 `apps/web/public/rooms/<room-id>/`，或打包为 ZIP 后在 Parti 中导入。完整开发流程和约束见[房间开发文档](./docs/README.md)。
 
-## 房间重连与持久化
+## 本地开发
 
-重连/现场恢复是 Runtime 内置的核心机制，创作者与接入方都**不直接接触
-sessionStorage**——只与 `SessionStore` 抽象交互（默认 `SessionStorageStore`，
-与 manifest `permissions.storage: "session"` 一致）。
+需要 Node.js、[pnpm](https://pnpm.io/) 以及支持 WebRTC 和 Web Worker 的现代浏览器。
 
-- **房主刷新**：复用稳定的 host peer id（邀请链接不变）+ 用持久化快照水合
-  Worker，状态恢复；在线玩家由 `ReconnectingClient` 自动重连回来。
-- **玩家刷新 / 掉线**：凭本地用户的稳定 `clientId` 重连回同一玩家身份，保留分数/座位；
-  掉线有宽限期（默认 30s），期内回归不丢数据，期满才真正离开。
-- **生命周期跟随 sessionStorage**：是否恢复完全取决于 sessionStorage 是否还在。
-  刷新页面 → 记录仍在 → 恢复现场；**退出房间回到大厅** → `clearRoomSession` 主动清除
-  （并销毁仍在运行的 runtime，避免写回）→ 再进入即全新房间；关闭标签页 → 存储随之失效。
-  不区分刷新方式。退出房间不会清除保存在 `localStorage` 中的用户身份。
+```bash
+pnpm install
+pnpm dev        # 启动 Web 应用：http://localhost:5173
+pnpm test       # 运行协议与 Runtime 测试
+pnpm typecheck  # 检查整个 monorepo 的类型
+pnpm build      # 构建 Web 应用
+```
 
-创作者默认**无需改动任何代码**即获得上述能力；如需感知，可实现可选钩子
-`onRestore(ctx)`（房间从快照恢复）与 `onReconnect(ctx, player)`（玩家重连回归）。
+开发环境提供本地多人预览和 DevTools；它们不会出现在生产构建中。即使没有配置大厅服务，仍然可以创建私密房间并通过邀请链接加入。
+
+### 可选配置
+
+复制 [`.env.example`](./.env.example)，按需设置：
+
+```bash
+# 启用公开在线大厅
+VITE_LOBBY_SERVICE_URL=https://<project-ref>.supabase.co/functions/v1/parti-lobby
+
+# 构建时注入可选的 GA4 gtag HTML 片段
+GA_MEASUREMENT_SNIPPET=<script>...</script>
+```
+
+大厅服务由仓库中的 Supabase Edge Function 和迁移提供。接口、租约与 CORS 约定见[大厅服务文档](./docs/lobby-service.md)。
+
+## 项目结构
+
+```text
+apps/web/                 React + Vite Web 应用、在线大厅、编辑器与房间界面
+packages/core/            协议、Host/Client Runtime 与状态同步
+packages/worker-sdk/      defineRoom、RoomEngine 与 Worker 宿主
+packages/client-sdk/      iframe 中的 parti API 与宿主页沙箱桥
+packages/transport-local/ 本地预览和测试使用的内存 Transport
+packages/transport-peerjs/基于 PeerJS / WebRTC 的联机 Transport
+packages/room-packager/   Manifest 校验与内容寻址房间包
+supabase/                 可选的在线大厅数据库迁移与 Edge Function
+docs/                     房间开发、API 和 Runtime 文档
+```
+
+核心数据流：
+
+```text
+iframe UI
+  -> host bridge -> ClientRuntime -> Transport
+  -> HostRuntime -> room.worker.js
+  -> authoritative state -> snapshot broadcast -> every player's UI
+```
+
+Runtime 的核心原则是：Runtime First、Protocol Stable、User Code Untrusted、Host Replaceable、Actions Over Messages、Snapshot First。
+
+## 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [快速开始](./docs/getting-started.md) | 房间模型、最小示例与运行方式 |
+| [完整井字棋示例](./docs/example-tic-tac-toe.md) | 从零实现一个可运行的多人游戏 |
+| [Worker API](./docs/worker-api.md) | `defineRoom`、action、上下文与生命周期 |
+| [Client API](./docs/client-api.md) | iframe 中可用的 `parti.*` API |
+| [Manifest](./docs/manifest.md) | `parti.room.json` 字段与约束 |
+| [Host Runtime](./docs/host-runtime.md) | 准入、容量、恢复与安全边界 |
+| [协议参考](./docs/protocol-reference.md) | 底层消息、状态同步与错误码 |
+| [大厅服务](./docs/lobby-service.md) | REST API、租约、部署与 CORS |
