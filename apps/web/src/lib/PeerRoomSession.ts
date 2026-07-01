@@ -16,7 +16,6 @@ import {
   type RoomAdmissionController,
 } from '@parti/core';
 import { type RoomClientPort } from '@parti/client-sdk';
-import { PeerJSTransportAdapter } from '@parti/transport-peerjs';
 import {
   getRoomHtml,
   getWorkerSource,
@@ -26,6 +25,7 @@ import { createWebWorkerHost } from './roomWorker.js';
 import { ReconnectingClient } from './ReconnectingClient.js';
 import { clearHostRoomSettings } from './roomSettings.js';
 import { loadLocalUser } from './localUser.js';
+import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
 
 /**
  * 当前页面内活跃的房间会话清理器（host 或 client），key = roomId。
@@ -69,11 +69,12 @@ export interface PeerHost {
 
 export interface PeerHostOptions {
   admissionController?: RoomAdmissionController;
+  transportConfig: TransportConfig;
 }
 
 export async function createPeerHost(
   pkg: RoomPackage,
-  options: PeerHostOptions = {},
+  options: PeerHostOptions,
 ): Promise<PeerHost> {
   const store = new SessionStorageStore();
   const user = loadLocalUser();
@@ -82,7 +83,7 @@ export async function createPeerHost(
   // 退出到大厅（已 clearRoomSession）后记录不在 → 全新房间。
   // 复用上次的稳定 host peer id（即邀请码），使刷新后邀请链接不变。
   const restored = store.loadRoom(roomId);
-  const adapter = new PeerJSTransportAdapter();
+  const adapter = createTransportAdapter(options.transportConfig);
   const transport = await adapter.createHost({
     roomId,
     ...(restored?.hostPeerId ? { hostId: restored.hostPeerId } : {}),
@@ -143,6 +144,7 @@ export interface PeerJoinHandlers {
 export function createPeerJoin(
   pkg: RoomPackage,
   hostPeerId: string,
+  transportConfig: TransportConfig,
   handlers: PeerJoinHandlers = {},
   credential?: string,
 ): PeerJoin {
@@ -153,6 +155,7 @@ export function createPeerJoin(
     roomId,
     packageHash: pkg.packageHash,
     hostPeerId,
+    transportConfig,
     playerName: user.name,
     clientId: user.id,
     ...(credential !== undefined ? { credential } : {}),

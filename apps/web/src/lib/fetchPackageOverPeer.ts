@@ -11,8 +11,8 @@ import {
   type RoomErrorPayload,
   type RoomMessage,
 } from '@parti/core';
-import { PeerJSTransportAdapter } from '@parti/transport-peerjs';
 import { createPackage, type RoomPackage } from '@parti/room-packager';
+import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
 
 const PACKAGE_FETCH_TIMEOUT_MS = 15_000;
 
@@ -31,9 +31,9 @@ export class FetchPackageError extends Error {
 export async function fetchPackageOverPeer(
   roomId: string,
   hostPeerId: string,
-  options: { clientId?: string; credential?: string } = {},
+  options: { clientId?: string; credential?: string; transportConfig?: TransportConfig } = {},
 ): Promise<RoomPackage> {
-  const adapter = new PeerJSTransportAdapter();
+  const adapter = createTransportAdapter(options.transportConfig ?? { adapter: 'peerjs' });
   const transport = await adapter.joinRoom({
     roomId,
     hostConnectionInfo: hostPeerId,

@@ -121,7 +121,9 @@ export function Lobby() {
                   disabled={!room.joinable}
                   onClick={() => {
                     if (!room.joinable) return;
-                    navigateToPeerJoin(buildJoinHashRoute(room.roomId, room.hostPeerId));
+                    const connectionInfo = room.connectionInfo ?? room.hostPeerId;
+                    if (!connectionInfo) return;
+                    navigateToPeerJoin(buildJoinHashRoute(room.roomId, connectionInfo, undefined, room.transportConfig ?? { adapter: 'peerjs' }));
                   }}
                 >
                   {room.joinable ? (

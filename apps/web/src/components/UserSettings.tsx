@@ -29,6 +29,7 @@ import {
   UserNameValidationError,
   type LocalUser,
 } from '../lib/localUser.js';
+import { isCommonTransportConfigured, loadTransportPreference, saveTransportPreference, type TransportPreference } from '../lib/transportConfig.js';
 
 const sectionCardClass =
   'gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]';
@@ -39,6 +40,8 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(user.name);
   const [message, setMessage] = useState<string | null>(null);
+  const [transport, setTransport] = useState<TransportPreference>(() => loadTransportPreference());
+  const commonConfigured = isCommonTransportConfigured();
 
   function setSheetOpen(next: boolean): void {
     setOpen(next);
@@ -116,6 +119,31 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
                   {intl.formatMessage({ id: 'user.settings.idInline' }, { id: user.id })}
                 </p>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card className={sectionCardClass}>
+            <CardHeader>
+              <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">
+                {intl.formatMessage({ id: 'user.settings.transportEyebrow' })}
+              </span>
+              <CardTitle className="mt-1 text-lg">{intl.formatMessage({ id: 'user.settings.transportTitle' })}</CardTitle>
+              <CardDescription>{intl.formatMessage({ id: 'user.settings.transportDescription' })}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              <Label htmlFor="parti-user-transport">{intl.formatMessage({ id: 'user.settings.transportLabel' })}</Label>
+              <Select value={transport} onValueChange={(value) => {
+                const next = value as TransportPreference;
+                saveTransportPreference(next);
+                setTransport(next);
+              }}>
+                <SelectTrigger id="parti-user-transport" className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="peerjs">PeerJS / WebRTC</SelectItem>
+                  <SelectItem value="common" disabled={!commonConfigured}>Common / Supabase Realtime</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{intl.formatMessage({ id: 'user.settings.transportHint' })}</p>
             </CardContent>
           </Card>
 

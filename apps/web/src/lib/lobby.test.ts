@@ -7,6 +7,7 @@ import {
   type LobbyRoomInput,
 } from './lobbyApi.js';
 import { buildInviteUrl, parseInviteInput, parsePeerRoute } from './peerRoutes.js';
+import type { TransportConfig } from './transportConfig.js';
 
 const input: LobbyRoomInput = {
   roomId: 'counter',
@@ -64,7 +65,7 @@ beforeEach(() => {
 describe('peer routes', () => {
   it('encodes and parses password invite links', () => {
     const url = buildInviteUrl('https://parti.test', '/app/', 'room id', 'peer/one', '0123');
-    expect(url).toBe('https://parti.test/app/#/peer/join/room%20id/peer%2Fone?password=0123');
+    expect(url).toBe('https://parti.test/app/#/online/join/room%20id/peer%2Fone?adapter=peerjs&password=0123');
     expect(parsePeerRoute('#/peer/join/room%20id/peer%2Fone?password=0123')).toMatchObject({
       mode: 'join',
       roomId: 'room id',
@@ -74,10 +75,26 @@ describe('peer routes', () => {
   });
 
   it('parses invite input from full URL, hash, and path', () => {
-    const expected = '/peer/join/room%20id/peer%2Fone?password=0123';
+    const expected = '/online/join/room%20id/peer%2Fone?adapter=peerjs&password=0123';
     expect(parseInviteInput('https://parti.test/app/#/peer/join/room%20id/peer%2Fone?password=0123')).toBe(expected);
     expect(parseInviteInput('#/peer/join/room%20id/peer%2Fone?password=0123')).toBe(expected);
-    expect(parseInviteInput('/peer/join/counter/peer%2Fabc')).toBe('/peer/join/counter/peer%2Fabc');
+    expect(parseInviteInput('/peer/join/counter/peer%2Fabc')).toBe('/online/join/counter/peer%2Fabc?adapter=peerjs');
+  });
+
+  it('round-trips a portable Supabase common transport link', () => {
+    const config: TransportConfig = {
+      adapter: 'common', provider: 'supabase', url: 'https://project.supabase.co', publishableKey: 'sb_publishable_public',
+    };
+    const url = buildInviteUrl('https://parti.test', '/', 'counter', 'opaque-info', '', config);
+    expect(parsePeerRoute(new URL(url).hash)).toMatchObject({
+      mode: 'join', roomId: 'counter', hostPeerId: 'opaque-info', transportConfig: config,
+    });
+    expect(parseInviteInput(url)).toContain('adapter=common&provider=supabase');
+  });
+
+  it('rejects unsafe common transport links', () => {
+    expect(parseInviteInput('#/online/join/room/info?adapter=common&provider=supabase&url=http%3A%2F%2Fevil.test&key=sb_publishable_x')).toBeNull();
+    expect(parseInviteInput('#/online/join/room/info?adapter=common&provider=supabase&url=https%3A%2F%2Fproject.supabase.co&key=sb_secret_x')).toBeNull();
   });
 
   it('returns null for invalid invite input', () => {
@@ -89,13 +106,13 @@ describe('peer routes', () => {
   });
 
   it('extracts invite URL from surrounding share text', () => {
-    const expected = '/peer/join/room%20id/peer%2Fone?password=0123';
+    const expected = '/online/join/room%20id/peer%2Fone?adapter=peerjs&password=0123';
     const url = 'https://parti.test/app/#/peer/join/room%20id/peer%2Fone?password=0123';
     expect(parseInviteInput(`快来加入：${url}`)).toBe(expected);
     expect(parseInviteInput(`邀请链接：${url}。`)).toBe(expected);
     expect(parseInviteInput(`Join us ${url} now`)).toBe(expected);
-    expect(parseInviteInput(`链接 /peer/join/counter/peer%2Fabc 在这里`)).toBe('/peer/join/counter/peer%2Fabc');
-    expect(parseInviteInput(`复制此链接 #/peer/join/counter/peer%2Fabc 加入`)).toBe('/peer/join/counter/peer%2Fabc');
+    expect(parseInviteInput(`链接 /peer/join/counter/peer%2Fabc 在这里`)).toBe('/online/join/counter/peer%2Fabc?adapter=peerjs');
+    expect(parseInviteInput(`复制此链接 #/peer/join/counter/peer%2Fabc 加入`)).toBe('/online/join/counter/peer%2Fabc?adapter=peerjs');
   });
 });
 

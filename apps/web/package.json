@@ -16,6 +16,7 @@
     "@parti/room-packager": "workspace:*",
     "@parti/transport-local": "workspace:*",
     "@parti/transport-peerjs": "workspace:*",
+    "@parti/transport-common": "workspace:*",
     "@parti/worker-sdk": "workspace:*",
     "@tailwindcss/vite": "^4.3.2",
     "class-variance-authority": "^0.7.1",

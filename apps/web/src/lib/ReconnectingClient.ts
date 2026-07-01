@@ -13,13 +13,14 @@ import {
   PARTI_VERSION,
   type ClientTransportSession,
 } from '@parti/core';
-import { PeerJSTransportAdapter } from '@parti/transport-peerjs';
 import type { RoomClientPort } from '@parti/client-sdk';
+import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
 
 export interface ReconnectingClientOptions {
   roomId: string;
   packageHash: string;
   hostPeerId: string;
+  transportConfig: TransportConfig;
   playerName: string;
   /** 稳定客户端身份 id（由入口层从 localStorage 用户身份取得）。 */
   clientId: string;
@@ -82,7 +83,7 @@ export class ReconnectingClient {
     this.cleanupRuntime();
     this.opts.onStatus?.(this.attempt === 0 ? 'connecting' : 'reconnecting');
     try {
-      const adapter = new PeerJSTransportAdapter();
+      const adapter = createTransportAdapter(this.opts.transportConfig);
       const transport = await adapter.joinRoom({
         roomId: this.opts.roomId,
         hostConnectionInfo: this.opts.hostPeerId,

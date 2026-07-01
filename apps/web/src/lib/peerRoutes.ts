@@ -1,124 +1,68 @@
+import { validateTransportConfig, type TransportConfig } from './transportConfig.js';
+
 export interface PeerRoute {
-  mode: 'host' | 'join';
-  roomId?: string;
-  hostPeerId?: string;
-  credential?: string;
+  mode: 'host' | 'join'; roomId?: string; hostPeerId?: string; credential?: string; transportConfig: TransportConfig;
+}
+
+function configFromQuery(query: URLSearchParams, legacy: boolean): TransportConfig {
+  const adapter = query.get('adapter');
+  if (legacy || !adapter || adapter === 'peerjs') return { adapter: 'peerjs' };
+  if (adapter !== 'common' || query.get('provider') !== 'supabase') throw new Error('Unsupported transport configuration');
+  return validateTransportConfig({
+    adapter: 'common', provider: 'supabase', url: query.get('url') ?? '', publishableKey: query.get('key') ?? '',
+  });
 }
 
 export function parsePeerRoute(hash: string): PeerRoute {
   const [path, query = ''] = hash.replace(/^#/, '').split('?');
-  const parts = path.split('/').filter(Boolean);
-  if (parts[1] === 'join') {
-    return {
-      mode: 'join',
-      roomId: parts[2] ? decodeURIComponent(parts[2]) : undefined,
-      hostPeerId: parts[3] ? decodeURIComponent(parts[3]) : undefined,
-      credential: new URLSearchParams(query).get('password') ?? undefined,
-    };
-  }
-  return {
-    mode: 'host',
-    roomId: parts[2] ? decodeURIComponent(parts[2]) : undefined,
+  const parts = path!.split('/').filter(Boolean);
+  const legacy = parts[0] === 'peer';
+  const online = parts[0] === 'online';
+  const params = new URLSearchParams(query);
+  if ((legacy || online) && parts[1] === 'join') return {
+    mode: 'join', roomId: parts[2] ? decodeURIComponent(parts[2]) : undefined,
+    hostPeerId: parts[3] ? decodeURIComponent(parts[3]) : undefined,
+    credential: params.get('password') ?? undefined, transportConfig: configFromQuery(params, legacy),
   };
+  return { mode: 'host', roomId: parts[2] ? decodeURIComponent(parts[2]) : undefined, transportConfig: { adapter: 'peerjs' } };
 }
 
-export function buildInviteUrl(
-  origin: string,
-  pathname: string,
-  roomId: string,
-  hostPeerId: string,
-  password = '',
-): string {
-  const base = `${origin}${pathname}#/peer/join/${encodeURIComponent(roomId)}/${encodeURIComponent(hostPeerId)}`;
-  return password ? `${base}?password=${encodeURIComponent(password)}` : base;
-}
-
-export function buildJoinHashRoute(roomId: string, hostPeerId: string, credential?: string): string {
-  const base = `/peer/join/${encodeURIComponent(roomId)}/${encodeURIComponent(hostPeerId)}`;
-  return credential ? `${base}?password=${encodeURIComponent(credential)}` : base;
-}
-
-function joinHashFromPeerRoute(route: PeerRoute): string | null {
-  if (route.mode !== 'join' || !route.roomId || !route.hostPeerId) return null;
-  return buildJoinHashRoute(route.roomId, route.hostPeerId, route.credential);
-}
-
-function parseInviteInputFromHash(hash: string): string | null {
-  const normalized = hash.startsWith('#') ? hash : `#${hash}`;
-  return joinHashFromPeerRoute(parsePeerRoute(normalized));
-}
-
-const TRAILING_PUNCTUATION = /[。，、；：！？,.;:!?)}\]'"\]]+$/;
-
-function trimTrailingPunctuation(value: string): string {
-  return value.replace(TRAILING_PUNCTUATION, '');
-}
-
-/** 从分享文本中提取可能的邀请链接片段。 */
-function extractInviteCandidate(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return trimmed;
-
-  if (
-    trimmed.startsWith('#/') ||
-    /^https?:\/\//i.test(trimmed) ||
-    trimmed.startsWith('/peer/join/') ||
-    trimmed.startsWith('peer/join/')
-  ) {
-    return trimmed;
+function configParams(config: TransportConfig, password = ''): URLSearchParams {
+  const params = new URLSearchParams({ adapter: config.adapter });
+  if (config.adapter === 'common') {
+    params.set('provider', config.provider); params.set('url', config.url); params.set('key', config.publishableKey);
   }
-
-  const httpMatch = trimmed.match(/https?:\/\/[^\s<>"']+/i);
-  if (httpMatch) return trimTrailingPunctuation(httpMatch[0]);
-
-  const hashMatch = trimmed.match(/#\/?peer\/join\/[^\s]+/i);
-  if (hashMatch) return hashMatch[0];
-
-  const pathMatch = trimmed.match(/\/?peer\/join\/[^\s]+/i);
-  if (pathMatch) {
-    const path = pathMatch[0];
-    return path.startsWith('/') ? path : `/${path}`;
-  }
-
-  return trimmed;
+  if (password) params.set('password', password);
+  return params;
 }
 
-function parseInviteInputCore(candidate: string): string | null {
-  const trimmed = candidate.trim();
-  if (!trimmed) return null;
+export function buildInviteUrl(origin: string, pathname: string, roomId: string, connectionInfo: string, password = '', config: TransportConfig = { adapter: 'peerjs' }): string {
+  return `${origin}${pathname}#${buildJoinHashRoute(roomId, connectionInfo, password, config)}`;
+}
 
-  if (trimmed.startsWith('#/')) {
-    return parseInviteInputFromHash(trimmed);
-  }
+export function buildJoinHashRoute(roomId: string, connectionInfo: string, credential?: string, config: TransportConfig = { adapter: 'peerjs' }): string {
+  return `/online/join/${encodeURIComponent(roomId)}/${encodeURIComponent(connectionInfo)}?${configParams(config, credential).toString()}`;
+}
 
-  if (/^https?:\/\//i.test(trimmed)) {
-    try {
-      const url = new URL(trimmed);
-      if (!url.hash) return null;
-      return parseInviteInputFromHash(url.hash);
-    } catch {
-      return null;
-    }
-  }
+function parseHash(hash: string): string | null {
+  try {
+    const route = parsePeerRoute(hash.startsWith('#') ? hash : `#${hash}`);
+    return route.mode === 'join' && route.roomId && route.hostPeerId
+      ? buildJoinHashRoute(route.roomId, route.hostPeerId, route.credential, route.transportConfig) : null;
+  } catch { return null; }
+}
 
-  if (trimmed.startsWith('/peer/join/')) {
-    return parseInviteInputFromHash(trimmed);
-  }
-
-  if (trimmed.startsWith('peer/join/')) {
-    return parseInviteInputFromHash(`/${trimmed}`);
-  }
-
+const TRAILING = /[。，、；：！？,.;:!?)}\]'"\]]+$/;
+export function parseInviteInput(raw: string): string | null {
+  const text = raw.trim();
+  const match = text.match(/https?:\/\/[^\s<>"']+|#\/?(?:peer|online)\/join\/[^\s]+|\/?(?:peer|online)\/join\/[^\s]+/i);
+  const candidate = (match?.[0] ?? text).replace(TRAILING, '');
+  if (/^https?:\/\//i.test(candidate)) { try { return parseHash(new URL(candidate).hash); } catch { return null; } }
+  if (candidate.startsWith('#')) return parseHash(candidate);
+  if (/^\/?(?:peer|online)\/join\//i.test(candidate)) return parseHash(candidate.startsWith('/') ? candidate : `/${candidate}`);
   return null;
 }
 
-/** 从粘贴的完整 URL / hash / 路径片段解析出 join hash 路由（不含 #）。 */
-export function parseInviteInput(raw: string): string | null {
-  return parseInviteInputCore(extractInviteCandidate(raw));
-}
-
-/** 用 replace 进入联机房间，禁止浏览器后退回到大厅前的输入态。 */
 export function navigateToPeerJoin(hashRoute: string): void {
-  const path = hashRoute.startsWith('/') ? hashRoute : `/${hashRoute}`;
-  location.replace(`${location.pathname}${location.search}#${path}`);
+  location.replace(`${location.pathname}${location.search}#${hashRoute.startsWith('/') ? hashRoute : `/${hashRoute}`}`);
 }

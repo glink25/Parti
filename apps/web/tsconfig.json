@@ -17,6 +17,7 @@
     { "path": "../../packages/client-sdk" },
     { "path": "../../packages/transport-local" },
     { "path": "../../packages/transport-peerjs" },
+    { "path": "../../packages/transport-common" },
     { "path": "../../packages/room-packager" }
   ]
 }

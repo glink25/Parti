@@ -162,7 +162,7 @@ export function EditorView() {
       if (!templateId) return;
       const roomId = await createRoom(templateId);
       if (activeTemplate !== 'blank') await recordTemplateUsage(activeTemplate);
-      window.location.hash = target === 'local' ? `#/local/${roomId}` : `#/peer/host/${roomId}`;
+      window.location.hash = target === 'local' ? `#/local/${roomId}` : `#/online/host/${roomId}`;
     } catch (reason) {
       setError(formatError(intl, reason));
     } finally {

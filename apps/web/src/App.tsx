@@ -32,7 +32,7 @@ function useHashRoute(): string {
 /** 从联机房间路由解析 roomId（host/join 均为第三段），非联机房间返回 null。 */
 function peerRoomIdOf(hash: string): string | null {
   const parts = hash.replace(/^#/, '').split('/').filter(Boolean);
-  return parts[0] === 'peer' ? (parts[2] ?? null) : null;
+  return parts[0] === 'peer' || parts[0] === 'online' ? (parts[2] ?? null) : null;
 }
 
 function AppLayout() {
@@ -63,7 +63,7 @@ function AppLayout() {
 
   const route = hash.replace(/^#/, '');
   const parts = route.split('/').filter(Boolean); // e.g. ['local','counter']
-  const isPlayerRoute = parts[0] === 'peer' && parts[1] === 'join';
+  const isPlayerRoute = (parts[0] === 'peer' || parts[0] === 'online') && parts[1] === 'join';
   const isLobbyRoute = parts.length === 0;
 
   let view;
@@ -71,7 +71,7 @@ function AppLayout() {
     view = <EditorView />;
   } else if (import.meta.env.DEV && parts[0] === 'local' && parts[1]) {
     view = <LocalRoomView roomId={parts[1]} />;
-  } else if (parts[0] === 'peer') {
+  } else if (parts[0] === 'peer' || parts[0] === 'online') {
     view = <PeerRoomView />;
   } else if (ReplayPage && parts[0] === 'replays') {
     view = <Suspense fallback={null}><ReplayPage /></Suspense>;
