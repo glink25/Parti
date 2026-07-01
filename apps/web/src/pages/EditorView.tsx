@@ -3,14 +3,10 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   BotIcon,
-  CheckIcon,
-  CopyIcon,
-  EyeIcon,
   FileArchiveIcon,
   FilePlusIcon,
   Link2Icon,
   PencilIcon,
-  RotateCcwIcon,
   SparklesIcon,
   Trash2Icon,
   XIcon,
@@ -18,94 +14,17 @@ import {
 import { createPackage, type RoomPackageInput } from '@parti/room-packager';
 import { Button } from '@/components/ui/button.js';
 import { Card } from '@/components/ui/card.js';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.js';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs.js';
 import { Textarea } from '@/components/ui/textarea.js';
 import { cn } from '@/lib/utils.js';
 import { copyTextToClipboard } from '@/lib/clipboard.js';
 import { createRoom } from '../lib/customRooms.js';
-import { createDraftId } from '../lib/ids.js';
 import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom.js';
 import { deleteImportedTemplate, recordTemplateUsage, saveDerivedTemplate } from '../lib/templates.js';
 import { getTemplateList, resolvePackage, type TemplateListEntry } from '../lib/rooms.js';
-
-type EditorFile = 'manifest' | 'html' | 'worker';
-type BlankChoice = { id: 'blank'; name: string; description: string };
-type SelectableTemplate = BlankChoice | TemplateListEntry;
-
-const BLANK_TEMPLATE: BlankChoice = {
-  id: 'blank',
-  name: '空白房间',
-  description: '从简洁的互动计数器开始，自由改造成你的玩法。',
-};
-
-const AI_ROOM_PROMPT = `请帮我创建一个可以直接导入 Parti 的多人联机游戏房间。
-
-开始设计和编写代码前，请先阅读并理解以下 GitHub docs 目录中的全部文档：
-https://github.com/glink25/Parti/tree/main/docs
-
-请严格遵守文档中关于 Manifest、客户端 API、Worker API、协议和 Host Runtime 的约束，尤其注意房间状态必须由 Worker 权威管理，客户端只能通过 Parti API 读取状态和提交动作。
-
-我的游戏创意如下（请让我在这里补充玩法、玩家人数、胜负条件和视觉风格）：
-[在这里补充你的游戏创意]
-
-如果需求中缺少会影响实现的关键信息，请先提出简短、必要的问题；信息足够后再生成最终结果。最终结果必须：
-1. 给出可直接保存的完整文件结构，至少包含 parti.room.json、index.html 和 room.worker.js。
-2. 分别输出三个文件的完整内容，不使用省略号、伪代码、占位实现或 Parti 不支持的依赖。
-3. 确保 manifest 的入口文件、玩家人数和权限配置与代码一致。
-4. 正确实现多人状态同步、服务端动作校验、胜负或结束条件，并安全处理异常或恶意输入。
-5. UI 应清晰、响应式，并能在手机端正常操作。
-6. 输出前自行复核代码与全部 Parti 文档约束，修正发现的问题。
-
-请将最终答案整理成用户可以逐个保存文件、打包为 ZIP 后直接导入 Parti 的形式。`;
-
-const DEFAULT_HTML = `<div style="font-family: system-ui, sans-serif; padding: 24px; color: #111;">
-  <h1 style="font-size: 24px;">我的房间</h1>
-  <div id="count" style="font-size: 48px; font-weight: 800;">0</div>
-  <button id="inc" style="font-size: 16px; padding: 10px 18px;">+1</button>
-
-  <script>
-    const countEl = document.getElementById('count');
-    parti.onState((state) => { countEl.textContent = String(state.count); });
-    document.getElementById('inc').onclick = () => parti.action('increment');
-    parti.ready();
-  </script>
-</div>
-`;
-
-const DEFAULT_WORKER = `import { defineRoom } from '@parti/worker-sdk';
-
-export default defineRoom({
-  initialState() {
-    return { count: 0 };
-  },
-  actions: {
-    increment(ctx) {
-      ctx.state.count += 1;
-      ctx.broadcast('counter:incremented', { count: ctx.state.count });
-    },
-  },
-});
-`;
-
-function blankManifest(): string {
-  return JSON.stringify(
-    {
-      partiVersion: '0.1.0',
-      protocolVersion: 1,
-      id: createDraftId(),
-      name: '我的房间',
-      version: '0.1.0',
-      description: '和朋友一起玩的互动房间',
-      entry: { ui: 'index.html', worker: 'room.worker.js' },
-      room: { minPlayers: 1, maxPlayers: 8 },
-      sync: { mode: 'snapshot' },
-      permissions: { network: false, storage: 'session' },
-    },
-    null,
-    2,
-  );
-}
+import { AI_ROOM_PROMPT, BLANK_TEMPLATE, DEFAULT_HTML, DEFAULT_WORKER, blankManifest, type EditorFile, type SelectableTemplate } from '@/components/editor/editorDefaults.js';
+import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs.js';
+import { EditorActionDock } from '@/components/editor/EditorActionDock.js';
 
 export function EditorView() {
   const [manifestText, setManifestText] = useState(blankManifest);
@@ -469,91 +388,10 @@ export function EditorView() {
       </section>
       )}
 
-      <div className="fixed bottom-4 left-1/2 z-40 flex w-[min(1240px,calc(100%-48px))] -translate-x-1/2 items-center justify-between gap-6 rounded-[18px] border border-border-strong bg-card/92 px-[18px] py-4 shadow-[0_16px_45px_rgba(91,72,15,0.14)] backdrop-blur-lg max-md:bottom-0 max-md:w-full max-md:items-stretch max-md:rounded-t-[20px] max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:px-4 max-md:pt-3 max-md:pb-[calc(12px+env(safe-area-inset-bottom))]">
-        <div className="flex flex-col gap-1 max-md:hidden"><b className="text-[15px]">准备好了吗？</b><span className="text-[11px] text-muted-foreground">创建后可继续设置标题、密码和公开状态。</span></div>
-        <div className="flex flex-wrap items-center gap-2.5 max-md:w-full max-md:flex-nowrap max-md:[&>*]:min-h-12 max-md:[&>*]:flex-1">
-          {goCreate ? (
-            <>
-              {import.meta.env.DEV && <Button variant="outline" disabled={busy} onClick={() => void onCreate('local')}><EyeIcon data-icon="inline-start" />本地预览</Button>}
-              <Button size="lg" disabled={busy} onClick={() => void onCreate('peer')}>{busy ? '正在创建…' : '创建联机房间'} <ArrowRightIcon data-icon="inline-end" /></Button>
-            </>
-          ) : (
-            <Button size="lg" disabled={templateBusy} onClick={() => setShowEditor(true)}>继续创建 <ArrowRightIcon data-icon="inline-end" /></Button>
-          )}
-        </div>
-      </div>
+      <EditorActionDock canCreate={goCreate} busy={busy} templateBusy={templateBusy} onEdit={() => setShowEditor(true)} onCreate={(target) => void onCreate(target)} />
 
-      <Dialog open={Boolean(pendingTemplate)} onOpenChange={(open) => { if (!open) setPendingTemplate(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <RotateCcwIcon className="mb-2 size-11 rounded-xl bg-secondary p-2.5 text-primary-bright" aria-hidden="true" />
-            <DialogTitle>替换当前内容？</DialogTitle>
-            <DialogDescription>切换到“{pendingTemplate?.name}”会替换当前代码和附加文件，此操作无法撤销。</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPendingTemplate(null)}>保留当前内容</Button>
-            <Button onClick={() => { if (pendingTemplate) void applyTemplate(pendingTemplate); }}>确认替换</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={aiDialogOpen}
-        onOpenChange={(open) => {
-          setAiDialogOpen(open);
-          if (!open) {
-            setAiPromptCopied(false);
-            setAiCopyError(null);
-          }
-        }}
-      >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <BotIcon className="mb-2 size-11 rounded-xl bg-secondary p-2.5 text-primary-bright" aria-hidden="true" />
-            <DialogTitle>让 AI 实现你的游戏创意</DialogTitle>
-            <DialogDescription>
-              复制一段为 Parti 准备的提示词，交给你常用的 AI，它会先阅读项目文档，再生成完整的房间代码。
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 text-sm">
-            <div className="rounded-xl border border-border bg-surface-2 p-4">
-              <p className="font-semibold text-foreground">AI 会生成这些必需文件</p>
-              <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-muted-foreground">
-                <span className="rounded-md bg-surface px-2 py-1">parti.room.json</span>
-                <span className="rounded-md bg-surface px-2 py-1">index.html</span>
-                <span className="rounded-md bg-surface px-2 py-1">room.worker.js</span>
-              </div>
-            </div>
-
-            <div>
-              <p className="font-semibold text-foreground">使用方式</p>
-              <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted-foreground">
-                <li>复制提示词并发送给 AI。</li>
-                <li>补充玩法、玩家人数、胜负条件和视觉风格。</li>
-                <li>检查生成的代码，将三个文件打包为 ZIP，或上传 GitHub 后回到这里导入。</li>
-              </ol>
-            </div>
-
-            <p className="rounded-lg border border-primary-bright/20 bg-secondary/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-              AI 生成的代码仍可能出错。导入前请检查内容，并先通过本地预览验证玩法。
-            </p>
-
-            {aiCopyError && (
-              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
-                {aiCopyError}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button className="w-full sm:w-auto" onClick={() => void copyAiPrompt()}>
-              {aiPromptCopied ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
-              {aiPromptCopied ? '提示词已复制' : '让 AI 帮我创建'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TemplateReplaceDialog pending={pendingTemplate} onCancel={() => setPendingTemplate(null)} onConfirm={() => { if (pendingTemplate) void applyTemplate(pendingTemplate); }} />
+      <AiCreationDialog open={aiDialogOpen} copied={aiPromptCopied} error={aiCopyError} onOpenChange={(open) => { setAiDialogOpen(open); if (!open) { setAiPromptCopied(false); setAiCopyError(null); } }} onCopy={() => void copyAiPrompt()} />
     </div>
   );
 }

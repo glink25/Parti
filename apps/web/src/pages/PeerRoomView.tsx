@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CopyIcon, QrCodeIcon, Settings2Icon, WandSparklesIcon } from 'lucide-react';
+import { Settings2Icon } from 'lucide-react';
 import type { HostRuntime, RoomAdmissionStatus } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
 import { createHostLocalPort } from '@parti/client-sdk';
@@ -16,7 +16,6 @@ import { resolvePackage } from '../lib/rooms.js';
 import { fetchPackageOverPeer } from '../lib/fetchPackageOverPeer.js';
 import {
   createPasswordAdmissionController,
-  generateRoomPassword,
   loadHostRoomSettings,
   saveHostRoomSettings,
   type HostRoomSettings,
@@ -29,14 +28,12 @@ import {
 } from '../lib/lobbyApi.js';
 import { buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes.js';
 import { loadLocalUser } from '../lib/localUser.js';
-import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.js';
+import { Card } from '@/components/ui/card.js';
 import { Input } from '@/components/ui/input.js';
-import { Label } from '@/components/ui/label.js';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet.js';
-import { cn } from '@/lib/utils.js';
 import { copyTextToClipboard } from '@/lib/clipboard.js';
+import { usePageFullscreen } from '@/components/PageFullscreen.js';
+import { ResponsiveRoomControls, RoomControlsSheet, type RoomControlsProps } from '@/components/PeerRoomControls.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -95,6 +92,7 @@ function PeerHostSession({
   const [copied, setCopied] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const { fullscreen, setFullscreen } = usePageFullscreen();
   const localUser = loadLocalUser();
   const [error, setError] = useState<string | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
@@ -156,6 +154,11 @@ function PeerHostSession({
     }
   }
 
+  function updatePasswordDraft(value: string): void {
+    setPasswordDraft(value);
+    if (value === '' || value.length === 4) applySettings({ ...settings, password: value });
+  }
+
   async function togglePublic(): Promise<void> {
     if (!state || !admission) return;
     if (settings.isPublic) {
@@ -199,84 +202,18 @@ function PeerHostSession({
     window.setTimeout(() => setCopied(false), 1800);
   }
 
-  function inviteCard(): React.ReactNode {
-    return (
-      <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
-        <CardHeader>
-          <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">邀请朋友</span>
-          <CardTitle className="text-lg">一起加入房间</CardTitle>
-          <CardDescription>{settings.password ? '链接中已包含房间密码，可以直接分享。' : '复制链接，邀请朋友现在加入。'}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-[7px]">
-            <Input className="min-w-0 flex-1" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
-            <div className="flex shrink-0 gap-[7px]">
-              <Button type="button" onClick={copyInvite}><CopyIcon data-icon="inline-start" />{copied ? '已复制' : '复制'}</Button>
-              <Button type="button" variant="outline" onClick={() => setQrOpen(true)}><QrCodeIcon data-icon="inline-start" />二维码</Button>
-            </div>
-          </div>
-          <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground"><span className={cn('size-1.5 rounded-full', activeAdmission.joinable ? 'bg-success' : 'bg-danger')} />{activeAdmission.joinable ? '当前可加入' : '房间人数已满'}</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  function settingsCard(): React.ReactNode {
-    return (
-      <Card className="gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
-        <CardHeader className="flex items-start justify-between gap-3">
-          <div><span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">房间设置</span><CardTitle className="mt-1 text-lg">管理房间</CardTitle></div>
-          <Badge variant={settings.isPublic ? 'default' : 'secondary'}>{settings.isPublic ? '公开' : '私密'}</Badge>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-        <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
-          房间标题
-          <Input value={settings.title} maxLength={80} onChange={(event) => applySettings({ ...settings, title: event.target.value })} />
-        </Label>
-        <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
-          4 位密码（留空为无密码）
-          <div className="flex gap-[7px]">
-            <Input
-              className="min-w-0 flex-1"
-              value={passwordDraft}
-              inputMode="numeric"
-              maxLength={4}
-              onChange={(event) => {
-                const value = event.target.value.replace(/\D/g, '').slice(0, 4);
-                setPasswordDraft(value);
-                if (value === '' || value.length === 4) {
-                  applySettings({ ...settings, password: value });
-                }
-              }}
-              onBlur={() => {
-                if (passwordDraft !== '' && !/^\d{4}$/.test(passwordDraft)) {
-                  setPasswordDraft(settings.password);
-                }
-              }}
-            />
-            <Button type="button" variant="outline" onClick={() => {
-              const value = generateRoomPassword();
-              setPasswordDraft(value);
-              applySettings({ ...settings, password: value });
-            }}>
-              <WandSparklesIcon data-icon="inline-start" />生成
-            </Button>
-          </div>
-        </Label>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} onClick={() => void togglePublic()}>
-            {settings.isPublic ? '设为私密' : '公开到大厅'}
-          </Button>
-        </div>
-        <span className="text-[10px] text-muted-foreground">{lobbyStatus}</span>
-        </CardContent>
-      </Card>
-    );
-  }
+  const controlsProps: RoomControlsProps = {
+    settings, passwordDraft, admission: activeAdmission, lobbyStatus, inviteUrl, copied,
+    onCopyInvite: () => void copyInvite(),
+    onOpenQr: () => setQrOpen(true),
+    onPasswordDraftChange: updatePasswordDraft,
+    onApplySettings: applySettings,
+    onTogglePublic: () => void togglePublic(),
+  };
 
   return (
-    <div className="mx-auto w-[min(1240px,100%)]">
-      <div className="mb-6 flex items-end justify-between gap-6 max-md:flex-col max-md:items-start max-md:gap-3.5">
+    <div className={fullscreen ? 'h-[100dvh] w-[100dvw] overflow-hidden bg-black' : 'mx-auto w-[min(1240px,100%)]'}>
+      {!fullscreen && <div className="mb-6 flex items-end justify-between gap-6 max-md:flex-col max-md:items-start max-md:gap-3.5">
         <div>
           <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">← 退出房间</a>
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">YOUR ROOM</span>
@@ -288,45 +225,27 @@ function PeerHostSession({
             <b className="text-foreground">{admission.activePlayers}</b> 人在线
             {admission.maxPlayers !== null && <span> / {admission.maxPlayers}</span>}
           </div>
-          <Sheet open={controlsOpen} onOpenChange={setControlsOpen}>
-            <SheetTrigger asChild>
-              <Button type="button" variant="outline" className="hidden min-h-11 max-md:inline-flex">
-                <Settings2Icon data-icon="inline-start" />房间设置
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
-              <SheetHeader className="border-b px-5 py-4 text-left">
-                <SheetTitle>房间设置</SheetTitle>
-                <SheetDescription>邀请朋友加入，或调整标题、密码和公开状态。</SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-3 overflow-y-auto px-4 pb-5 sm:grid-cols-2">
-                {inviteCard()}
-                {settingsCard()}
-              </div>
-            </SheetContent>
-          </Sheet>
+          <Button type="button" variant="outline" className="hidden min-h-11 max-md:inline-flex" onClick={() => setControlsOpen(true)}><Settings2Icon data-icon="inline-start" />房间设置</Button>
         </div>
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_330px] items-start gap-[18px] max-lg:grid-cols-1">
+      <div className={fullscreen ? 'h-full w-full' : 'grid grid-cols-[minmax(0,1fr)_330px] items-start gap-[18px] max-lg:grid-cols-1'}>
         <div>
           <div className="grid grid-cols-1">
-            <RoomFrame html={state.roomHtml} port={state.port} label="房主画面" role="房主" expandable className="min-h-[min(68vh,720px)] max-lg:min-h-[58vh] max-md:min-h-[62dvh]" />
+            <RoomFrame html={state.roomHtml} port={state.port} label="房主画面" role="房主" fullscreen={fullscreen} onEnterFullscreen={() => { setControlsOpen(false); setFullscreen(true); }} onExitFullscreen={() => { setControlsOpen(false); setFullscreen(false); }} onFullscreenMore={() => setControlsOpen(true)} className={fullscreen ? undefined : 'min-h-[min(68vh,720px)] max-lg:min-h-[58vh] max-md:min-h-[62dvh]'} />
           </div>
         </div>
-        <aside className="flex flex-col gap-3.5 max-lg:grid max-lg:grid-cols-2 max-md:hidden">
-          {inviteCard()}
-          {settingsCard()}
-        </aside>
+        {!fullscreen && <ResponsiveRoomControls open={controlsOpen} onOpenChange={setControlsOpen} props={controlsProps} />}
       </div>
-      {import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />}
-      <InviteQrDialog
+      {!fullscreen && import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />}
+      {!fullscreen && <InviteQrDialog
         open={qrOpen}
         onOpenChange={setQrOpen}
         inviteUrl={inviteUrl}
         inviterName={localUser.name}
         roomTitle={roomTitle}
-      />
+      />}
+      {fullscreen && <RoomControlsSheet open={controlsOpen} onOpenChange={setControlsOpen} props={controlsProps} />}
     </div>
   );
 }
@@ -437,7 +356,7 @@ function PeerJoinView({
 
   return (
     <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-black" data-connection-status={status}>
-      <RoomFrame html={state.roomHtml} port={state.port} label="房间画面" role="玩家" immersive />
+      <RoomFrame html={state.roomHtml} port={state.port} label="房间画面" role="玩家" fullscreen />
     </div>
   );
 }

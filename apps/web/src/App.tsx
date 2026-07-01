@@ -8,6 +8,7 @@ import { EditorView } from './pages/EditorView.js';
 import { clearRoomSession } from './lib/PeerRoomSession.js';
 import { loadLocalUser } from './lib/localUser.js';
 import { UserSettings } from './components/UserSettings.js';
+import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen.js';
 
 /** 极简 hash 路由：#/ 大厅 / #/editor 创作 / #/peer/... 联机。 */
 function useHashRoute(): string {
@@ -26,13 +27,15 @@ function peerRoomIdOf(hash: string): string | null {
   return parts[0] === 'peer' ? (parts[2] ?? null) : null;
 }
 
-export function App() {
+function AppLayout() {
   const hash = useHashRoute();
   const [user, setUser] = useState(loadLocalUser);
+  const { fullscreen, setFullscreen } = usePageFullscreen();
 
   useEffect(() => {
+    setFullscreen(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  }, [hash]);
+  }, [hash, setFullscreen]);
 
   // 离开联机房间（回大厅 / 进入其它房间）时清除该房间的会话，
   // 使后续再进入使用全新数据。刷新是整页重载、不触发 hashchange，故不受影响。
@@ -62,7 +65,7 @@ export function App() {
 
   return (
     <div>
-      {!isPlayerRoute && (
+      {!isPlayerRoute && !fullscreen && (
         <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-card/85 px-[18px] backdrop-blur-lg md:h-[72px] md:px-[max(1.5rem,calc((100vw-1240px)/2))]">
           <a
             className="inline-flex items-center gap-2.5 rounded-md text-xl font-extrabold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -93,7 +96,7 @@ export function App() {
       )}
       <main
         className={
-          isPlayerRoute
+          isPlayerRoute || fullscreen
             ? 'min-h-[100dvh]'
             : 'min-h-[calc(100vh-62px)] px-4 pt-7 pb-12 md:min-h-[calc(100vh-72px)] md:px-6 md:pt-12 md:pb-[72px]'
         }
@@ -102,4 +105,8 @@ export function App() {
       </main>
     </div>
   );
+}
+
+export function App() {
+  return <PageFullscreenProvider><AppLayout /></PageFullscreenProvider>;
 }
