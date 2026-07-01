@@ -92,9 +92,17 @@ describe('peer routes', () => {
     expect(parseInviteInput(url)).toContain('adapter=common&provider=supabase');
   });
 
+  it('round-trips a custom PeerServer link', () => {
+    const config: TransportConfig = { adapter: 'peerjs', serverUrl: 'https://peer.example.com/peerjs' };
+    const url = buildInviteUrl('https://parti.test', '/', 'counter', 'peer-id', '', config);
+    expect(parsePeerRoute(new URL(url).hash).transportConfig).toEqual(config);
+    expect(url).toContain('server=https%3A%2F%2Fpeer.example.com%2Fpeerjs');
+  });
+
   it('rejects unsafe common transport links', () => {
     expect(parseInviteInput('#/online/join/room/info?adapter=common&provider=supabase&url=http%3A%2F%2Fevil.test&key=sb_publishable_x')).toBeNull();
     expect(parseInviteInput('#/online/join/room/info?adapter=common&provider=supabase&url=https%3A%2F%2Fproject.supabase.co&key=sb_secret_x')).toBeNull();
+    expect(parseInviteInput('#/online/join/room/info?adapter=peerjs&server=http%3A%2F%2Fevil.test')).toBeNull();
   });
 
   it('returns null for invalid invite input', () => {

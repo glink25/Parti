@@ -23,16 +23,17 @@ import {
 import { LOCALE_LABELS, LOCALES, type AppLocale } from '@/i18n/locales.js';
 import { useLocale } from '@/i18n/LocaleProvider.js';
 import { formatUserNameError } from '@/i18n/formatErrors.js';
+import { TransportProfilesDialog } from './TransportProfilesDialog.js';
 import {
   MAX_USER_NAME_LENGTH,
   saveLocalUserName,
   UserNameValidationError,
   type LocalUser,
 } from '../lib/localUser.js';
-import { isCommonTransportConfigured, loadTransportPreference, saveTransportPreference, type TransportPreference } from '../lib/transportConfig.js';
+import { getSelectedTransportProfile, getTransportProfiles, selectTransportProfile } from '../lib/transportConfig.js';
 
 const sectionCardClass =
-  'gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]';
+  'gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] flex-shrink-0';
 
 export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (user: LocalUser) => void }) {
   const intl = useIntl();
@@ -40,8 +41,10 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(user.name);
   const [message, setMessage] = useState<string | null>(null);
-  const [transport, setTransport] = useState<TransportPreference>(() => loadTransportPreference());
-  const commonConfigured = isCommonTransportConfigured();
+  const [profilesVersion, setProfilesVersion] = useState(0);
+  const [profilesOpen, setProfilesOpen] = useState(false);
+  const profiles = getTransportProfiles();
+  const selectedProfile = getSelectedTransportProfile();
 
   function setSheetOpen(next: boolean): void {
     setOpen(next);
@@ -132,18 +135,19 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
             </CardHeader>
             <CardContent className="grid gap-2">
               <Label htmlFor="parti-user-transport">{intl.formatMessage({ id: 'user.settings.transportLabel' })}</Label>
-              <Select value={transport} onValueChange={(value) => {
-                const next = value as TransportPreference;
-                saveTransportPreference(next);
-                setTransport(next);
+              <Select value={selectedProfile.id} onValueChange={(value) => {
+                selectTransportProfile(value);
+                setProfilesVersion((current) => current + 1);
               }}>
                 <SelectTrigger id="parti-user-transport" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="peerjs">PeerJS / WebRTC</SelectItem>
-                  <SelectItem value="common" disabled={!commonConfigured}>Common / Supabase Realtime</SelectItem>
+                  {profiles.map((profile) => <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">{intl.formatMessage({ id: 'user.settings.transportHint' })}</p>
+              <Button type="button" variant="outline" onClick={() => setProfilesOpen(true)}>
+                {intl.formatMessage({ id: 'user.settings.profilesButton' })}
+              </Button>
             </CardContent>
           </Card>
 
@@ -173,6 +177,12 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
           </Card>
         </div>
       </SheetContent>
+      <TransportProfilesDialog
+        key={profilesVersion}
+        open={profilesOpen}
+        onOpenChange={setProfilesOpen}
+        onProfilesChange={() => setProfilesVersion((current) => current + 1)}
+      />
     </Sheet>
   );
 }

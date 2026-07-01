@@ -6,7 +6,10 @@ export interface PeerRoute {
 
 function configFromQuery(query: URLSearchParams, legacy: boolean): TransportConfig {
   const adapter = query.get('adapter');
-  if (legacy || !adapter || adapter === 'peerjs') return { adapter: 'peerjs' };
+  if (legacy || !adapter) return { adapter: 'peerjs' };
+  if (adapter === 'peerjs') {
+    return validateTransportConfig({ adapter: 'peerjs', ...(query.get('server') ? { serverUrl: query.get('server')! } : {}) });
+  }
   if (adapter !== 'common' || query.get('provider') !== 'supabase') throw new Error('Unsupported transport configuration');
   return validateTransportConfig({
     adapter: 'common', provider: 'supabase', url: query.get('url') ?? '', publishableKey: query.get('key') ?? '',
@@ -29,6 +32,7 @@ export function parsePeerRoute(hash: string): PeerRoute {
 
 function configParams(config: TransportConfig, password = ''): URLSearchParams {
   const params = new URLSearchParams({ adapter: config.adapter });
+  if (config.adapter === 'peerjs' && config.serverUrl) params.set('server', config.serverUrl);
   if (config.adapter === 'common') {
     params.set('provider', config.provider); params.set('url', config.url); params.set('key', config.publishableKey);
   }

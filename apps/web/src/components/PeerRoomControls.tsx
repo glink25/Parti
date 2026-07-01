@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CircleIcon, CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
@@ -11,9 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input.js';
 import { Label } from '@/components/ui/label.js';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet.js';
+import { InviteJoinHelpDialog } from '@/components/InviteJoinHelpDialog.js';
 import { cn } from '@/lib/utils.js';
 import { useMediaQuery } from '@/hooks/useMediaQuery.js';
 import { ENABLE_REPLAYS } from '@/lib/featureFlags.js';
+import type { TransportConfig } from '@/lib/transportConfig.js';
 
 export type RoomControlsProps = {
   settings: HostRoomSettings;
@@ -23,6 +26,7 @@ export type RoomControlsProps = {
   lobbyError: string | null;
   inviteUrl: string;
   copied: boolean;
+  transportConfig: TransportConfig;
   onCopyInvite: () => void;
   onOpenQr: () => void;
   onPasswordDraftChange: (value: string) => void;
@@ -34,7 +38,8 @@ export type RoomControlsProps = {
 };
 
 function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControlsProps; showAdmissionStatus?: boolean }) {
-  const { settings, admission, inviteUrl, copied, onCopyInvite, onOpenQr } = props;
+  const { settings, admission, inviteUrl, copied, transportConfig, onCopyInvite, onOpenQr } = props;
+  const [helpOpen, setHelpOpen] = useState(false);
   return (
     <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
       <CardHeader>
@@ -59,12 +64,22 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
             </Button>
           </div>
         </div>
-        {showAdmissionStatus && (
-          <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground">
-            <span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />
-            <FormattedMessage id={admission.joinable ? 'peer.invite.joinable' : 'peer.invite.full'} />
-          </div>
-        )}
+        <div className='flex justify-between items-center'>
+          {showAdmissionStatus && (
+            <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground">
+              <span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />
+              <FormattedMessage id={admission.joinable ? 'peer.invite.joinable' : 'peer.invite.full'} />
+            </div>
+          )}
+          <button
+            type="button"
+            className="mt-2 text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            onClick={() => setHelpOpen(true)}
+          >
+            <FormattedMessage id="peer.invite.joinHelpLink" />
+          </button>
+        </div>
+        <InviteJoinHelpDialog open={helpOpen} onOpenChange={setHelpOpen} transportConfig={transportConfig} />
       </CardContent>
     </Card>
   );
