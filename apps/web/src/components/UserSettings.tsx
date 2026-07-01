@@ -57,7 +57,7 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
           aria-label={intl.formatMessage({ id: 'user.settings.ariaLabel' }, { name: user.name })}
         >
           <UserRoundIcon />
-          <span className="hidden truncate sm:inline">{user.name}</span>
+          <span className="truncate sm:inline">{user.name}</span>
         </Button>
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-md">

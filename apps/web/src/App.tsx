@@ -87,6 +87,15 @@ function AppLayout() {
           <span className="hidden text-[13px] text-muted-foreground md:inline">
             <FormattedMessage id="app.header.tagline" />
           </span>
+          <a
+              href="https://github.com/glink25/Parti"
+              target="_blank"
+              rel="noopener noreferrer"
+              className='size-4'
+              aria-label={intl.formatMessage({ id: 'app.header.github' })}
+            >
+              <GithubIcon />
+            </a>
           {isLobbyRoute && <UserSettings user={user} onChange={setUser} />}
           <Button
             asChild
@@ -94,14 +103,6 @@ function AppLayout() {
             size="icon-sm"
             className={`${isLobbyRoute ? '' : 'ml-auto'} shrink-0 text-muted-foreground hover:text-foreground`}
           >
-            <a
-              href="https://github.com/glink25/Parti"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={intl.formatMessage({ id: 'app.header.github' })}
-            >
-              <GithubIcon />
-            </a>
           </Button>
         </header>
       )}
