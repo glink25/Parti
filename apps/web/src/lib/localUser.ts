@@ -1,3 +1,6 @@
+import type { AppLocale } from '@/i18n/locales.js';
+import { getRandomNamePools } from '@/i18n/messages.js';
+
 export interface LocalUser {
   id: string;
   name: string;
@@ -6,10 +9,21 @@ export interface LocalUser {
 const STORAGE_KEY = 'parti:user';
 export const MAX_USER_NAME_LENGTH = 24;
 
-const ADJECTIVES = ['快乐', '勇敢', '闪亮', '悠闲', '机灵', '温柔', '幸运', '热情'];
-const ANIMALS = ['海獭', '熊猫', '狐狸', '水豚', '企鹅', '浣熊', '兔子', '橘猫'];
-
 let memoryUser: LocalUser | null = null;
+
+export type UserNameValidationCode = 'empty' | 'tooLong';
+
+export class UserNameValidationError extends Error {
+  readonly code: UserNameValidationCode;
+  readonly maxLength?: number;
+
+  constructor(code: UserNameValidationCode, maxLength?: number) {
+    super(code);
+    this.name = 'UserNameValidationError';
+    this.code = code;
+    if (maxLength !== undefined) this.maxLength = maxLength;
+  }
+}
 
 function localStorageOrUndefined(): Storage | undefined {
   try {
@@ -35,9 +49,10 @@ function createUserId(): string {
   return `user_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 }
 
-function createRandomName(): string {
+export function createRandomName(locale: AppLocale): string {
+  const { adjectives, animals } = getRandomNamePools(locale);
   const number = String(randomIndex(10_000)).padStart(4, '0');
-  return `${ADJECTIVES[randomIndex(ADJECTIVES.length)]}${ANIMALS[randomIndex(ANIMALS.length)]} ${number}`;
+  return `${adjectives[randomIndex(adjectives.length)]}${animals[randomIndex(animals.length)]} ${number}`;
 }
 
 function isLocalUser(value: unknown): value is LocalUser {
@@ -61,7 +76,7 @@ function persist(user: LocalUser, storage = localStorageOrUndefined()): void {
   }
 }
 
-export function loadLocalUser(storage = localStorageOrUndefined()): LocalUser {
+export function loadLocalUser(storage = localStorageOrUndefined(), locale: AppLocale = 'zh-CN'): LocalUser {
   let storedValueWasInvalid = false;
   try {
     const raw = storage?.getItem(STORAGE_KEY);
@@ -83,16 +98,16 @@ export function loadLocalUser(storage = localStorageOrUndefined()): LocalUser {
   }
 
   if (memoryUser && !storedValueWasInvalid) return memoryUser;
-  const user = { id: createUserId(), name: createRandomName() };
+  const user = { id: createUserId(), name: createRandomName(locale) };
   persist(user, storage);
   return user;
 }
 
 export function saveLocalUserName(name: string, storage = localStorageOrUndefined()): LocalUser {
   const normalized = name.trim();
-  if (!normalized) throw new Error('用户名不能为空');
+  if (!normalized) throw new UserNameValidationError('empty');
   if (normalized.length > MAX_USER_NAME_LENGTH) {
-    throw new Error(`用户名不能超过 ${MAX_USER_NAME_LENGTH} 个字符`);
+    throw new UserNameValidationError('tooLong', MAX_USER_NAME_LENGTH);
   }
   const user = { ...loadLocalUser(storage), name: normalized };
   persist(user, storage);

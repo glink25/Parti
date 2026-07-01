@@ -10,7 +10,7 @@
     "types": ["vite/client"],
     "noEmit": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/i18n/messages/*.json"],
   "references": [
     { "path": "../../packages/core" },
     { "path": "../../packages/worker-sdk" },

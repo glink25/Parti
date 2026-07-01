@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { GithubIcon } from '@/components/icons/GithubIcon.js';
 import { Logo } from '@/components/Logo.js';
 import { Button } from '@/components/ui/button.js';
@@ -10,6 +11,7 @@ import { clearRoomSession } from './lib/PeerRoomSession.js';
 import { loadLocalUser } from './lib/localUser.js';
 import { UserSettings } from './components/UserSettings.js';
 import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen.js';
+import { useLocale } from './i18n/LocaleProvider.js';
 
 /** 极简 hash 路由：#/ 大厅 / #/editor 创作 / #/peer/... 联机。 */
 function useHashRoute(): string {
@@ -30,8 +32,14 @@ function peerRoomIdOf(hash: string): string | null {
 
 function AppLayout() {
   const hash = useHashRoute();
-  const [user, setUser] = useState(loadLocalUser);
+  const { locale } = useLocale();
+  const intl = useIntl();
+  const [user, setUser] = useState(() => loadLocalUser(undefined, locale));
   const { fullscreen, setFullscreen } = usePageFullscreen();
+
+  useEffect(() => {
+    setUser(loadLocalUser(undefined, locale));
+  }, [locale]);
 
   useEffect(() => {
     setFullscreen(false);
@@ -71,12 +79,14 @@ function AppLayout() {
           <a
             className="inline-flex items-center gap-2.5 rounded-md text-xl font-extrabold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             href="#/"
-            aria-label="返回 Parti 大厅"
+            aria-label={intl.formatMessage({ id: 'app.header.backToLobby' })}
           >
             <Logo />
             <span>Parti</span>
           </a>
-          <span className="hidden text-[13px] text-muted-foreground md:inline">和朋友一起创造，一起游玩</span>
+          <span className="hidden text-[13px] text-muted-foreground md:inline">
+            <FormattedMessage id="app.header.tagline" />
+          </span>
           {isLobbyRoute && <UserSettings user={user} onChange={setUser} />}
           <Button
             asChild
@@ -88,7 +98,7 @@ function AppLayout() {
               href="https://github.com/glink25/Parti"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="在 GitHub 上查看 Parti 源码"
+              aria-label={intl.formatMessage({ id: 'app.header.github' })}
             >
               <GithubIcon />
             </a>

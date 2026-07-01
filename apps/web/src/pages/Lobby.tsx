@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { CloudIcon, PlusIcon, SparklesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
@@ -11,6 +12,7 @@ import {
 
 /** 面向玩家的在线大厅。创作草稿与开发预览不在这里展示。 */
 export function Lobby() {
+  const intl = useIntl();
   const [online, setOnline] = useState<LobbyRoom[]>([]);
   const [onlineStatus, setOnlineStatus] = useState<'loading' | 'ready' | 'offline'>('loading');
 
@@ -47,36 +49,44 @@ export function Lobby() {
         />
         <div className="relative">
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">PARTI ONLINE</span>
-          <h1 className="mb-3 text-[clamp(38px,6vw,68px)] leading-[0.98] font-extrabold tracking-[-0.055em]">在线大厅</h1>
-          <p className="max-w-[540px] text-base leading-[1.7] text-muted-foreground">发现正在进行的房间，或者创建一个属于你们的欢乐现场。</p>
+          <h1 className="mb-3 text-[clamp(38px,6vw,68px)] leading-[0.98] font-extrabold tracking-[-0.055em]">
+            <FormattedMessage id="lobby.hero.title" />
+          </h1>
+          <p className="max-w-[540px] text-base leading-[1.7] text-muted-foreground">
+            <FormattedMessage id="lobby.hero.description" />
+          </p>
         </div>
         <Button asChild size="lg" className="relative h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
-          <a href="#/editor"><PlusIcon data-icon="inline-start" />创建联机房间</a>
+          <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
         </Button>
       </section>
 
       <div className="mb-[18px] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <span className="size-2 rounded-full bg-success shadow-[0_0_0_5px_rgba(81,219,147,0.11)]" />
-          <h2 className="text-xl font-semibold">正在进行</h2>
+          <h2 className="text-xl font-semibold"><FormattedMessage id="lobby.live.title" /></h2>
         </div>
-        {onlineStatus === 'ready' && <span className="text-xs text-muted-foreground">{online.length} 个房间</span>}
+        {onlineStatus === 'ready' && (
+          <span className="text-xs text-muted-foreground">
+            {intl.formatMessage({ id: 'lobby.live.roomCount' }, { count: online.length })}
+          </span>
+        )}
       </div>
 
-      {onlineStatus === 'loading' && <div className={emptyState}>正在寻找可加入的房间…</div>}
+      {onlineStatus === 'loading' && <div className={emptyState}><FormattedMessage id="lobby.loading" /></div>}
       {onlineStatus === 'offline' && (
         <Card className={emptyState}>
           <CloudIcon className="size-12 rounded-2xl bg-secondary p-3 text-primary-bright" aria-hidden="true" />
-          <h3 className="mt-3 mb-[7px] text-[19px] font-semibold text-foreground">大厅暂时无法连接</h3>
-          <p className="mb-[18px]">你仍然可以创建房间，通过邀请链接和朋友一起玩。</p>
+          <h3 className="mt-3 mb-[7px] text-[19px] font-semibold text-foreground"><FormattedMessage id="lobby.offline.title" /></h3>
+          <p className="mb-[18px]"><FormattedMessage id="lobby.offline.description" /></p>
         </Card>
       )}
       {online.length === 0 && onlineStatus === 'ready' && (
         <Card className={emptyState}>
           <SparklesIcon className="size-12 rounded-2xl bg-secondary p-3 text-primary-bright" aria-hidden="true" />
-          <h3 className="mt-3 mb-[7px] text-[19px] font-semibold text-foreground">等待第一场派对</h3>
-          <p className="mb-[18px]">这里还没有公开房间，创建一个房间邀请朋友加入吧。</p>
-          <Button asChild variant="outline"><a href="#/editor">创建房间</a></Button>
+          <h3 className="mt-3 mb-[7px] text-[19px] font-semibold text-foreground"><FormattedMessage id="lobby.empty.title" /></h3>
+          <p className="mb-[18px]"><FormattedMessage id="lobby.empty.description" /></p>
+          <Button asChild variant="outline"><a href="#/editor"><FormattedMessage id="lobby.empty.createRoom" /></a></Button>
         </Card>
       )}
       {online.length > 0 && (
@@ -88,15 +98,23 @@ export function Lobby() {
             >
               <CardHeader className="flex items-start justify-between gap-3 px-5">
                 <div><CardTitle className="text-lg">{room.title}</CardTitle><CardDescription className="mt-1">{room.packageName}</CardDescription></div>
-                {room.credentialRequired && <Badge variant="secondary">需密码</Badge>}
+                {room.credentialRequired && <Badge variant="secondary"><FormattedMessage id="lobby.room.passwordRequired" /></Badge>}
               </CardHeader>
               <CardFooter className="bg-transparent border-none flex items-center justify-between gap-3 p-2">
                 <span className="text-xs text-muted-foreground">
-                  <span aria-hidden="true" className="text-[8px] text-success">●</span> {room.playerCount}
-                  {room.maxPlayers === null ? ' 人在线' : ` / ${room.maxPlayers} 人`}
+                  <span aria-hidden="true" className="text-[8px] text-success">●</span>{' '}
+                  {room.maxPlayers === null
+                    ? intl.formatMessage({ id: 'lobby.room.playersOnline' }, { count: room.playerCount })
+                    : intl.formatMessage({ id: 'lobby.room.playersCapacity' }, { current: room.playerCount, max: room.maxPlayers })}
                 </span>
                 <Button asChild={room.joinable} disabled={!room.joinable}>
-                  {room.joinable ? <a href={`#/peer/join/${encodeURIComponent(room.roomId)}/${encodeURIComponent(room.hostPeerId)}`}>加入房间</a> : <span>房间已满</span>}
+                  {room.joinable ? (
+                    <a href={`#/peer/join/${encodeURIComponent(room.roomId)}/${encodeURIComponent(room.hostPeerId)}`}>
+                      <FormattedMessage id="lobby.room.join" />
+                    </a>
+                  ) : (
+                    <span><FormattedMessage id="lobby.room.full" /></span>
+                  )}
                 </Button>
               </CardFooter>
             </Card>

@@ -14,6 +14,7 @@ export interface CustomRoomEntry {
   id: string;
   name: string;
   description: string;
+  descriptionFallback?: 'customRoom';
 }
 
 const BUILTIN = new Map(
@@ -30,7 +31,8 @@ async function templateMeta(templateId: string): Promise<{ name: string; descrip
   const record = await db.get('templates', templateId);
   return {
     name: record?.manifest.name ?? templateId,
-    description: record?.manifest.description ?? '自定义房间',
+    description: record?.manifest.description ?? '',
+    ...(record?.manifest.description ? {} : { descriptionFallback: 'customRoom' as const }),
   };
 }
 

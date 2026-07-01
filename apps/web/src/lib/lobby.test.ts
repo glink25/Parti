@@ -88,6 +88,6 @@ describe('LobbyPublisher', () => {
 
     await publisher.unpublish();
     expect(client.deletes).toBe(1);
-    expect(statuses.at(-1)).toBe('私密');
+    expect(statuses.at(-1)).toBe('private');
   });
 });

@@ -1,3 +1,4 @@
+import { useIntl } from 'react-intl';
 import { MoreHorizontalIcon } from 'lucide-react';
 import { cn } from '@/lib/utils.js';
 
@@ -24,6 +25,7 @@ export function RoomImmersiveCapsule({
   onExit: () => void;
   className?: string;
 }) {
+  const intl = useIntl();
   const buttonClass =
     'flex size-8 items-center justify-center text-white/90 transition-colors hover:text-white active:text-white/70';
 
@@ -40,8 +42,8 @@ export function RoomImmersiveCapsule({
           <button
             type="button"
             className={buttonClass}
-            aria-label="房间设置"
-            title="房间设置"
+            aria-label={intl.formatMessage({ id: 'peer.fullscreen.settingsAria' })}
+            title={intl.formatMessage({ id: 'peer.fullscreen.settingsAria' })}
             onClick={onMore}
           >
             <MoreHorizontalIcon className="size-[18px]" />
@@ -52,8 +54,8 @@ export function RoomImmersiveCapsule({
       <button
         type="button"
         className={buttonClass}
-        aria-label="退出全屏展示"
-        title="退出全屏（Esc）"
+        aria-label={intl.formatMessage({ id: 'peer.fullscreen.exitAria' })}
+        title={intl.formatMessage({ id: 'peer.fullscreen.exitTitle' })}
         onClick={onExit}
       >
         <ExitImmersiveIcon />

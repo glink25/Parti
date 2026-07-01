@@ -1,12 +1,5 @@
 /**
  * joiner 端取包 —— 经 Host 点对点下载房间代码包 (GOAL §11.1, §8.5)。
- *
- * MVP 无后端：加入自定义房间的玩家无法 fetch 静态 URL，改为连上 host 后通过
- * 现有 PeerJS 通道请求房间文件，再用 packageHash 做**内容寻址校验**——
- * 加入者信任自己重算出的 hash，而非 host 自述。
- *
- * 用一次性临时连接取包；随后 ReconnectingClient 照旧开自己的连接做 hello。
- * 重连不需要重新取包（pkg 已被 join 流程持有）。
  */
 import {
   PARTI_VERSION,
@@ -23,6 +16,18 @@ import { createPackage, type RoomPackage } from '@parti/room-packager';
 
 const PACKAGE_FETCH_TIMEOUT_MS = 15_000;
 
+export type FetchPackageErrorCode = 'timeout' | 'disconnected';
+
+export class FetchPackageError extends Error {
+  readonly code: FetchPackageErrorCode;
+
+  constructor(code: FetchPackageErrorCode) {
+    super(code);
+    this.name = 'FetchPackageError';
+    this.code = code;
+  }
+}
+
 export async function fetchPackageOverPeer(
   roomId: string,
   hostPeerId: string,
@@ -36,7 +41,6 @@ export async function fetchPackageOverPeer(
 
   try {
     const data = await requestPackageData(transport, roomId, options);
-    // 重算并校验 packageHash（内容寻址：host 谎报文件会被 hash 比对拒绝）。
     return await createPackage({ manifest: data.manifest, files: data.files });
   } finally {
     transport.close();
@@ -55,9 +59,7 @@ function requestPackageData(
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
-      reject(
-        new Error('取房间代码包超时（房主可能不在线，或使用了不支持取包的旧版本）'),
-      );
+      reject(new FetchPackageError('timeout'));
     }, PACKAGE_FETCH_TIMEOUT_MS);
 
     transport.onMessage((tm) => {
@@ -75,11 +77,11 @@ function requestPackageData(
       }
     });
 
-    transport.onDisconnect((reason) => {
+    transport.onDisconnect(() => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      reject(new Error(reason ?? '与房主的连接已断开，未能取得房间代码包'));
+      reject(new FetchPackageError('disconnected'));
     });
 
     const payload: PackageRequestPayload = {

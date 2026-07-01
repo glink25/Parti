@@ -27,6 +27,7 @@
     "radix-ui": "^1.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-intl": "^10.1.14",
     "shadcn": "^4.12.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.2",
@@ -35,6 +36,7 @@
     "webcrypto-liner": "^1.4.3"
   },
   "devDependencies": {
+    "@formatjs/cli": "^6.16.11",
     "@types/node": "^26.0.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",

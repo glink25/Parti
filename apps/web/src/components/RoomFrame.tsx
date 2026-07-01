@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useIntl } from 'react-intl';
 import { Maximize2Icon } from 'lucide-react';
 import {
   UISandboxBridge,
@@ -9,10 +10,6 @@ import { Button } from '@/components/ui/button.js';
 import { RoomImmersiveCapsule } from '@/components/RoomImmersiveCapsule.js';
 import { cn } from '@/lib/utils.js';
 
-/**
- * 一个沙箱 iframe + UISandboxBridge。Room UI 运行在 sandbox="allow-scripts"
- * 的 iframe 中（默认最小权限，§12.1），通过 client-sdk 桥与 Runtime 通信。
- */
 export function RoomFrame({
   html,
   port,
@@ -36,6 +33,7 @@ export function RoomFrame({
   onLog?: (args: unknown[]) => void;
   className?: string;
 }) {
+  const intl = useIntl();
   const ref = useRef<HTMLIFrameElement>(null);
   const roomDocument = buildRoomDocument(html);
 
@@ -76,12 +74,12 @@ export function RoomFrame({
                 variant="outline"
                 size="sm"
                 className="h-8 rounded-lg border-border bg-surface-3 px-2.5 text-[10px] text-foreground shadow-none"
-                aria-label="全屏展示房间"
-                title="全屏展示"
+                aria-label={intl.formatMessage({ id: 'peer.fullscreen.enterAria' })}
+                title={intl.formatMessage({ id: 'peer.fullscreen.enter' })}
                 onClick={onEnterFullscreen}
               >
                 <Maximize2Icon />
-                全屏展示
+                {intl.formatMessage({ id: 'peer.fullscreen.enter' })}
               </Button>
             )}
           </div>

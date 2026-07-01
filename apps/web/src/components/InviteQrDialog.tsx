@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useIntl } from 'react-intl';
 import QRCode from 'qrcode';
 import {
   Dialog,
@@ -15,7 +16,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('无法加载图标'));
+    image.onerror = () => reject(new Error('iconLoadFailed'));
     image.src = src;
   });
 }
@@ -80,6 +81,7 @@ export function InviteQrDialog({
   inviterName: string;
   roomTitle: string;
 }) {
+  const intl = useIntl();
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,7 +105,10 @@ export function InviteQrDialog({
     void drawInviteQr(canvasEl, inviteUrl)
       .catch((reason) => {
         if (!cancelled) {
-          setError(reason instanceof Error ? reason.message : '二维码生成失败');
+          const message = reason instanceof Error && reason.message === 'iconLoadFailed'
+            ? intl.formatMessage({ id: 'peer.invite.iconLoadFailed' })
+            : intl.formatMessage({ id: 'peer.invite.qrFailed' });
+          setError(message);
         }
       })
       .finally(() => {
@@ -113,13 +118,13 @@ export function InviteQrDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, inviteUrl, canvasEl]);
+  }, [open, inviteUrl, canvasEl, intl]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xs">
         <DialogHeader>
-          <DialogTitle>扫码加入房间</DialogTitle>
+          <DialogTitle>{intl.formatMessage({ id: 'peer.invite.qrTitle' })}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-3">
           <div
@@ -140,7 +145,7 @@ export function InviteQrDialog({
             )}
           </div>
           <p className="text-center text-sm wrap-break-word text-muted-foreground">
-            {inviterName}邀请你来{roomTitle}
+            {intl.formatMessage({ id: 'peer.invite.qrInvite' }, { inviterName, roomTitle })}
           </p>
         </div>
       </DialogContent>

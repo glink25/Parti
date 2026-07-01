@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadLocalUser, saveLocalUserName } from './localUser.js';
+import { loadLocalUser, saveLocalUserName, UserNameValidationError } from './localUser.js';
 
 class TestStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -38,7 +38,8 @@ describe('本地用户身份', () => {
   it('拒绝空用户名和过长用户名', () => {
     const storage = new TestStorage();
     loadLocalUser(storage);
-    expect(() => saveLocalUserName('   ', storage)).toThrow('用户名不能为空');
-    expect(() => saveLocalUserName('名'.repeat(25), storage)).toThrow('不能超过 24 个字符');
+    expect(() => saveLocalUserName('   ', storage)).toThrow(UserNameValidationError);
+    expect(() => saveLocalUserName('   ', storage)).toThrow(expect.objectContaining({ code: 'empty' }));
+    expect(() => saveLocalUserName('名'.repeat(25), storage)).toThrow(expect.objectContaining({ code: 'tooLong' }));
   });
 });

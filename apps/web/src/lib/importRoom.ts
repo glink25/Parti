@@ -1,9 +1,5 @@
 /**
  * 从 ZIP 文件或 GitHub 地址导入房间模版。
- *
- * 复用核心逻辑：validateManifest + createPackage（@parti/room-packager）。
- * 校验：必须含 parti.room.json，且其声明的 entry.ui / entry.worker 文件存在。
- * 整个文件夹原样下载，所有文件按文本进 RoomPackageInput.files（不做封面 URL 解析）。
  */
 import JSZip from 'jszip';
 import { createPackage, validateManifest, type RoomPackageInput } from '@parti/room-packager';
@@ -11,30 +7,56 @@ import { saveImportedTemplate } from './templates.js';
 
 const MANIFEST_NAME = 'parti.room.json';
 
+export type ImportRoomErrorCode =
+  | 'MANIFEST_NOT_FOUND'
+  | 'MANIFEST_INVALID_JSON'
+  | 'UI_ENTRY_MISSING'
+  | 'WORKER_ENTRY_MISSING'
+  | 'ZIP_MANIFEST_NOT_FOUND'
+  | 'GITHUB_URL_INVALID'
+  | 'GITHUB_RATE_LIMITED'
+  | 'GITHUB_DIR_READ_FAILED'
+  | 'GITHUB_MANIFEST_NOT_FOUND'
+  | 'DOWNLOAD_FAILED';
+
+export class ImportRoomError extends Error {
+  readonly code: ImportRoomErrorCode;
+  readonly path?: string;
+  readonly status?: number;
+
+  constructor(code: ImportRoomErrorCode, options: { path?: string; status?: number } = {}) {
+    super(code);
+    this.name = 'ImportRoomError';
+    this.code = code;
+    if (options.path !== undefined) this.path = options.path;
+    if (options.status !== undefined) this.status = options.status;
+  }
+}
+
 /** 由一组文件构造并校验 RoomPackageInput（manifest 取自 parti.room.json）。 */
 export async function buildPackageInputFromFiles(
   files: Record<string, string>,
 ): Promise<RoomPackageInput> {
   const manifestRaw = files[MANIFEST_NAME];
   if (manifestRaw === undefined) {
-    throw new Error('未找到 parti.room.json，无法识别为有效的房间包。');
+    throw new ImportRoomError('MANIFEST_NOT_FOUND');
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(manifestRaw);
   } catch {
-    throw new Error('parti.room.json 不是有效的 JSON。');
+    throw new ImportRoomError('MANIFEST_INVALID_JSON');
   }
   const manifest = validateManifest(parsed);
   const { [MANIFEST_NAME]: _ignored, ...rest } = files;
   if (rest[manifest.entry.ui] === undefined) {
-    throw new Error(`缺少 UI 入口文件：${manifest.entry.ui}`);
+    throw new ImportRoomError('UI_ENTRY_MISSING', { path: manifest.entry.ui });
   }
   if (rest[manifest.entry.worker] === undefined) {
-    throw new Error(`缺少 worker 入口文件：${manifest.entry.worker}`);
+    throw new ImportRoomError('WORKER_ENTRY_MISSING', { path: manifest.entry.worker });
   }
   const input: RoomPackageInput = { manifest, files: rest };
-  await createPackage(input); // 最终校验 / 算 hash
+  await createPackage(input);
   return input;
 }
 
@@ -43,15 +65,14 @@ export async function importRoomFromZip(file: File): Promise<string> {
   const zip = await JSZip.loadAsync(file);
   const entries = Object.values(zip.files).filter((e) => !e.dir);
 
-  // 找最浅的 parti.room.json 确定根前缀。
   const manifestEntries = entries
     .filter((e) => e.name === MANIFEST_NAME || e.name.endsWith(`/${MANIFEST_NAME}`))
     .sort((a, b) => a.name.split('/').length - b.name.split('/').length);
   if (manifestEntries.length === 0) {
-    throw new Error('ZIP 中未找到 parti.room.json。');
+    throw new ImportRoomError('ZIP_MANIFEST_NOT_FOUND');
   }
   const manifestPath = manifestEntries[0].name;
-  const prefix = manifestPath.slice(0, manifestPath.length - MANIFEST_NAME.length); // 含尾部 '/' 或为 ''
+  const prefix = manifestPath.slice(0, manifestPath.length - MANIFEST_NAME.length);
 
   const files: Record<string, string> = {};
   for (const entry of entries) {
@@ -72,18 +93,16 @@ interface GitHubContentItem {
   download_url: string | null;
 }
 
-/** 解析 github 网页地址，确定包所在文件夹。 */
 function parseGitHubUrl(url: string): { owner: string; repo: string; ref: string; dir: string } {
   const match = url
     .trim()
     .match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:blob|tree)\/([^/]+)\/(.+?)\/?$/);
   if (!match) {
-    throw new Error('无法识别的 GitHub 地址，请提供指向文件或文件夹的 blob/tree 链接。');
+    throw new ImportRoomError('GITHUB_URL_INVALID');
   }
   const [, owner, repo, ref, rawPath] = match;
   const segments = rawPath.split('/');
   const last = segments[segments.length - 1];
-  // 末段是带扩展名的文件 → 取其同级目录；否则路径本身即文件夹。
   const dir = last.includes('.') ? segments.slice(0, -1).join('/') : segments.join('/');
   return { owner, repo, ref, dir };
 }
@@ -97,10 +116,10 @@ async function listGitHubDir(
   const api = `https://api.github.com/repos/${owner}/${repo}/contents/${dir}?ref=${encodeURIComponent(ref)}`;
   const res = await fetch(api, { headers: { Accept: 'application/vnd.github+json' } });
   if (res.status === 403) {
-    throw new Error('GitHub API 请求受限（未认证限速 60 次/时），请稍后再试。');
+    throw new ImportRoomError('GITHUB_RATE_LIMITED');
   }
   if (!res.ok) {
-    throw new Error(`读取 GitHub 目录失败（${res.status}）。`);
+    throw new ImportRoomError('GITHUB_DIR_READ_FAILED', { status: res.status });
   }
   const data = (await res.json()) as GitHubContentItem | GitHubContentItem[];
   return Array.isArray(data) ? data : [data];
@@ -111,7 +130,7 @@ export async function importRoomFromGitHub(url: string): Promise<string> {
   const { owner, repo, ref, dir } = parseGitHubUrl(url);
   const rootItems = await listGitHubDir(owner, repo, ref, dir);
   if (!rootItems.some((i) => i.type === 'file' && i.name === MANIFEST_NAME)) {
-    throw new Error('该地址对应的文件夹下未找到 parti.room.json。');
+    throw new ImportRoomError('GITHUB_MANIFEST_NOT_FOUND');
   }
 
   const files: Record<string, string> = {};
@@ -124,7 +143,7 @@ export async function importRoomFromGitHub(url: string): Promise<string> {
         await collect(await listGitHubDir(owner, repo, ref, item.path));
       } else if (item.download_url) {
         const res = await fetch(item.download_url);
-        if (!res.ok) throw new Error(`下载文件失败：${item.path}`);
+        if (!res.ok) throw new ImportRoomError('DOWNLOAD_FAILED', { path: item.path });
         files[relativeOf(item.path)] = await res.text();
       }
     }

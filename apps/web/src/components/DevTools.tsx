@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import type {
   HostRuntime,
   MessageLogEntry,
@@ -21,6 +22,7 @@ export function DevTools({
   packageHash: string;
   transportName: string;
 }) {
+  const intl = useIntl();
   const [players, setPlayers] = useState<Player[]>(() => host.listPlayers());
   const [snapshot, setSnapshot] = useState<SnapshotPayload>(() =>
     host.currentSnapshot(),
@@ -53,7 +55,7 @@ export function DevTools({
     try {
       parsed = payload.trim() ? JSON.parse(payload) : {};
     } catch {
-      alert('payload 不是合法 JSON');
+      alert(intl.formatMessage({ id: 'devTools.invalidPayload' }));
       return;
     }
     host.submitLocalAction(action, parsed);
@@ -61,7 +63,7 @@ export function DevTools({
 
   return (
     <Card className="mt-[18px] rounded-[16px] border-border bg-surface p-4">
-      <h3 className="mb-2.5 text-sm font-semibold">DevTools</h3>
+      <h3 className="mb-2.5 text-sm font-semibold"><FormattedMessage id="devTools.title" /></h3>
       <div className="my-1 text-[11px] text-muted-foreground">
         transport: <b>{transportName}</b> · packageHash:{' '}
         <code>{packageHash.slice(0, 12)}…</code> · stateVersion:{' '}
@@ -70,7 +72,9 @@ export function DevTools({
 
       <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
         <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
-          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">玩家 ({players.length})</h4>
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">
+            {intl.formatMessage({ id: 'devTools.players' }, { count: players.length })}
+          </h4>
           <ul className="m-0 list-none p-0">
             {players.map((p) => (
               <li key={p.id} className="flex justify-between border-b border-dashed border-border py-1 text-[11px]">
@@ -82,7 +86,9 @@ export function DevTools({
             ))}
           </ul>
 
-          <h4 className="mt-3.5 mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">手动发送 action（以 host 身份）</h4>
+          <h4 className="mt-3.5 mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">
+            <FormattedMessage id="devTools.manualAction" />
+          </h4>
           <div className="mt-2 flex gap-1.5">
             <Input
               className="min-w-0 flex-1 text-[10px]"
@@ -96,17 +102,21 @@ export function DevTools({
               onChange={(e) => setPayload(e.target.value)}
               placeholder="payload JSON"
             />
-            <Button onClick={sendManual}>发送</Button>
+            <Button onClick={sendManual}><FormattedMessage id="devTools.send" /></Button>
           </div>
         </Card>
 
         <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
-          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">当前 State (v{snapshot.version})</h4>
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">
+            {intl.formatMessage({ id: 'devTools.currentState' }, { version: snapshot.version })}
+          </h4>
           <pre className="m-0 max-h-[220px] overflow-auto font-mono text-[11px] text-success">{JSON.stringify(snapshot.state, null, 2)}</pre>
         </Card>
 
         <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
-          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">消息日志</h4>
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">
+            <FormattedMessage id="devTools.messageLog" />
+          </h4>
           <div className="flex max-h-[220px] flex-col-reverse overflow-auto font-mono text-[10px]">
             {log.map((e, i) => (
               <div className="border-b border-dashed border-border py-0.5" key={i}>
@@ -123,7 +133,9 @@ export function DevTools({
         </Card>
 
         <Card className="rounded-[10px] border-border bg-surface-2 p-2.5">
-          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">Worker / 错误日志</h4>
+          <h4 className="mb-2 text-[10px] tracking-[0.04em] text-muted-foreground uppercase">
+            <FormattedMessage id="devTools.workerLog" />
+          </h4>
           <div className="flex max-h-[220px] flex-col-reverse overflow-auto font-mono text-[10px]">
             {errors.map((e, i) => (
               <div className="border-b border-dashed border-border py-0.5 text-danger" key={`e${i}`}>

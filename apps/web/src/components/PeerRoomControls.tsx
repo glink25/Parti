@@ -1,7 +1,10 @@
 import { CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
 import type { HostRoomSettings } from '@/lib/roomSettings.js';
+import type { LobbyStatusKey } from '@/lib/lobbyApi.js';
 import { generateRoomPassword } from '@/lib/roomSettings.js';
+import { formatLobbyStatus } from '@/i18n/formatErrors.js';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.js';
@@ -15,7 +18,8 @@ export type RoomControlsProps = {
   settings: HostRoomSettings;
   passwordDraft: string;
   admission: RoomAdmissionStatus;
-  lobbyStatus: string;
+  lobbyStatus: LobbyStatusKey;
+  lobbyError: string | null;
   inviteUrl: string;
   copied: boolean;
   onCopyInvite: () => void;
@@ -30,43 +34,75 @@ function InviteCard({ props }: { props: RoomControlsProps }) {
   return (
     <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
       <CardHeader>
-        <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">邀请朋友</span>
-        <CardTitle className="text-lg">一起加入房间</CardTitle>
-        <CardDescription>{settings.password ? '链接中已包含房间密码，可以直接分享。' : '复制链接，邀请朋友现在加入。'}</CardDescription>
+        <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">
+          <FormattedMessage id="peer.invite.eyebrow" />
+        </span>
+        <CardTitle className="text-lg"><FormattedMessage id="peer.invite.title" /></CardTitle>
+        <CardDescription>
+          <FormattedMessage id={settings.password ? 'peer.invite.withPassword' : 'peer.invite.withoutPassword'} />
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex gap-[7px]">
           <Input className="min-w-0 flex-1" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
           <div className="flex shrink-0 gap-[7px]">
-            <Button type="button" onClick={onCopyInvite}><CopyIcon data-icon="inline-start" />{copied ? '已复制' : '复制'}</Button>
-            <Button type="button" variant="outline" onClick={onOpenQr}><QrCodeIcon data-icon="inline-start" />二维码</Button>
+            <Button type="button" onClick={onCopyInvite}>
+              <CopyIcon data-icon="inline-start" />
+              <FormattedMessage id={copied ? 'peer.invite.copied' : 'peer.invite.copy'} />
+            </Button>
+            <Button type="button" variant="outline" onClick={onOpenQr}>
+              <QrCodeIcon data-icon="inline-start" /><FormattedMessage id="peer.invite.qr" />
+            </Button>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground"><span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />{admission.joinable ? '当前可加入' : '房间人数已满'}</div>
+        <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground">
+          <span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />
+          <FormattedMessage id={admission.joinable ? 'peer.invite.joinable' : 'peer.invite.full'} />
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 function SettingsCard({ props }: { props: RoomControlsProps }) {
-  const { settings, passwordDraft, lobbyStatus, onPasswordDraftChange, onApplySettings, onTogglePublic } = props;
+  const intl = useIntl();
+  const { settings, passwordDraft, lobbyStatus, lobbyError, onPasswordDraftChange, onApplySettings, onTogglePublic } = props;
   return (
     <Card className="gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
       <CardHeader className="flex items-start justify-between gap-3">
-        <div><span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">房间设置</span><CardTitle className="mt-1 text-lg">管理房间</CardTitle></div>
-        <Badge variant={settings.isPublic ? 'default' : 'secondary'}>{settings.isPublic ? '公开' : '私密'}</Badge>
+        <div>
+          <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">
+            <FormattedMessage id="peer.settings.eyebrow" />
+          </span>
+          <CardTitle className="mt-1 text-lg"><FormattedMessage id="peer.settings.title" /></CardTitle>
+        </div>
+        <Badge variant={settings.isPublic ? 'default' : 'secondary'}>
+          <FormattedMessage id={settings.isPublic ? 'peer.settings.public' : 'peer.settings.private'} />
+        </Badge>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">房间标题<Input value={settings.title} maxLength={80} onChange={(event) => onApplySettings({ ...settings, title: event.target.value })} /></Label>
         <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
-          4 位密码（留空为无密码）
+          <FormattedMessage id="peer.settings.roomTitle" />
+          <Input value={settings.title} maxLength={80} onChange={(event) => onApplySettings({ ...settings, title: event.target.value })} />
+        </Label>
+        <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
+          <FormattedMessage id="peer.settings.passwordLabel" />
           <div className="flex gap-[7px]">
             <Input className="min-w-0 flex-1" value={passwordDraft} inputMode="numeric" maxLength={4} onChange={(event) => onPasswordDraftChange(event.target.value.replace(/\D/g, '').slice(0, 4))} onBlur={() => { if (passwordDraft !== '' && !/^\d{4}$/.test(passwordDraft)) onPasswordDraftChange(settings.password); }} />
-            <Button type="button" variant="outline" onClick={() => onPasswordDraftChange(generateRoomPassword())}><WandSparklesIcon data-icon="inline-start" />生成</Button>
+            <Button type="button" variant="outline" onClick={() => onPasswordDraftChange(generateRoomPassword())}>
+              <WandSparklesIcon data-icon="inline-start" /><FormattedMessage id="peer.settings.generate" />
+            </Button>
           </div>
         </Label>
-        <div><Button type="button" variant={settings.isPublic ? 'outline' : 'default'} onClick={onTogglePublic}>{settings.isPublic ? '设为私密' : '公开到大厅'}</Button></div>
-        <span className="text-[10px] text-muted-foreground">{lobbyStatus}</span>
+        <div>
+          <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} onClick={onTogglePublic}>
+            <FormattedMessage id={settings.isPublic ? 'peer.settings.makePrivate' : 'peer.settings.makePublic'} />
+          </Button>
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          {formatLobbyStatus(intl, lobbyStatus)}
+          {lobbyError ? ` · ${lobbyError}` : ''}
+        </span>
       </CardContent>
     </Card>
   );
@@ -87,7 +123,10 @@ export function RoomControlsSheet({ open, onOpenChange, props }: { open: boolean
   return (
     <Sheet open onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
-        <SheetHeader className="border-b px-5 py-4 text-left"><SheetTitle>房间设置</SheetTitle><SheetDescription>邀请朋友加入，或调整标题、密码和公开状态。</SheetDescription></SheetHeader>
+        <SheetHeader className="border-b px-5 py-4 text-left">
+          <SheetTitle><FormattedMessage id="peer.settings.sheetTitle" /></SheetTitle>
+          <SheetDescription><FormattedMessage id="peer.settings.sheetDescription" /></SheetDescription>
+        </SheetHeader>
         <div className="grid gap-3 overflow-y-auto px-4 pb-5 sm:grid-cols-2"><ControlsContent props={props} /></div>
       </SheetContent>
     </Sheet>

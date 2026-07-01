@@ -82,14 +82,25 @@ export async function resolvePackage(id: string): Promise<RoomPackage> {
 
 async function createPackageFromTemplate(templateId: string): Promise<RoomPackage> {
   const input = await getTemplatePackage(templateId);
-  if (!input) throw new Error(`未知房间: ${templateId}`);
+  if (!input) throw new RoomNotFoundError(templateId);
   return createPackage(input);
+}
+
+export class RoomNotFoundError extends Error {
+  readonly templateId: string;
+
+  constructor(templateId: string) {
+    super(templateId);
+    this.name = 'RoomNotFoundError';
+    this.templateId = templateId;
+  }
 }
 
 export interface TemplateListEntry {
   id: string;
   name: string;
   description: string;
+  descriptionFallback?: 'importedTemplate';
   cover?: string;
   /** 导入模版可删除；内置模版为 false */
   removable: boolean;
@@ -113,6 +124,7 @@ export async function getTemplateList(): Promise<TemplateListEntry[]> {
     id: t.id,
     name: t.name,
     description: t.description,
+    ...(t.descriptionFallback ? { descriptionFallback: t.descriptionFallback } : {}),
     removable: true,
     usageCount: usage[t.id] ?? 0,
   }));

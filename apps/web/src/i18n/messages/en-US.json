@@ -1,0 +1,259 @@
+{
+  "app": {
+    "documentTitle": "Parti — Create and play together with friends",
+    "header": {
+      "tagline": "Create and play together with friends",
+      "backToLobby": "Back to Parti lobby",
+      "github": "View Parti source on GitHub"
+    }
+  },
+  "user": {
+    "settings": {
+      "title": "User settings",
+      "description": "This identity is saved in your browser and used when creating or joining rooms.",
+      "sheetTitle": "Settings",
+      "sheetDescription": "Manage your local identity and interface preferences.",
+      "profileEyebrow": "Profile",
+      "profileTitle": "User settings",
+      "profileDescription": "This identity is saved in your browser and used when creating or joining rooms.",
+      "languageEyebrow": "Interface",
+      "languageTitle": "Language",
+      "idInline": "ID: {id}",
+      "ariaLabel": "User settings: {name}",
+      "nameLabel": "Display name",
+      "nameHint": "Friends will recognize you by this name in rooms.",
+      "save": "Save name",
+      "saved": "Saved. It will apply on your next visit or reconnect.",
+      "languageLabel": "Language",
+      "languageHint": "Interface language, saved in this browser."
+    },
+    "validation": {
+      "empty": "Display name cannot be empty",
+      "tooLong": "Display name cannot exceed {max} characters"
+    }
+  },
+  "randomName": {
+    "adjectives": ["Happy", "Brave", "Shiny", "Chill", "Clever", "Gentle", "Lucky", "Eager"],
+    "animals": ["Otter", "Panda", "Fox", "Capybara", "Penguin", "Raccoon", "Bunny", "Ginger Cat"]
+  },
+  "lobby": {
+    "hero": {
+      "title": "Online lobby",
+      "description": "Discover rooms in progress, or create a fun space for your group.",
+      "createRoom": "Create online room"
+    },
+    "live": {
+      "title": "Live now",
+      "roomCount": "{count, plural, one {# room} other {# rooms}}"
+    },
+    "loading": "Looking for joinable rooms…",
+    "offline": {
+      "title": "Lobby is temporarily unavailable",
+      "description": "You can still create a room and invite friends with a link."
+    },
+    "empty": {
+      "title": "Waiting for the first party",
+      "description": "No public rooms yet. Create one and invite your friends.",
+      "createRoom": "Create room"
+    },
+    "room": {
+      "passwordRequired": "Password",
+      "playersOnline": "{count} online",
+      "playersCapacity": "{current} / {max}",
+      "join": "Join room",
+      "full": "Room full"
+    },
+    "status": {
+      "publishing": "Publishing…",
+      "published": "Public",
+      "syncFailed": "Sync failed, will retry automatically",
+      "private": "Private",
+      "restoring": "Restoring public listing…",
+      "lobbyUnavailableKeptPrivate": "Lobby unavailable; room kept private",
+      "lobbyUnavailableStillPrivate": "Lobby unavailable; room remains private"
+    }
+  },
+  "editor": {
+    "backToLobby": "← Back to lobby",
+    "backToTemplates": "← Back to templates",
+    "title": "Create online room",
+    "description": "Pick a template to start building, then invite friends when you're ready.",
+    "aiCreateAria": "Create room with AI",
+    "newRoom": {
+      "title": "New room",
+      "blank": "Start from blank template",
+      "importZip": "Import from ZIP",
+      "importing": "Importing…",
+      "githubPlaceholder": "Paste a GitHub URL and press Enter",
+      "githubImportAria": "Import room from GitHub"
+    },
+    "template": {
+      "selected": "Selected",
+      "continueEdit": "Continue editing",
+      "deleteAria": "Delete {name}",
+      "replaceTitle": "Replace current content?",
+      "replaceDescription": "Switching to \"{name}\" will replace your code and extra files. This cannot be undone.",
+      "keepCurrent": "Keep current content",
+      "confirmReplace": "Confirm replace"
+    },
+    "files": {
+      "ariaLabel": "Room files",
+      "extraTitle": "Extra files",
+      "extraDescription": "Add styles or other text assets. They are saved with the room.",
+      "addFile": "Add file",
+      "removeAria": "Remove {name}"
+    },
+    "error": {
+      "invalidJson": "Room config is not valid JSON. Please check and try again.",
+      "clipboardFailed": "Copy failed. Please allow clipboard access for this page and try again."
+    },
+    "dock": {
+      "readyTitle": "Ready to go?",
+      "readyDescription": "After creating, you can set title, password, and visibility.",
+      "localPreview": "Local preview",
+      "creating": "Creating…",
+      "createPeer": "Create online room",
+      "continueCreate": "Continue"
+    },
+    "ai": {
+      "dialogTitle": "Let AI build your game idea",
+      "dialogDescription": "Copy a Parti-ready prompt for your favorite AI. It will read the project docs first, then generate complete room code.",
+      "filesTitle": "AI will generate these required files",
+      "stepsTitle": "How to use",
+      "step1": "Copy the prompt and send it to your AI.",
+      "step2": "Add gameplay, player count, win conditions, and visual style.",
+      "step3": "Review the code, zip the three files, or upload to GitHub and import here.",
+      "warning": "AI-generated code may still have bugs. Review before importing and validate with local preview.",
+      "copy": "Create with AI",
+      "copied": "Prompt copied",
+      "prompt": "Please help me create a multiplayer online game room that can be imported directly into Parti.\n\nBefore designing and writing code, read and understand all documents in this GitHub docs directory:\nhttps://github.com/glink25/Parti/tree/main/docs\n\nStrictly follow the docs on Manifest, client API, Worker API, protocol, and Host Runtime. Room state must be authoritative on the Worker; clients may only read state and submit actions through the Parti API.\n\nMy game idea (please fill in gameplay, player count, win/lose conditions, and visual style):\n[Describe your game idea here]\n\nIf critical details are missing, ask brief necessary questions first. Once you have enough info, the final result must:\n1. Provide a complete file structure with at least parti.room.json, index.html, and room.worker.js.\n2. Output full contents of all three files—no ellipses, pseudocode, placeholders, or unsupported dependencies.\n3. Ensure manifest entry files, player counts, and permissions match the code.\n4. Implement multiplayer sync, server-side action validation, win/end conditions, and safe handling of bad input.\n5. UI should be clear, responsive, and usable on mobile.\n6. Self-review against all Parti docs before output.\n\nFormat the answer so the user can save each file and zip them for direct Parti import."
+    },
+    "defaults": {
+      "blankName": "Blank room",
+      "blankDescription": "Start from a simple interactive counter and shape it into your game.",
+      "roomName": "My room",
+      "roomDescription": "An interactive room to play with friends",
+      "htmlTitle": "My room",
+      "htmlButton": "+1",
+      "html": "<div style=\"font-family: system-ui, sans-serif; padding: 24px; color: #111;\">\n  <h1 style=\"font-size: 24px;\">My room</h1>\n  <div id=\"count\" style=\"font-size: 48px; font-weight: 800;\">0</div>\n  <button id=\"inc\" style=\"font-size: 16px; padding: 10px 18px;\">+1</button>\n  <script>\n    const countEl = document.getElementById('count');\n    parti.onState((state) => { countEl.textContent = String(state.count); });\n    document.getElementById('inc').onclick = () => parti.action('increment');\n    parti.ready();\n  </script>\n</div>"
+    }
+  },
+  "peer": {
+    "loading": {
+      "room": "Loading room…",
+      "preparing": "Preparing room…",
+      "joining": "Joining room…",
+      "browserHint": "For the best experience, use your system browser or Chrome"
+    },
+    "host": {
+      "exit": "← Leave room",
+      "playersOnline": "<b>{count}</b> online",
+      "playersCapacity": " / {max}",
+      "settings": "Room settings",
+      "hostView": "Host view"
+    },
+    "join": {
+      "passwordTitle": "Enter room password",
+      "passwordDescription": "This room requires a password to join.",
+      "passwordAria": "4-digit room password",
+      "passwordPlaceholder": "4-digit password",
+      "wrongPassword": "Wrong password, please try again",
+      "join": "Join room"
+    },
+    "playerView": "Room view",
+    "role": {
+      "host": "Host",
+      "player": "Player"
+    },
+    "error": {
+      "title": "Unable to enter room",
+      "backToLobby": "Back to lobby",
+      "connectionFailed": "Cannot reach the host. Make sure the room is still active and try again.",
+      "credentialRequired": "This room requires a password",
+      "invalidCredential": "Incorrect room password"
+    },
+    "fetchPackage": {
+      "timeout": "Timed out fetching room package (host may be offline or using an older version)",
+      "disconnected": "Disconnected from host before receiving the room package"
+    },
+    "invite": {
+      "eyebrow": "Invite friends",
+      "title": "Join the room together",
+      "withPassword": "The link includes the room password and is ready to share.",
+      "withoutPassword": "Copy the link and invite friends to join now.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "qr": "QR code",
+      "joinable": "Joinable now",
+      "full": "Room is full",
+      "qrTitle": "Scan to join",
+      "qrInvite": "{inviterName} invited you to {roomTitle}",
+      "qrFailed": "Failed to generate QR code",
+      "iconLoadFailed": "Failed to load icon"
+    },
+    "settings": {
+      "eyebrow": "Room settings",
+      "title": "Manage room",
+      "public": "Public",
+      "private": "Private",
+      "roomTitle": "Room title",
+      "passwordLabel": "4-digit password (leave empty for none)",
+      "generate": "Generate",
+      "makePrivate": "Make private",
+      "makePublic": "List in lobby",
+      "sheetTitle": "Room settings",
+      "sheetDescription": "Invite friends or adjust title, password, and visibility."
+    },
+    "fullscreen": {
+      "enter": "Fullscreen",
+      "enterAria": "View room in fullscreen",
+      "settingsAria": "Room settings",
+      "exitAria": "Exit fullscreen",
+      "exitTitle": "Exit fullscreen (Esc)"
+    }
+  },
+  "local": {
+    "loadFailed": "Load failed: {error}",
+    "backToLobby": "Back to lobby",
+    "loading": "Loading room package and starting runtime…",
+    "title": "Local multiplayer preview · {name}",
+    "seat": {
+      "host": "Host",
+      "alice": "Alice",
+      "bob": "Bob"
+    }
+  },
+  "devTools": {
+    "title": "DevTools",
+    "players": "Players ({count})",
+    "manualAction": "Send action manually (as host)",
+    "send": "Send",
+    "currentState": "Current state (v{version})",
+    "messageLog": "Message log",
+    "workerLog": "Worker / error log",
+    "invalidPayload": "payload is not valid JSON"
+  },
+  "import": {
+    "error": {
+      "MANIFEST_NOT_FOUND": "parti.room.json not found. This does not look like a valid room package.",
+      "MANIFEST_INVALID_JSON": "parti.room.json is not valid JSON.",
+      "UI_ENTRY_MISSING": "Missing UI entry file: {path}",
+      "WORKER_ENTRY_MISSING": "Missing worker entry file: {path}",
+      "ZIP_MANIFEST_NOT_FOUND": "parti.room.json not found in ZIP.",
+      "GITHUB_URL_INVALID": "Unrecognized GitHub URL. Provide a blob/tree link to a file or folder.",
+      "GITHUB_RATE_LIMITED": "GitHub API rate limited (60/hour unauthenticated). Please try again later.",
+      "GITHUB_DIR_READ_FAILED": "Failed to read GitHub directory ({status}).",
+      "GITHUB_MANIFEST_NOT_FOUND": "parti.room.json not found in the folder for this URL.",
+      "DOWNLOAD_FAILED": "Failed to download file: {path}"
+    }
+  },
+  "template": {
+    "fallback": {
+      "customRoom": "Custom room",
+      "importedTemplate": "Imported room template"
+    }
+  },
+  "rooms": {
+    "unknown": "Unknown room: {id}"
+  }
+}

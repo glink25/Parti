@@ -19,6 +19,7 @@ export interface TemplateMeta {
   id: string;
   name: string;
   description: string;
+  descriptionFallback?: 'importedTemplate';
   source?: TemplateRecord['source'];
 }
 
@@ -35,7 +36,8 @@ export async function listImportedTemplates(): Promise<TemplateMeta[]> {
     .map((t) => ({
       id: t.id,
       name: t.manifest.name ?? t.id,
-      description: t.manifest.description ?? '导入的房间模版',
+      description: t.manifest.description ?? '',
+      ...(t.manifest.description ? {} : { descriptionFallback: 'importedTemplate' as const }),
       source: t.source,
     }));
 }

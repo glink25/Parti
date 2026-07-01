@@ -24,6 +24,15 @@ export interface LobbyLease {
   expiresAt: number;
 }
 
+export type LobbyStatusKey =
+  | 'publishing'
+  | 'published'
+  | 'syncFailed'
+  | 'private'
+  | 'restoring'
+  | 'lobbyUnavailableKeptPrivate'
+  | 'lobbyUnavailableStillPrivate';
+
 export class LobbyHttpError extends Error {
   constructor(
     message: string,
@@ -100,7 +109,7 @@ export class LobbyPublisher {
   constructor(
     private readonly roomId: string,
     private readonly client: LobbyClient,
-    private readonly onStatus: (status: string) => void,
+    private readonly onStatus: (status: LobbyStatusKey) => void,
   ) {
     this.lease = loadLease(roomId);
   }
@@ -108,7 +117,7 @@ export class LobbyPublisher {
   async publish(input: LobbyRoomInput): Promise<void> {
     this.input = input;
     this.startHeartbeat();
-    this.onStatus('正在上架…');
+    this.onStatus('publishing');
     await this.client.health();
     if (this.lease) {
       try {
@@ -120,7 +129,7 @@ export class LobbyPublisher {
     }
     if (!this.lease) this.lease = await this.client.createRoom(input);
     saveLease(this.roomId, this.lease);
-    this.onStatus('已公开');
+    this.onStatus('published');
   }
 
   async sync(input: LobbyRoomInput): Promise<void> {
@@ -129,14 +138,14 @@ export class LobbyPublisher {
       try {
         await this.publish(input);
       } catch {
-        this.onStatus('同步失败，将自动重试');
+        this.onStatus('syncFailed');
       }
       return;
     }
     try {
       this.lease = await this.client.updateRoom(this.lease, input);
       saveLease(this.roomId, this.lease);
-      this.onStatus('已公开');
+      this.onStatus('published');
     } catch (error) {
       if (error instanceof LobbyHttpError && error.status === 404) {
         this.lease = null;
@@ -144,7 +153,7 @@ export class LobbyPublisher {
         await this.publish(input);
         return;
       }
-      this.onStatus('同步失败，将自动重试');
+      this.onStatus('syncFailed');
     }
   }
 
@@ -160,7 +169,7 @@ export class LobbyPublisher {
         // 租约会在服务端自动过期。
       }
     }
-    this.onStatus('私密');
+    this.onStatus('private');
   }
 
   private startHeartbeat(): void {

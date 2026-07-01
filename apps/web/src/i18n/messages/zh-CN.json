@@ -1,0 +1,259 @@
+{
+  "app": {
+    "documentTitle": "Parti — 和朋友一起创造，一起游玩",
+    "header": {
+      "tagline": "和朋友一起创造，一起游玩",
+      "backToLobby": "返回 Parti 大厅",
+      "github": "在 GitHub 上查看 Parti 源码"
+    }
+  },
+  "user": {
+    "settings": {
+      "title": "用户设置",
+      "description": "这个身份保存在当前浏览器中，并用于创建或加入房间。",
+      "sheetTitle": "设置",
+      "sheetDescription": "管理你的本地身份与界面偏好。",
+      "profileEyebrow": "用户",
+      "profileTitle": "用户设置",
+      "profileDescription": "这个身份保存在当前浏览器中，并用于创建或加入房间。",
+      "languageEyebrow": "界面",
+      "languageTitle": "语言设置",
+      "idInline": "ID: {id}",
+      "ariaLabel": "用户设置：{name}",
+      "nameLabel": "用户名",
+      "nameHint": "朋友会在房间中通过这个名称认出你。",
+      "save": "保存用户名",
+      "saved": "已保存，将在下次进入或重连房间时生效。",
+      "languageLabel": "语言",
+      "languageHint": "界面显示语言，保存在当前浏览器中。"
+    },
+    "validation": {
+      "empty": "用户名不能为空",
+      "tooLong": "用户名不能超过 {max} 个字符"
+    }
+  },
+  "randomName": {
+    "adjectives": ["快乐", "勇敢", "闪亮", "悠闲", "机灵", "温柔", "幸运", "热情"],
+    "animals": ["海獭", "熊猫", "狐狸", "水豚", "企鹅", "浣熊", "兔子", "橘猫"]
+  },
+  "lobby": {
+    "hero": {
+      "title": "在线大厅",
+      "description": "发现正在进行的房间，或者创建一个属于你们的欢乐现场。",
+      "createRoom": "创建联机房间"
+    },
+    "live": {
+      "title": "正在进行",
+      "roomCount": "{count, plural, other {# 个房间}}"
+    },
+    "loading": "正在寻找可加入的房间…",
+    "offline": {
+      "title": "大厅暂时无法连接",
+      "description": "你仍然可以创建房间，通过邀请链接和朋友一起玩。"
+    },
+    "empty": {
+      "title": "等待第一场派对",
+      "description": "这里还没有公开房间，创建一个房间邀请朋友加入吧。",
+      "createRoom": "创建房间"
+    },
+    "room": {
+      "passwordRequired": "需密码",
+      "playersOnline": "{count} 人在线",
+      "playersCapacity": "{current} / {max} 人",
+      "join": "加入房间",
+      "full": "房间已满"
+    },
+    "status": {
+      "publishing": "正在上架…",
+      "published": "已公开",
+      "syncFailed": "同步失败，将自动重试",
+      "private": "私密",
+      "restoring": "正在恢复公开状态…",
+      "lobbyUnavailableKeptPrivate": "大厅暂时不可用，房间已保持私密",
+      "lobbyUnavailableStillPrivate": "大厅暂时不可用，房间仍为私密"
+    }
+  },
+  "editor": {
+    "backToLobby": "← 返回大厅",
+    "backToTemplates": "← 返回选择模板",
+    "title": "创建联机房间",
+    "description": "选择一个模板开始创作，完成后立即邀请朋友加入。",
+    "aiCreateAria": "使用 AI 创建房间",
+    "newRoom": {
+      "title": "新建房间",
+      "blank": "从空白模版开始",
+      "importZip": "从 ZIP 导入",
+      "importing": "导入中…",
+      "githubPlaceholder": "粘贴 GitHub 地址，回车导入",
+      "githubImportAria": "导入 GitHub 房间"
+    },
+    "template": {
+      "selected": "已选择",
+      "continueEdit": "继续编辑",
+      "deleteAria": "删除 {name}",
+      "replaceTitle": "替换当前内容？",
+      "replaceDescription": "切换到「{name}」会替换当前代码和附加文件，此操作无法撤销。",
+      "keepCurrent": "保留当前内容",
+      "confirmReplace": "确认替换"
+    },
+    "files": {
+      "ariaLabel": "房间文件",
+      "extraTitle": "附加文件",
+      "extraDescription": "可加入样式或其他文本资源，文件会和房间内容一起保存。",
+      "addFile": "添加文件",
+      "removeAria": "移除 {name}"
+    },
+    "error": {
+      "invalidJson": "房间配置不是有效的 JSON，请检查后重试。",
+      "clipboardFailed": "复制失败，请允许此页面访问剪贴板后重试。"
+    },
+    "dock": {
+      "readyTitle": "准备好了吗？",
+      "readyDescription": "创建后可继续设置标题、密码和公开状态。",
+      "localPreview": "本地预览",
+      "creating": "正在创建…",
+      "createPeer": "创建联机房间",
+      "continueCreate": "继续创建"
+    },
+    "ai": {
+      "dialogTitle": "让 AI 实现你的游戏创意",
+      "dialogDescription": "复制一段为 Parti 准备的提示词，交给你常用的 AI，它会先阅读项目文档，再生成完整的房间代码。",
+      "filesTitle": "AI 会生成这些必需文件",
+      "stepsTitle": "使用方式",
+      "step1": "复制提示词并发送给 AI。",
+      "step2": "补充玩法、玩家人数、胜负条件和视觉风格。",
+      "step3": "检查生成的代码，将三个文件打包为 ZIP，或上传 GitHub 后回到这里导入。",
+      "warning": "AI 生成的代码仍可能出错。导入前请检查内容，并先通过本地预览验证玩法。",
+      "copy": "让 AI 帮我创建",
+      "copied": "提示词已复制",
+      "prompt": "请帮我创建一个可以直接导入 Parti 的多人联机游戏房间。\n\n开始设计和编写代码前，请先阅读并理解以下 GitHub docs 目录中的全部文档：\nhttps://github.com/glink25/Parti/tree/main/docs\n\n请严格遵守文档中关于 Manifest、客户端 API、Worker API、协议和 Host Runtime 的约束，尤其注意房间状态必须由 Worker 权威管理，客户端只能通过 Parti API 读取状态和提交动作。\n\n我的游戏创意如下（请让我在这里补充玩法、玩家人数、胜负条件和视觉风格）：\n[在这里补充你的游戏创意]\n\n如果需求中缺少会影响实现的关键信息，请先提出简短、必要的问题；信息足够后再生成最终结果。最终结果必须：\n1. 给出可直接保存的完整文件结构，至少包含 parti.room.json、index.html 和 room.worker.js。\n2. 分别输出三个文件的完整内容，不使用省略号、伪代码、占位实现或 Parti 不支持的依赖。\n3. 确保 manifest 的入口文件、玩家人数和权限配置与代码一致。\n4. 正确实现多人状态同步、服务端动作校验、胜负或结束条件，并安全处理异常或恶意输入。\n5. UI 应清晰、响应式，并能在手机端正常操作。\n6. 输出前自行复核代码与全部 Parti 文档约束，修正发现的问题。\n\n请将最终答案整理成用户可以逐个保存文件、打包为 ZIP 后直接导入 Parti 的形式。"
+    },
+    "defaults": {
+      "blankName": "空白房间",
+      "blankDescription": "从简洁的互动计数器开始，自由改造成你的玩法。",
+      "roomName": "我的房间",
+      "roomDescription": "和朋友一起玩的互动房间",
+      "htmlTitle": "我的房间",
+      "htmlButton": "+1",
+      "html": "<div style=\"font-family: system-ui, sans-serif; padding: 24px; color: #111;\">\n  <h1 style=\"font-size: 24px;\">我的房间</h1>\n  <div id=\"count\" style=\"font-size: 48px; font-weight: 800;\">0</div>\n  <button id=\"inc\" style=\"font-size: 16px; padding: 10px 18px;\">+1</button>\n  <script>\n    const countEl = document.getElementById('count');\n    parti.onState((state) => { countEl.textContent = String(state.count); });\n    document.getElementById('inc').onclick = () => parti.action('increment');\n    parti.ready();\n  </script>\n</div>"
+    }
+  },
+  "peer": {
+    "loading": {
+      "room": "正在加载房间…",
+      "preparing": "正在准备房间…",
+      "joining": "正在加入房间…",
+      "browserHint": "使用系统浏览器或者Chrome浏览器体验最佳"
+    },
+    "host": {
+      "exit": "← 退出房间",
+      "playersOnline": "<b>{count}</b> 人在线",
+      "playersCapacity": " / {max}",
+      "settings": "房间设置",
+      "hostView": "房主画面"
+    },
+    "join": {
+      "passwordTitle": "输入房间密码",
+      "passwordDescription": "这个房间需要密码才能加入。",
+      "passwordAria": "4 位房间密码",
+      "passwordPlaceholder": "4 位数字密码",
+      "wrongPassword": "密码错误，请重试",
+      "join": "加入房间"
+    },
+    "playerView": "房间画面",
+    "role": {
+      "host": "房主",
+      "player": "玩家"
+    },
+    "error": {
+      "title": "暂时无法进入房间",
+      "backToLobby": "返回大厅",
+      "connectionFailed": "暂时无法连接房主，请确认房间仍在进行并稍后重试。",
+      "credentialRequired": "该房间需要密码",
+      "invalidCredential": "房间密码错误"
+    },
+    "fetchPackage": {
+      "timeout": "取房间代码包超时（房主可能不在线，或使用了不支持取包的旧版本）",
+      "disconnected": "与房主的连接已断开，未能取得房间代码包"
+    },
+    "invite": {
+      "eyebrow": "邀请朋友",
+      "title": "一起加入房间",
+      "withPassword": "链接中已包含房间密码，可以直接分享。",
+      "withoutPassword": "复制链接，邀请朋友现在加入。",
+      "copy": "复制",
+      "copied": "已复制",
+      "qr": "二维码",
+      "joinable": "当前可加入",
+      "full": "房间人数已满",
+      "qrTitle": "扫码加入房间",
+      "qrInvite": "{inviterName}邀请你来{roomTitle}",
+      "qrFailed": "二维码生成失败",
+      "iconLoadFailed": "无法加载图标"
+    },
+    "settings": {
+      "eyebrow": "房间设置",
+      "title": "管理房间",
+      "public": "公开",
+      "private": "私密",
+      "roomTitle": "房间标题",
+      "passwordLabel": "4 位密码（留空为无密码）",
+      "generate": "生成",
+      "makePrivate": "设为私密",
+      "makePublic": "公开到大厅",
+      "sheetTitle": "房间设置",
+      "sheetDescription": "邀请朋友加入，或调整标题、密码和公开状态。"
+    },
+    "fullscreen": {
+      "enter": "全屏展示",
+      "enterAria": "全屏展示房间",
+      "settingsAria": "房间设置",
+      "exitAria": "退出全屏展示",
+      "exitTitle": "退出全屏（Esc）"
+    }
+  },
+  "local": {
+    "loadFailed": "加载失败：{error}",
+    "backToLobby": "返回大厅",
+    "loading": "正在加载 Room Package 并启动 Runtime…",
+    "title": "本地多人预览 · {name}",
+    "seat": {
+      "host": "Host",
+      "alice": "Alice",
+      "bob": "Bob"
+    }
+  },
+  "devTools": {
+    "title": "DevTools",
+    "players": "玩家 ({count})",
+    "manualAction": "手动发送 action（以 host 身份）",
+    "send": "发送",
+    "currentState": "当前 State (v{version})",
+    "messageLog": "消息日志",
+    "workerLog": "Worker / 错误日志",
+    "invalidPayload": "payload 不是合法 JSON"
+  },
+  "import": {
+    "error": {
+      "MANIFEST_NOT_FOUND": "未找到 parti.room.json，无法识别为有效的房间包。",
+      "MANIFEST_INVALID_JSON": "parti.room.json 不是有效的 JSON。",
+      "UI_ENTRY_MISSING": "缺少 UI 入口文件：{path}",
+      "WORKER_ENTRY_MISSING": "缺少 worker 入口文件：{path}",
+      "ZIP_MANIFEST_NOT_FOUND": "ZIP 中未找到 parti.room.json。",
+      "GITHUB_URL_INVALID": "无法识别的 GitHub 地址，请提供指向文件或文件夹的 blob/tree 链接。",
+      "GITHUB_RATE_LIMITED": "GitHub API 请求受限（未认证限速 60 次/时），请稍后再试。",
+      "GITHUB_DIR_READ_FAILED": "读取 GitHub 目录失败（{status}）。",
+      "GITHUB_MANIFEST_NOT_FOUND": "该地址对应的文件夹下未找到 parti.room.json。",
+      "DOWNLOAD_FAILED": "下载文件失败：{path}"
+    }
+  },
+  "template": {
+    "fallback": {
+      "customRoom": "自定义房间",
+      "importedTemplate": "导入的房间模版"
+    }
+  },
+  "rooms": {
+    "unknown": "未知房间: {id}"
+  }
+}

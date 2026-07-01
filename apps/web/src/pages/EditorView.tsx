@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -22,13 +23,31 @@ import { createRoom } from '../lib/customRooms.js';
 import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom.js';
 import { deleteImportedTemplate, recordTemplateUsage, saveDerivedTemplate } from '../lib/templates.js';
 import { getTemplateList, resolvePackage, type TemplateListEntry } from '../lib/rooms.js';
-import { AI_ROOM_PROMPT, BLANK_TEMPLATE, DEFAULT_HTML, DEFAULT_WORKER, blankManifest, type EditorFile, type SelectableTemplate } from '@/components/editor/editorDefaults.js';
+import { useLocale } from '@/i18n/LocaleProvider.js';
+import { formatResolveError, templateDescription } from '@/i18n/formatErrors.js';
+import {
+  blankManifest,
+  getAiRoomPrompt,
+  getBlankTemplate,
+  getDefaultHtml,
+  DEFAULT_WORKER,
+  type EditorFile,
+  type SelectableTemplate,
+} from '@/components/editor/editorDefaults.js';
 import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs.js';
 import { EditorActionDock } from '@/components/editor/EditorActionDock.js';
 
+function formatError(intl: ReturnType<typeof useIntl>, reason: unknown): string {
+  return formatResolveError(intl, reason);
+}
+
 export function EditorView() {
-  const [manifestText, setManifestText] = useState(blankManifest);
-  const [htmlText, setHtmlText] = useState(DEFAULT_HTML);
+  const intl = useIntl();
+  const { locale } = useLocale();
+  const blankTemplate = getBlankTemplate(locale);
+
+  const [manifestText, setManifestText] = useState(() => blankManifest(locale));
+  const [htmlText, setHtmlText] = useState(() => getDefaultHtml(locale));
   const [workerText, setWorkerText] = useState(DEFAULT_WORKER);
   const [extraFiles, setExtraFiles] = useState<Record<string, string>>({});
   const [activeFile, setActiveFile] = useState<EditorFile>('manifest');
@@ -46,12 +65,11 @@ export function EditorView() {
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [aiCopyError, setAiCopyError] = useState<string | null>(null);
 
-  // 首次加载模版列表（内置 + 导入，按使用次数排序），默认选中第一个。
   useEffect(() => {
     void (async () => {
       const list = await getTemplateList();
       setTemplates(list);
-      await applyTemplate(list[0] ?? BLANK_TEMPLATE);
+      await applyTemplate(list[0] ?? blankTemplate);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -67,8 +85,8 @@ export function EditorView() {
     setError(null);
     try {
       if (template.id === 'blank') {
-        setManifestText(blankManifest());
-        setHtmlText(DEFAULT_HTML);
+        setManifestText(blankManifest(locale));
+        setHtmlText(getDefaultHtml(locale));
         setWorkerText(DEFAULT_WORKER);
         setExtraFiles({});
       } else {
@@ -88,7 +106,7 @@ export function EditorView() {
       setActiveFile('manifest');
       setDirty(false);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(formatError(intl, reason));
     } finally {
       setTemplateBusy(false);
       setPendingTemplate(null);
@@ -104,14 +122,13 @@ export function EditorView() {
     void applyTemplate(template);
   }
 
-  /** 从编辑器内容构造并校验包输入（用于空白/编辑后的派生包）。 */
   async function buildEditorInput(): Promise<RoomPackageInput | null> {
     setError(null);
     let manifest: unknown;
     try {
       manifest = JSON.parse(manifestText);
     } catch {
-      setError('房间配置不是有效的 JSON，请检查后重试。');
+      setError(intl.formatMessage({ id: 'editor.error.invalidJson' }));
       setActiveFile('manifest');
       return null;
     }
@@ -126,12 +143,11 @@ export function EditorView() {
       await createPackage(input);
       return input;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(formatError(intl, reason));
       return null;
     }
   }
 
-  /** 解析出本次房间应指向的 templateId（未改动→复用模版；改动/空白→存派生包）。 */
   async function resolveTemplateId(): Promise<string | null> {
     if (!dirty && activeTemplate !== 'blank') return activeTemplate;
     const input = await buildEditorInput();
@@ -148,7 +164,7 @@ export function EditorView() {
       if (activeTemplate !== 'blank') await recordTemplateUsage(activeTemplate);
       window.location.hash = target === 'local' ? `#/local/${roomId}` : `#/peer/host/${roomId}`;
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(formatError(intl, reason));
     } finally {
       setBusy(false);
     }
@@ -173,7 +189,7 @@ export function EditorView() {
       const entry = list.find((t) => t.id === id);
       if (entry) await applyTemplate(entry);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(formatError(intl, reason));
     } finally {
       setImporting(false);
     }
@@ -197,14 +213,14 @@ export function EditorView() {
   async function onDeleteTemplate(entry: TemplateListEntry): Promise<void> {
     await deleteImportedTemplate(entry.id);
     const list = await reloadTemplates();
-    if (activeTemplate === entry.id) await applyTemplate(list[0] ?? BLANK_TEMPLATE);
+    if (activeTemplate === entry.id) await applyTemplate(list[0] ?? blankTemplate);
   }
 
   async function copyAiPrompt(): Promise<void> {
     setAiCopyError(null);
-    const ok = await copyTextToClipboard(AI_ROOM_PROMPT);
+    const ok = await copyTextToClipboard(getAiRoomPrompt(locale));
     if (!ok) {
-      setAiCopyError('复制失败，请允许此页面访问剪贴板后重试。');
+      setAiCopyError(intl.formatMessage({ id: 'editor.error.clipboardFailed' }));
       return;
     }
     setAiPromptCopied(true);
@@ -212,7 +228,6 @@ export function EditorView() {
   }
 
   const isBlank = activeTemplate === 'blank';
-  // grid 视图选中非空白模板可直接创建；空白模板需先「继续创建」进入编辑器。
   const goCreate = showEditor || !isBlank;
   const fileValue = activeFile === 'manifest' ? manifestText : activeFile === 'html' ? htmlText : workerText;
   const fileLabel = activeFile === 'manifest' ? 'parti.room.json' : activeFile === 'html' ? 'index.html' : 'room.worker.js';
@@ -231,23 +246,27 @@ export function EditorView() {
     <div className="mx-auto w-[min(1240px,100%)] pb-24 md:pb-28">
       <div className="mb-[42px]">
         <div>
-          <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">← 返回大厅</a>
+          <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">
+            <FormattedMessage id="editor.backToLobby" />
+          </a>
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">CREATE A ROOM</span>
           <div className="mb-2.5 flex items-center gap-2.5 sm:gap-3">
-            <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">创建联机房间</h1>
+            <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">
+              <FormattedMessage id="editor.title" />
+            </h1>
             <Button
               type="button"
               variant="outline"
               size="icon"
               className="mt-1 shrink-0 rounded-full text-primary-bright shadow-sm focus-visible:ring-2 focus-visible:ring-primary-bright/50 sm:mt-2"
-              aria-label="使用 AI 创建房间"
-              title="使用 AI 创建房间"
+              aria-label={intl.formatMessage({ id: 'editor.aiCreateAria' })}
+              title={intl.formatMessage({ id: 'editor.aiCreateAria' })}
               onClick={() => setAiDialogOpen(true)}
             >
               <BotIcon aria-hidden="true" />
             </Button>
           </div>
-          <p className="text-[15px] text-muted-foreground">选择一个模板开始创作，完成后立即邀请朋友加入。</p>
+          <p className="text-[15px] text-muted-foreground"><FormattedMessage id="editor.description" /></p>
         </div>
       </div>
 
@@ -255,7 +274,6 @@ export function EditorView() {
         <section className="mb-[42px]">
           {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
-            {/* 特殊首卡：新建房间的三种方式 */}
             <div
               className={cn(
                 'flex flex-col gap-3 rounded-[18px] border border-dashed border-border-strong bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]',
@@ -264,19 +282,20 @@ export function EditorView() {
             >
               <div className="flex items-center gap-2">
                 <SparklesIcon className="size-4 text-primary-bright" aria-hidden="true" />
-                <b className="text-sm md:text-base">新建房间</b>
+                <b className="text-sm md:text-base"><FormattedMessage id="editor.newRoom.title" /></b>
               </div>
               <button
                 type="button"
                 className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
                 disabled={templateBusy || importing}
-                onClick={() => chooseTemplate(BLANK_TEMPLATE)}
+                onClick={() => chooseTemplate(blankTemplate)}
               >
-                <SparklesIcon />从空白模版开始
+                <SparklesIcon /><FormattedMessage id="editor.newRoom.blank" />
               </button>
               <Button asChild variant="outline" className={cn(startCardBtn, 'h-auto')}>
                 <label>
-                  <FileArchiveIcon />{importing ? '导入中…' : '从 ZIP 导入'}
+                  <FileArchiveIcon />
+                  {importing ? intl.formatMessage({ id: 'editor.newRoom.importing' }) : intl.formatMessage({ id: 'editor.newRoom.importZip' })}
                   <input className="hidden" type="file" accept=".zip" disabled={importing} onChange={onZipSelected} />
                 </label>
               </Button>
@@ -286,13 +305,13 @@ export function EditorView() {
                   className={cn(startCardBtn, 'justify-start pr-9 pl-9 font-medium')}
                   type="url"
                   inputMode="url"
-                  placeholder="粘贴 GitHub 地址，回车导入"
+                  placeholder={intl.formatMessage({ id: 'editor.newRoom.githubPlaceholder' })}
                   value={githubUrl}
                   disabled={importing}
                   onChange={(event) => setGithubUrl(event.target.value)}
                 />
                 {githubUrl.trim() && (
-                  <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label="导入 GitHub 房间">
+                  <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label={intl.formatMessage({ id: 'editor.newRoom.githubImportAria' })}>
                     <ArrowRightIcon className="size-4" />
                   </button>
                 )}
@@ -319,9 +338,15 @@ export function EditorView() {
                     />
                     <span className="flex flex-col gap-2 px-[13px] pt-3 pb-3.5 md:px-5 md:pt-[18px] md:pb-5">
                       <b className="text-sm md:text-base">{template.name}</b>
-                      <small className="text-xs font-medium leading-[1.55] text-muted-foreground">{template.description}</small>
+                      <small className="text-xs font-medium leading-[1.55] text-muted-foreground">
+                        {templateDescription(intl, template)}
+                      </small>
                     </span>
-                    {selected && <span className="absolute top-3 right-3 rounded-full bg-success/15 px-2.5 py-[3px] text-[10px] font-bold text-success">已选择</span>}
+                    {selected && (
+                      <span className="absolute top-3 right-3 rounded-full bg-success/15 px-2.5 py-[3px] text-[10px] font-bold text-success">
+                        <FormattedMessage id="editor.template.selected" />
+                      </span>
+                    )}
                   </button>
                   {selected && (
                     <Button
@@ -331,7 +356,7 @@ export function EditorView() {
                       disabled={templateBusy}
                       onClick={() => setShowEditor(true)}
                     >
-                      <PencilIcon data-icon="inline-start" />继续编辑
+                      <PencilIcon data-icon="inline-start" /><FormattedMessage id="editor.template.continueEdit" />
                     </Button>
                   )}
                   {template.removable && (
@@ -340,7 +365,7 @@ export function EditorView() {
                       size="icon-xs"
                       className="absolute top-2.5 right-2.5 z-[2] text-muted-foreground hover:text-destructive"
                       disabled={templateBusy || importing}
-                      aria-label={`删除 ${template.name}`}
+                      aria-label={intl.formatMessage({ id: 'editor.template.deleteAria' }, { name: template.name })}
                       onClick={() => void onDeleteTemplate(template)}
                     >
                       <Trash2Icon />
@@ -356,12 +381,12 @@ export function EditorView() {
       {showEditor && (
       <section className="mb-[42px]">
         <button type="button" className="mb-[18px] inline-flex w-max cursor-pointer items-center gap-1 border-0 bg-transparent text-[13px] text-muted-foreground transition-colors hover:text-foreground" onClick={() => setShowEditor(false)}>
-          <ArrowLeftIcon data-icon="inline-start" />返回选择模板
+          <ArrowLeftIcon data-icon="inline-start" /><FormattedMessage id="editor.backToTemplates" />
         </button>
         {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
         <div className="overflow-hidden rounded-[17px] border border-border bg-[#0c0f18] shadow-[0_18px_55px_rgba(0,0,0,0.25)]">
           <Tabs value={activeFile} onValueChange={(value) => setActiveFile(value as EditorFile)}>
-          <TabsList className="flex h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-surface p-0" aria-label="房间文件">
+          <TabsList className="flex h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-surface p-0" aria-label={intl.formatMessage({ id: 'editor.files.ariaLabel' })}>
             {(['manifest', 'html', 'worker'] as EditorFile[]).map((file) => {
               const label = file === 'manifest' ? 'parti.room.json' : file === 'html' ? 'index.html' : 'room.worker.js';
               return <TabsTrigger value={file} className="h-11 flex-none rounded-none border-r border-border px-4 font-mono text-xs data-active:bg-[#0c0f18] data-active:text-white" key={file}>{label}</TabsTrigger>;
@@ -375,12 +400,31 @@ export function EditorView() {
         </div>
 
         <Card className="mt-3 flex flex-col items-start gap-4 rounded-[14px] border-border bg-surface px-[18px] py-[17px] sm:flex-row sm:items-center">
-          <div className="flex-1"><b className="text-[13px]">附加文件</b><p className="mt-1 text-[11px] text-muted-foreground">可加入样式或其他文本资源，文件会和房间内容一起保存。</p></div>
-          <Button asChild variant="outline"><label><FilePlusIcon data-icon="inline-start" />添加文件<input className="hidden" type="file" multiple onChange={onUpload} /></label></Button>
+          <div className="flex-1">
+            <b className="text-[13px]"><FormattedMessage id="editor.files.extraTitle" /></b>
+            <p className="mt-1 text-[11px] text-muted-foreground"><FormattedMessage id="editor.files.extraDescription" /></p>
+          </div>
+          <Button asChild variant="outline">
+            <label>
+              <FilePlusIcon data-icon="inline-start" /><FormattedMessage id="editor.files.addFile" />
+              <input className="hidden" type="file" multiple onChange={onUpload} />
+            </label>
+          </Button>
           {Object.keys(extraFiles).length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {Object.keys(extraFiles).map((name) => (
-                <span key={name} className="flex items-center gap-1 rounded-[7px] bg-surface-3 px-[7px] py-1 text-[10px] text-muted-foreground">{name}<Button size="icon-xs" variant="ghost" type="button" aria-label={`移除 ${name}`} onClick={() => { setExtraFiles((previous) => { const next = { ...previous }; delete next[name]; return next; }); setDirty(true); }}><XIcon /></Button></span>
+                <span key={name} className="flex items-center gap-1 rounded-[7px] bg-surface-3 px-[7px] py-1 text-[10px] text-muted-foreground">
+                  {name}
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    type="button"
+                    aria-label={intl.formatMessage({ id: 'editor.files.removeAria' }, { name })}
+                    onClick={() => { setExtraFiles((previous) => { const next = { ...previous }; delete next[name]; return next; }); setDirty(true); }}
+                  >
+                    <XIcon />
+                  </Button>
+                </span>
               ))}
             </div>
           )}
