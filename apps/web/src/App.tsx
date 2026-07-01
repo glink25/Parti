@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { GithubIcon } from '@/components/icons/GithubIcon.js';
+import { Logo } from '@/components/Logo.js';
 import { Button } from '@/components/ui/button.js';
 import { Lobby } from './pages/Lobby.js';
 import { LocalRoomView } from './pages/LocalRoomView.js';
@@ -72,7 +73,7 @@ function AppLayout() {
             href="#/"
             aria-label="返回 Parti 大厅"
           >
-            <span className="grid size-[34px] place-items-center rounded-[11px] bg-primary font-black text-primary-foreground shadow-[0_8px_24px_rgba(201,151,0,0.2)]">P</span>
+            <Logo />
             <span>Parti</span>
           </a>
           <span className="hidden text-[13px] text-muted-foreground md:inline">和朋友一起创造，一起游玩</span>

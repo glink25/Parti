@@ -7,9 +7,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.js';
 import { cn } from '@/lib/utils.js';
+import { LOGO_URL } from './Logo.js';
 
 const QR_SIZE = 240;
-const LOGO_URL = '/icon-192.png';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

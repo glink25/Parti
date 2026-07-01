@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input.js';
 import { copyTextToClipboard } from '@/lib/clipboard.js';
 import { usePageFullscreen } from '@/components/PageFullscreen.js';
 import { ResponsiveRoomControls, RoomControlsSheet, type RoomControlsProps } from '@/components/PeerRoomControls.js';
+import { Logo } from '@/components/Logo.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -315,7 +316,6 @@ function PeerJoinView({
   }, [attempt, credential, hostPeerId, roomId]);
 
   const playerGate = 'flex min-h-[100dvh] flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,211,55,0.25),transparent_34rem)] p-6';
-  const gateMark = 'mb-2.5 grid size-12 place-items-center rounded-[15px] bg-primary text-[20px] font-black text-primary-foreground shadow-[0_8px_24px_rgba(201,151,0,0.2)]';
 
   if (needsPassword) {
     return (
@@ -331,7 +331,7 @@ function PeerJoinView({
           }}
         >
         <Card className="flex w-full flex-col gap-3.5 rounded-[20px] border-border bg-surface p-[26px] shadow-soft">
-          <span className={gateMark}>P</span>
+          <Logo size="md" className="mb-2.5" />
           <h2 className="text-xl font-semibold">输入房间密码</h2>
           <p className="my-1 text-[11px] text-muted-foreground">这个房间需要密码才能加入。</p>
           {error && <p className="text-danger">{error}</p>}
@@ -352,7 +352,18 @@ function PeerJoinView({
     );
   }
   if (error) return <RoomError message={error} />;
-  if (!state) return <div className={playerGate}><span className={gateMark}>P</span><div className="p-[22px] text-center text-[13px] text-muted-foreground">正在加入房间…</div></div>;
+  if (!state) {
+    return (
+      <div className={playerGate}>
+        <Logo size="md" className="mb-2.5" />
+        <div className="p-[22px] text-center text-[13px] text-muted-foreground">
+          正在加入房间…
+          <br />
+          <span className="text-[11px]">使用系统浏览器或者Chrome浏览器体验最佳</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-black" data-connection-status={status}>
