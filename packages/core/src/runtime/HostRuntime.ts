@@ -59,6 +59,8 @@ export interface HostRuntimeOptions {
   packageFiles?: Record<string, string>;
   /** host 玩家展示名 */
   hostName?: string;
+  /** host 的稳定客户端身份 id，与远端玩家的 clientId 语义一致。 */
+  hostClientId?: string;
   /**
    * 可选会话存储。提供后 Runtime 自动持久化权威快照 + 玩家身份映射，
    * 并在重启时据此水合恢复（GOAL §17 Phase 4）。创作者无需感知。
@@ -161,6 +163,7 @@ export class HostRuntime {
       id:
         this.opts.hostPlayerId ?? restored?.hostPlayerId ?? generateId('player'),
       peerId: this.transport.selfId,
+      ...(this.opts.hostClientId ? { clientId: this.opts.hostClientId } : {}),
       name: this.opts.hostName ?? 'Host',
       role: 'host',
       status: 'connected',

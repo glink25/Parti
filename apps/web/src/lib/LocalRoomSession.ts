@@ -18,6 +18,7 @@ import {
   type RoomPackage,
 } from '@parti/room-packager';
 import { createWebWorkerHost } from './roomWorker.js';
+import { loadLocalUser } from './localUser.js';
 
 const ROOM_ID = 'local-preview';
 
@@ -34,6 +35,7 @@ export class LocalRoomSession {
   }
 
   static async create(pkg: RoomPackage): Promise<LocalRoomSession> {
+    const user = loadLocalUser();
     const adapter = new LocalTransportAdapter();
     const transport = await adapter.createHost({ roomId: ROOM_ID, hostId: 'host' });
     const host = new HostRuntime({
@@ -44,7 +46,8 @@ export class LocalRoomSession {
       worker: createWebWorkerHost(),
       roomSource: getWorkerSource(pkg),
       manifest: pkg.manifest,
-      hostName: 'Host',
+      hostName: user.name,
+      hostClientId: user.id,
       ...(pkg.manifest.room?.maxPlayers !== undefined
         ? { maxPlayers: pkg.manifest.room.maxPlayers }
         : {}),

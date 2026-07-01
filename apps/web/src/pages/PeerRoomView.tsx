@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { CopyIcon, Settings2Icon, WandSparklesIcon } from 'lucide-react';
+import { CopyIcon, QrCodeIcon, Settings2Icon, WandSparklesIcon } from 'lucide-react';
 import type { HostRuntime, RoomAdmissionStatus } from '@parti/core';
-import { SessionStorageStore } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
 import { createHostLocalPort } from '@parti/client-sdk';
 import { type RoomPackage } from '@parti/room-packager';
+import { InviteQrDialog } from '../components/InviteQrDialog.js';
 import { RoomFrame } from '../components/RoomFrame.js';
 import { DevTools } from '../components/DevTools.js';
 import {
@@ -28,6 +28,7 @@ import {
   type LobbyRoomInput,
 } from '../lib/lobbyApi.js';
 import { buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes.js';
+import { loadLocalUser } from '../lib/localUser.js';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.js';
@@ -35,6 +36,7 @@ import { Input } from '@/components/ui/input.js';
 import { Label } from '@/components/ui/label.js';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet.js';
 import { cn } from '@/lib/utils.js';
+import { copyTextToClipboard } from '@/lib/clipboard.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -91,7 +93,9 @@ function PeerHostSession({
   const [admission, setAdmission] = useState<RoomAdmissionStatus | null>(null);
   const [lobbyStatus, setLobbyStatus] = useState(initialSettings.isPublic ? '正在恢复公开状态…' : '私密');
   const [copied, setCopied] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const localUser = loadLocalUser();
   const [error, setError] = useState<string | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
   const started = useRef(false);
@@ -186,9 +190,11 @@ function PeerHostSession({
     state.hostPeerId,
     settings.password,
   );
+  const roomTitle = settings.title.trim() || pkg.manifest.name;
 
-  function copyInvite(): void {
-    void navigator.clipboard?.writeText(inviteUrl);
+  async function copyInvite(): Promise<void> {
+    const ok = await copyTextToClipboard(inviteUrl);
+    if (!ok) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
@@ -204,7 +210,10 @@ function PeerHostSession({
         <CardContent>
           <div className="flex gap-[7px]">
             <Input className="min-w-0 flex-1" readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} />
-            <Button type="button" onClick={copyInvite}><CopyIcon data-icon="inline-start" />{copied ? '已复制' : '复制'}</Button>
+            <div className="flex shrink-0 gap-[7px]">
+              <Button type="button" onClick={copyInvite}><CopyIcon data-icon="inline-start" />{copied ? '已复制' : '复制'}</Button>
+              <Button type="button" variant="outline" onClick={() => setQrOpen(true)}><QrCodeIcon data-icon="inline-start" />二维码</Button>
+            </div>
           </div>
           <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground"><span className={cn('size-1.5 rounded-full', activeAdmission.joinable ? 'bg-success' : 'bg-danger')} />{activeAdmission.joinable ? '当前可加入' : '房间人数已满'}</div>
         </CardContent>
@@ -311,6 +320,13 @@ function PeerHostSession({
         </aside>
       </div>
       {import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />}
+      <InviteQrDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        inviteUrl={inviteUrl}
+        inviterName={localUser.name}
+        roomTitle={roomTitle}
+      />
     </div>
   );
 }
@@ -346,17 +362,15 @@ function PeerJoinView({
     activeAttempt.current = key;
     setError(null);
     setNeedsPassword(false);
-    const store = new SessionStorageStore();
-    const clientId = store.loadClientId(roomId) ?? undefined;
+    const user = loadLocalUser();
     fetchPackageOverPeer(roomId, hostPeerId, {
-      ...(clientId ? { clientId } : {}),
+      clientId: user.id,
       ...(credential ? { credential } : {}),
     })
       .then((pkg) => {
         const joined = createPeerJoin(
           pkg,
           hostPeerId,
-          'Guest',
           {
             onStatus: setStatus,
             onFatal: (message) => {

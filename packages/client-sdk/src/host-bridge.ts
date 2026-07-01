@@ -106,7 +106,8 @@ export class UISandboxBridge {
 export function buildRoomDocument(roomHtml: string): string {
   return `<!doctype html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<head><meta charset="utf-8"><meta name="viewport"
+    content="width=device-width,initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" /></head>
 <body>
 <script>${CLIENT_SDK_SCRIPT}</script>
 ${roomHtml}

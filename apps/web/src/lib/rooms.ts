@@ -7,7 +7,8 @@ import {
   loadPackageFromUrl,
   type RoomPackage,
 } from '@parti/room-packager';
-import { getCustomRoom } from './customRooms.js';
+import { getRoomPointer } from './customRooms.js';
+import { getTemplatePackage, getUsageCounts, listImportedTemplates } from './templates.js';
 
 export interface RoomEntry {
   id: string;
@@ -51,7 +52,11 @@ export function findRoom(id: string): RoomEntry | undefined {
 }
 
 /**
- * 统一解析房间包：官方房间从静态 URL 加载，自定义房间从 localStorage 重建。
+ * 统一解析包：
+ * 1) 官方房间 → 静态 URL 加载；
+ * 2) room 指针 → 取其模版包，并把 manifest.id 覆盖为 roomId（保证 host 房间身份唯一，
+ *    多个房间复用同一模版、零重复存储）；
+ * 3) template id（供编辑器按模版加载）→ 直接返回其包。
  * host / 本地预览侧据此拿到内存中的 RoomPackage（含 packageHash 与全部文件）。
  * 加入者不走这里——其包经 fetchPackageOverPeer 从 host 点对点取得。
  */
@@ -59,8 +64,59 @@ export async function resolvePackage(id: string): Promise<RoomPackage> {
   const official = findRoom(id);
   if (official) return loadPackageFromUrl(official.baseUrl);
 
-  const custom = getCustomRoom(id);
-  if (custom) return createPackage(custom);
+  const pointer = await getRoomPointer(id);
+  if (pointer) {
+    const tplId = pointer.templateId;
+    const officialTpl = findRoom(tplId);
+    const base = officialTpl
+      ? await loadPackageFromUrl(officialTpl.baseUrl)
+      : await createPackageFromTemplate(tplId);
+    return createPackage({
+      manifest: { ...base.manifest, id },
+      files: base.files,
+    });
+  }
 
-  throw new Error(`未知房间: ${id}`);
+  return createPackageFromTemplate(id);
+}
+
+async function createPackageFromTemplate(templateId: string): Promise<RoomPackage> {
+  const input = await getTemplatePackage(templateId);
+  if (!input) throw new Error(`未知房间: ${templateId}`);
+  return createPackage(input);
+}
+
+export interface TemplateListEntry {
+  id: string;
+  name: string;
+  description: string;
+  cover?: string;
+  /** 导入模版可删除；内置模版为 false */
+  removable: boolean;
+  usageCount: number;
+}
+
+/**
+ * 创建页用的模版列表：内置 + 导入，按创建次数降序（并列按 name）。
+ */
+export async function getTemplateList(): Promise<TemplateListEntry[]> {
+  const [imported, usage] = await Promise.all([listImportedTemplates(), getUsageCounts()]);
+  const builtin: TemplateListEntry[] = ROOMS.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    cover: r.cover,
+    removable: false,
+    usageCount: usage[r.id] ?? 0,
+  }));
+  const importedEntries: TemplateListEntry[] = imported.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    removable: true,
+    usageCount: usage[t.id] ?? 0,
+  }));
+  return [...builtin, ...importedEntries].sort(
+    (a, b) => b.usageCount - a.usageCount || a.name.localeCompare(b.name),
+  );
 }

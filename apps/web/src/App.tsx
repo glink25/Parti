@@ -6,6 +6,8 @@ import { LocalRoomView } from './pages/LocalRoomView.js';
 import { PeerRoomView } from './pages/PeerRoomView.js';
 import { EditorView } from './pages/EditorView.js';
 import { clearRoomSession } from './lib/PeerRoomSession.js';
+import { loadLocalUser } from './lib/localUser.js';
+import { UserSettings } from './components/UserSettings.js';
 
 /** 极简 hash 路由：#/ 大厅 / #/editor 创作 / #/peer/... 联机。 */
 function useHashRoute(): string {
@@ -26,6 +28,7 @@ function peerRoomIdOf(hash: string): string | null {
 
 export function App() {
   const hash = useHashRoute();
+  const [user, setUser] = useState(loadLocalUser);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -44,6 +47,7 @@ export function App() {
   const route = hash.replace(/^#/, '');
   const parts = route.split('/').filter(Boolean); // e.g. ['local','counter']
   const isPlayerRoute = parts[0] === 'peer' && parts[1] === 'join';
+  const isLobbyRoute = parts.length === 0;
 
   let view;
   if (parts[0] === 'editor') {
@@ -69,11 +73,12 @@ export function App() {
             <span>Parti</span>
           </a>
           <span className="hidden text-[13px] text-muted-foreground md:inline">和朋友一起创造，一起游玩</span>
+          {isLobbyRoute && <UserSettings user={user} onChange={setUser} />}
           <Button
             asChild
             variant="ghost"
             size="icon-sm"
-            className="ml-auto shrink-0 text-muted-foreground hover:text-foreground"
+            className={`${isLobbyRoute ? '' : 'ml-auto'} shrink-0 text-muted-foreground hover:text-foreground`}
           >
             <a
               href="https://github.com/glink25/Parti"

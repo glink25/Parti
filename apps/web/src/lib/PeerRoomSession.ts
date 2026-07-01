@@ -13,7 +13,6 @@ import {
   HostRuntime,
   PARTI_VERSION,
   SessionStorageStore,
-  generateId,
   type RoomAdmissionController,
 } from '@parti/core';
 import { type RoomClientPort } from '@parti/client-sdk';
@@ -26,6 +25,7 @@ import {
 import { createWebWorkerHost } from './roomWorker.js';
 import { ReconnectingClient } from './ReconnectingClient.js';
 import { clearHostRoomSettings } from './roomSettings.js';
+import { loadLocalUser } from './localUser.js';
 
 /**
  * 当前页面内活跃的房间会话清理器（host 或 client），key = roomId。
@@ -76,6 +76,7 @@ export async function createPeerHost(
   options: PeerHostOptions = {},
 ): Promise<PeerHost> {
   const store = new SessionStorageStore();
+  const user = loadLocalUser();
   const roomId = pkg.manifest.id;
   // 恢复与否完全交给 sessionStorage：刷新时记录仍在 → 恢复现场；关闭标签页或
   // 退出到大厅（已 clearRoomSession）后记录不在 → 全新房间。
@@ -96,7 +97,8 @@ export async function createPeerHost(
     manifest: pkg.manifest,
     // 透传全部文件，使 host 能响应加入者的 sys:package-request 点对点下发房间代码。
     packageFiles: pkg.files,
-    hostName: 'Host',
+    hostName: user.name,
+    hostClientId: user.id,
     store,
     ...(options.admissionController
       ? { admissionController: options.admissionController }
@@ -141,26 +143,18 @@ export interface PeerJoinHandlers {
 export function createPeerJoin(
   pkg: RoomPackage,
   hostPeerId: string,
-  playerName: string,
   handlers: PeerJoinHandlers = {},
   credential?: string,
 ): PeerJoin {
-  const store = new SessionStorageStore();
   const roomId = pkg.manifest.id;
-  // 玩家稳定身份：刷新/掉线后凭它重连回同一玩家（保留分数/座位）。
-  // 退出到大厅会清除它，于是再次进入作为新玩家加入。
-  let clientId = store.loadClientId(roomId);
-  if (!clientId) {
-    clientId = generateId('client');
-    store.saveClientId(roomId, clientId);
-  }
+  const user = loadLocalUser();
 
   const client = new ReconnectingClient({
     roomId,
     packageHash: pkg.packageHash,
     hostPeerId,
-    playerName,
-    clientId,
+    playerName: user.name,
+    clientId: user.id,
     ...(credential !== undefined ? { credential } : {}),
     ...(handlers.onStatus ? { onStatus: handlers.onStatus } : {}),
     ...(handlers.onFatal ? { onFatal: handlers.onFatal } : {}),

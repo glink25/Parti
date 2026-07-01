@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { ArrowLeftIcon, ArrowRightIcon, EyeIcon, FilePlusIcon, PencilIcon, RotateCcwIcon, XIcon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BotIcon,
+  CheckIcon,
+  CopyIcon,
+  EyeIcon,
+  FileArchiveIcon,
+  FilePlusIcon,
+  Link2Icon,
+  PencilIcon,
+  RotateCcwIcon,
+  SparklesIcon,
+  Trash2Icon,
+  XIcon,
+} from 'lucide-react';
 import { createPackage, type RoomPackageInput } from '@parti/room-packager';
 import { Button } from '@/components/ui/button.js';
 import { Card } from '@/components/ui/card.js';
@@ -8,17 +22,42 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs.js';
 import { Textarea } from '@/components/ui/textarea.js';
 import { cn } from '@/lib/utils.js';
-import { saveCustomRoom } from '../lib/customRooms.js';
-import { ROOMS, resolvePackage, type RoomEntry } from '../lib/rooms.js';
+import { copyTextToClipboard } from '@/lib/clipboard.js';
+import { createRoom } from '../lib/customRooms.js';
+import { createDraftId } from '../lib/ids.js';
+import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom.js';
+import { deleteImportedTemplate, recordTemplateUsage, saveDerivedTemplate } from '../lib/templates.js';
+import { getTemplateList, resolvePackage, type TemplateListEntry } from '../lib/rooms.js';
 
 type EditorFile = 'manifest' | 'html' | 'worker';
-type TemplateChoice = { id: 'blank'; name: string; description: string; cover?: string } | RoomEntry;
+type BlankChoice = { id: 'blank'; name: string; description: string };
+type SelectableTemplate = BlankChoice | TemplateListEntry;
 
-const BLANK_TEMPLATE: TemplateChoice = {
+const BLANK_TEMPLATE: BlankChoice = {
   id: 'blank',
   name: '空白房间',
   description: '从简洁的互动计数器开始，自由改造成你的玩法。',
 };
+
+const AI_ROOM_PROMPT = `请帮我创建一个可以直接导入 Parti 的多人联机游戏房间。
+
+开始设计和编写代码前，请先阅读并理解以下 GitHub docs 目录中的全部文档：
+https://github.com/glink25/Parti/tree/main/docs
+
+请严格遵守文档中关于 Manifest、客户端 API、Worker API、协议和 Host Runtime 的约束，尤其注意房间状态必须由 Worker 权威管理，客户端只能通过 Parti API 读取状态和提交动作。
+
+我的游戏创意如下（请让我在这里补充玩法、玩家人数、胜负条件和视觉风格）：
+[在这里补充你的游戏创意]
+
+如果需求中缺少会影响实现的关键信息，请先提出简短、必要的问题；信息足够后再生成最终结果。最终结果必须：
+1. 给出可直接保存的完整文件结构，至少包含 parti.room.json、index.html 和 room.worker.js。
+2. 分别输出三个文件的完整内容，不使用省略号、伪代码、占位实现或 Parti 不支持的依赖。
+3. 确保 manifest 的入口文件、玩家人数和权限配置与代码一致。
+4. 正确实现多人状态同步、服务端动作校验、胜负或结束条件，并安全处理异常或恶意输入。
+5. UI 应清晰、响应式，并能在手机端正常操作。
+6. 输出前自行复核代码与全部 Parti 文档约束，修正发现的问题。
+
+请将最终答案整理成用户可以逐个保存文件、打包为 ZIP 后直接导入 Parti 的形式。`;
 
 const DEFAULT_HTML = `<div style="font-family: system-ui, sans-serif; padding: 24px; color: #111;">
   <h1 style="font-size: 24px;">我的房间</h1>
@@ -49,10 +88,6 @@ export default defineRoom({
 });
 `;
 
-function createDraftId(prefix = 'room'): string {
-  return `${prefix}-${uuidv4().slice(0, 8)}`;
-}
-
 function blankManifest(): string {
   return JSON.stringify(
     {
@@ -78,23 +113,37 @@ export function EditorView() {
   const [workerText, setWorkerText] = useState(DEFAULT_WORKER);
   const [extraFiles, setExtraFiles] = useState<Record<string, string>>({});
   const [activeFile, setActiveFile] = useState<EditorFile>('manifest');
-  const [activeTemplate, setActiveTemplate] = useState(ROOMS[0]?.id ?? 'blank');
-  const [pendingTemplate, setPendingTemplate] = useState<TemplateChoice | null>(null);
+  const [templates, setTemplates] = useState<TemplateListEntry[]>([]);
+  const [activeTemplate, setActiveTemplate] = useState<string>('blank');
+  const [pendingTemplate, setPendingTemplate] = useState<SelectableTemplate | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [githubUrl, setGithubUrl] = useState('');
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPromptCopied, setAiPromptCopied] = useState(false);
+  const [aiCopyError, setAiCopyError] = useState<string | null>(null);
 
-  const templates: TemplateChoice[] = [BLANK_TEMPLATE, ...ROOMS];
-
-  // 进入页面默认选中第二个模板（第一个固定为空白模板），并预加载其内容。
+  // 首次加载模版列表（内置 + 导入，按使用次数排序），默认选中第一个。
   useEffect(() => {
-    void applyTemplate(templates[1] ?? BLANK_TEMPLATE);
+    void (async () => {
+      const list = await getTemplateList();
+      setTemplates(list);
+      await applyTemplate(list[0] ?? BLANK_TEMPLATE);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function applyTemplate(template: TemplateChoice): Promise<void> {
+  async function reloadTemplates(): Promise<TemplateListEntry[]> {
+    const list = await getTemplateList();
+    setTemplates(list);
+    return list;
+  }
+
+  async function applyTemplate(template: SelectableTemplate): Promise<void> {
     setTemplateBusy(true);
     setError(null);
     try {
@@ -105,13 +154,9 @@ export function EditorView() {
         setExtraFiles({});
       } else {
         const pkg = await resolvePackage(template.id);
-        const manifest = {
-          ...pkg.manifest,
-          id: createDraftId(template.id),
-        };
-        const uiName = manifest.entry.ui;
-        const workerName = manifest.entry.worker;
-        setManifestText(JSON.stringify(manifest, null, 2));
+        const uiName = pkg.manifest.entry.ui;
+        const workerName = pkg.manifest.entry.worker;
+        setManifestText(JSON.stringify(pkg.manifest, null, 2));
         setHtmlText(pkg.files[uiName] ?? '');
         setWorkerText(pkg.files[workerName] ?? '');
         setExtraFiles(
@@ -131,7 +176,7 @@ export function EditorView() {
     }
   }
 
-  function chooseTemplate(template: TemplateChoice): void {
+  function chooseTemplate(template: SelectableTemplate): void {
     if (template.id === activeTemplate) return;
     if (dirty) {
       setPendingTemplate(template);
@@ -140,7 +185,8 @@ export function EditorView() {
     void applyTemplate(template);
   }
 
-  async function build(): Promise<string | null> {
+  /** 从编辑器内容构造并校验包输入（用于空白/编辑后的派生包）。 */
+  async function buildEditorInput(): Promise<RoomPackageInput | null> {
     setError(null);
     let manifest: unknown;
     try {
@@ -159,19 +205,31 @@ export function EditorView() {
     };
     try {
       await createPackage(input);
-      return saveCustomRoom(input);
+      return input;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
       return null;
     }
   }
 
+  /** 解析出本次房间应指向的 templateId（未改动→复用模版；改动/空白→存派生包）。 */
+  async function resolveTemplateId(): Promise<string | null> {
+    if (!dirty && activeTemplate !== 'blank') return activeTemplate;
+    const input = await buildEditorInput();
+    if (!input) return null;
+    return saveDerivedTemplate(input);
+  }
+
   async function onCreate(target: 'local' | 'peer'): Promise<void> {
     setBusy(true);
     try {
-      const id = await build();
-      if (!id) return;
-      window.location.hash = target === 'local' ? `#/local/${id}` : `#/peer/host/${id}`;
+      const templateId = await resolveTemplateId();
+      if (!templateId) return;
+      const roomId = await createRoom(templateId);
+      if (activeTemplate !== 'blank') await recordTemplateUsage(activeTemplate);
+      window.location.hash = target === 'local' ? `#/local/${roomId}` : `#/peer/host/${roomId}`;
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       setBusy(false);
     }
@@ -187,6 +245,53 @@ export function EditorView() {
     event.target.value = '';
   }
 
+  async function runImport(task: () => Promise<string>): Promise<void> {
+    setImporting(true);
+    setError(null);
+    try {
+      const id = await task();
+      const list = await reloadTemplates();
+      const entry = list.find((t) => t.id === id);
+      if (entry) await applyTemplate(entry);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function onZipSelected(event: React.ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    await runImport(() => importRoomFromZip(file));
+  }
+
+  async function onGithubSubmit(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    const url = githubUrl.trim();
+    if (!url || importing) return;
+    await runImport(() => importRoomFromGitHub(url));
+    setGithubUrl('');
+  }
+
+  async function onDeleteTemplate(entry: TemplateListEntry): Promise<void> {
+    await deleteImportedTemplate(entry.id);
+    const list = await reloadTemplates();
+    if (activeTemplate === entry.id) await applyTemplate(list[0] ?? BLANK_TEMPLATE);
+  }
+
+  async function copyAiPrompt(): Promise<void> {
+    setAiCopyError(null);
+    const ok = await copyTextToClipboard(AI_ROOM_PROMPT);
+    if (!ok) {
+      setAiCopyError('复制失败，请允许此页面访问剪贴板后重试。');
+      return;
+    }
+    setAiPromptCopied(true);
+    window.setTimeout(() => setAiPromptCopied(false), 1800);
+  }
+
   const isBlank = activeTemplate === 'blank';
   // grid 视图选中非空白模板可直接创建；空白模板需先「继续创建」进入编辑器。
   const goCreate = showEditor || !isBlank;
@@ -200,13 +305,29 @@ export function EditorView() {
     setDirty(true);
   }
 
+  const startCardBtn =
+    'flex w-full items-center justify-center gap-2 rounded-[11px] border border-border bg-surface px-3 py-2.5 text-[13px] font-semibold text-foreground transition-colors hover:not-disabled:border-border-strong hover:not-disabled:bg-surface-2 disabled:cursor-default disabled:opacity-60 [&_svg]:size-4';
+
   return (
     <div className="mx-auto w-[min(1240px,100%)] pb-24 md:pb-28">
       <div className="mb-[42px]">
         <div>
           <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">← 返回大厅</a>
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">CREATE A ROOM</span>
-          <h1 className="mb-2.5 text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">创建联机房间</h1>
+          <div className="mb-2.5 flex items-center gap-2.5 sm:gap-3">
+            <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">创建联机房间</h1>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="mt-1 shrink-0 rounded-full text-primary-bright shadow-sm focus-visible:ring-2 focus-visible:ring-primary-bright/50 sm:mt-2"
+              aria-label="使用 AI 创建房间"
+              title="使用 AI 创建房间"
+              onClick={() => setAiDialogOpen(true)}
+            >
+              <BotIcon aria-hidden="true" />
+            </Button>
+          </div>
           <p className="text-[15px] text-muted-foreground">选择一个模板开始创作，完成后立即邀请朋友加入。</p>
         </div>
       </div>
@@ -215,8 +336,51 @@ export function EditorView() {
         <section className="mb-[42px]">
           {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
+            {/* 特殊首卡：新建房间的三种方式 */}
+            <div
+              className={cn(
+                'flex flex-col gap-3 rounded-[18px] border border-dashed border-border-strong bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]',
+                isBlank && 'border-solid border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="size-4 text-primary-bright" aria-hidden="true" />
+                <b className="text-sm md:text-base">新建房间</b>
+              </div>
+              <button
+                type="button"
+                className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
+                disabled={templateBusy || importing}
+                onClick={() => chooseTemplate(BLANK_TEMPLATE)}
+              >
+                <SparklesIcon />从空白模版开始
+              </button>
+              <Button asChild variant="outline" className={cn(startCardBtn, 'h-auto')}>
+                <label>
+                  <FileArchiveIcon />{importing ? '导入中…' : '从 ZIP 导入'}
+                  <input className="hidden" type="file" accept=".zip" disabled={importing} onChange={onZipSelected} />
+                </label>
+              </Button>
+              <form onSubmit={onGithubSubmit} className="relative">
+                <Link2Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <input
+                  className={cn(startCardBtn, 'justify-start pr-9 pl-9 font-medium')}
+                  type="url"
+                  inputMode="url"
+                  placeholder="粘贴 GitHub 地址，回车导入"
+                  value={githubUrl}
+                  disabled={importing}
+                  onChange={(event) => setGithubUrl(event.target.value)}
+                />
+                {githubUrl.trim() && (
+                  <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label="导入 GitHub 房间">
+                    <ArrowRightIcon className="size-4" />
+                  </button>
+                )}
+              </form>
+            </div>
+
             {templates.map((template) => {
-              const cover = 'cover' in template ? template.cover : undefined;
               const selected = activeTemplate === template.id;
               return (
                 <div className="relative" key={template.id}>
@@ -232,7 +396,7 @@ export function EditorView() {
                     <span
                       className="block aspect-[16/10] w-full bg-[linear-gradient(135deg,rgba(155,113,0,0.22),rgba(139,92,246,0.18)_55%,rgba(81,219,147,0.2))] bg-cover bg-center"
                       aria-hidden="true"
-                      style={cover ? { backgroundImage: `url(${cover})` } : undefined}
+                      style={template.cover ? { backgroundImage: `url(${template.cover})` } : undefined}
                     />
                     <span className="flex flex-col gap-2 px-[13px] pt-3 pb-3.5 md:px-5 md:pt-[18px] md:pb-5">
                       <b className="text-sm md:text-base">{template.name}</b>
@@ -249,6 +413,18 @@ export function EditorView() {
                       onClick={() => setShowEditor(true)}
                     >
                       <PencilIcon data-icon="inline-start" />继续编辑
+                    </Button>
+                  )}
+                  {template.removable && (
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="absolute top-2.5 right-2.5 z-[2] text-muted-foreground hover:text-destructive"
+                      disabled={templateBusy || importing}
+                      aria-label={`删除 ${template.name}`}
+                      onClick={() => void onDeleteTemplate(template)}
+                    >
+                      <Trash2Icon />
                     </Button>
                   )}
                 </div>
@@ -317,6 +493,64 @@ export function EditorView() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPendingTemplate(null)}>保留当前内容</Button>
             <Button onClick={() => { if (pendingTemplate) void applyTemplate(pendingTemplate); }}>确认替换</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={aiDialogOpen}
+        onOpenChange={(open) => {
+          setAiDialogOpen(open);
+          if (!open) {
+            setAiPromptCopied(false);
+            setAiCopyError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <BotIcon className="mb-2 size-11 rounded-xl bg-secondary p-2.5 text-primary-bright" aria-hidden="true" />
+            <DialogTitle>让 AI 实现你的游戏创意</DialogTitle>
+            <DialogDescription>
+              复制一段为 Parti 准备的提示词，交给你常用的 AI，它会先阅读项目文档，再生成完整的房间代码。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm">
+            <div className="rounded-xl border border-border bg-surface-2 p-4">
+              <p className="font-semibold text-foreground">AI 会生成这些必需文件</p>
+              <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-muted-foreground">
+                <span className="rounded-md bg-surface px-2 py-1">parti.room.json</span>
+                <span className="rounded-md bg-surface px-2 py-1">index.html</span>
+                <span className="rounded-md bg-surface px-2 py-1">room.worker.js</span>
+              </div>
+            </div>
+
+            <div>
+              <p className="font-semibold text-foreground">使用方式</p>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-muted-foreground">
+                <li>复制提示词并发送给 AI。</li>
+                <li>补充玩法、玩家人数、胜负条件和视觉风格。</li>
+                <li>检查生成的代码，将三个文件打包为 ZIP，或上传 GitHub 后回到这里导入。</li>
+              </ol>
+            </div>
+
+            <p className="rounded-lg border border-primary-bright/20 bg-secondary/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+              AI 生成的代码仍可能出错。导入前请检查内容，并先通过本地预览验证玩法。
+            </p>
+
+            {aiCopyError && (
+              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+                {aiCopyError}
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button className="w-full sm:w-auto" onClick={() => void copyAiPrompt()}>
+              {aiPromptCopied ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
+              {aiPromptCopied ? '提示词已复制' : '让 AI 帮我创建'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

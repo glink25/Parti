@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CloudIcon, PlusIcon, SparklesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge.js';
 import { Button } from '@/components/ui/button.js';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.js';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.js';
 import {
   LobbyClient,
   lobbyServiceUrl,

@@ -21,7 +21,7 @@ export interface ReconnectingClientOptions {
   packageHash: string;
   hostPeerId: string;
   playerName: string;
-  /** 稳定客户端身份 id（由入口层从 SessionStore 取得/生成）。 */
+  /** 稳定客户端身份 id（由入口层从 localStorage 用户身份取得）。 */
   clientId: string;
   credential?: string;
   /** 连接状态变化回调（connecting / connected / reconnecting / closed）。 */
