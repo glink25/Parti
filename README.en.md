@@ -24,6 +24,12 @@ Parti is a web platform and runtime for creating and playing multiplayer interac
 
 Parti uses a **host-authoritative** model: players send intentions, while a Worker in the host's browser owns the single authoritative state and synchronizes results to everyone. Creators do not need to manage WebRTC, `postMessage`, sequence numbers, or acknowledgements directly.
 
+## Intended use and limitations
+
+Parti is designed for everyday social settings: gatherings with friends, family entertainment, in-person events, and other lightweight group activities. It works best among people who already trust one another, not as an open, adversarial, or high-risk public service.
+
+Parti provides **no guarantee of cheat prevention, competitive fairness, or adversarial security**. Host-authoritative describes where state is computed and synchronized; it does not make the host, player clients, or room code trustworthy. Do not use Parti for gambling, prize competitions, financial transactions, critical operations, security-sensitive scenarios, or any unlawful purpose.
+
 ## Create a room
 
 A minimal Parti room contains three files:
