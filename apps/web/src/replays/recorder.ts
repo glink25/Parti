@@ -45,7 +45,7 @@ export async function startReplayRecording(options: {
         steps: [],
       };
 
-  await putReplayPackage({ hash: pkg.packageHash, manifest: pkg.manifest, files: pkg.files });
+  await putReplayPackage({ hash: pkg.packageHash, packageHash: pkg.packageHash, manifest: pkg.manifest, files: pkg.files });
   sessionStorage.setItem(sessionKey, record.id);
 
   let active = true;

@@ -31,4 +31,8 @@ export async function clearAllBrowserStorage(): Promise<void> {
     // ignore
   }
   await deleteAllIndexedDatabases();
+  if ('caches' in globalThis) {
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name.startsWith('parti-package-')).map((name) => caches.delete(name)));
+  }
 }

@@ -2,7 +2,7 @@
  * 从 ZIP 文件或 GitHub 地址导入房间模版。
  */
 import JSZip from 'jszip';
-import { createPackage, validateManifest, type RoomPackageInput } from '@parti/room-packager';
+import { createPackage, decodeText, validateManifest, type RoomPackageInput } from '@parti/room-packager';
 import { saveImportedTemplate } from './templates.js';
 
 const MANIFEST_NAME = 'parti.room.json';
@@ -35,7 +35,7 @@ export class ImportRoomError extends Error {
 
 /** 由一组文件构造并校验 RoomPackageInput（manifest 取自 parti.room.json）。 */
 export async function buildPackageInputFromFiles(
-  files: Record<string, string>,
+  files: Record<string, Uint8Array>,
 ): Promise<RoomPackageInput> {
   const manifestRaw = files[MANIFEST_NAME];
   if (manifestRaw === undefined) {
@@ -43,7 +43,7 @@ export async function buildPackageInputFromFiles(
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(manifestRaw);
+    parsed = JSON.parse(decodeText(manifestRaw));
   } catch {
     throw new ImportRoomError('MANIFEST_INVALID_JSON');
   }
@@ -74,12 +74,12 @@ export async function importRoomFromZip(file: File): Promise<string> {
   const manifestPath = manifestEntries[0].name;
   const prefix = manifestPath.slice(0, manifestPath.length - MANIFEST_NAME.length);
 
-  const files: Record<string, string> = {};
+  const files: Record<string, Uint8Array> = {};
   for (const entry of entries) {
     if (prefix && !entry.name.startsWith(prefix)) continue;
     const rel = entry.name.slice(prefix.length);
     if (!rel) continue;
-    files[rel] = await entry.async('string');
+    files[rel] = await entry.async('uint8array');
   }
 
   const input = await buildPackageInputFromFiles(files);
@@ -133,7 +133,7 @@ export async function importRoomFromGitHub(url: string): Promise<string> {
     throw new ImportRoomError('GITHUB_MANIFEST_NOT_FOUND');
   }
 
-  const files: Record<string, string> = {};
+  const files: Record<string, Uint8Array> = {};
   const rootDepth = dir === '' ? 0 : dir.split('/').length;
   const relativeOf = (path: string) => path.split('/').slice(rootDepth).join('/');
 
@@ -144,7 +144,7 @@ export async function importRoomFromGitHub(url: string): Promise<string> {
       } else if (item.download_url) {
         const res = await fetch(item.download_url);
         if (!res.ok) throw new ImportRoomError('DOWNLOAD_FAILED', { path: item.path });
-        files[relativeOf(item.path)] = await res.text();
+        files[relativeOf(item.path)] = new Uint8Array(await res.arrayBuffer());
       }
     }
   }

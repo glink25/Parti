@@ -23,7 +23,16 @@ function roomRegistryPlugin(): Plugin {
       const manifestPath = path.join(roomsDir, entry.name, 'parti.room.json');
       if (!fs.existsSync(manifestPath)) return [];
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      return [{ dir: entry.name, manifest }];
+      const files: string[] = [];
+      const collect = (current: string, prefix = '') => {
+        for (const child of fs.readdirSync(current, { withFileTypes: true })) {
+          const relative = prefix ? `${prefix}/${child.name}` : child.name;
+          if (child.isDirectory()) collect(path.join(current, child.name), relative);
+          else if (child.isFile()) files.push(relative);
+        }
+      };
+      collect(path.dirname(manifestPath));
+      return [{ dir: entry.name, manifest, files: files.sort() }];
     });
     return `export const rooms = ${JSON.stringify(entries)};`;
   }
@@ -71,7 +80,7 @@ function gaSnippetPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [roomRegistryPlugin(), gaSnippetPlugin(), react(), tailwindcss()],
-  server: { port: 5173 },
+  server: { port: 5157 },
   resolve: {
     alias: [
       { find: '@', replacement: path.resolve(__dirname, './src') },

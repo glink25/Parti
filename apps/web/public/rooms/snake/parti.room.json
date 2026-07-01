@@ -4,6 +4,7 @@
   "id": "snake",
   "name": "多人贪吃蛇",
   "version": "0.1.0",
+  "packageMode": "blob",
   "description": "极简多人贪吃蛇：实时移动、吃食物变长、撞墙撞身后重生，累计得分排行。",
   "author": { "name": "Parti" },
   "entry": { "ui": "index.html", "worker": "room.worker.js" },

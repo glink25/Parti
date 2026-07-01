@@ -54,7 +54,7 @@ function ReplayCard({ record, onDeleted }: { record: ReplayRecord; onDeleted: ()
 
 function ReplayDetail({ id }: { id: string }) {
   const intl = useIntl();
-  const [data, setData] = useState<{ record: ReplayRecord; html: string } | null | undefined>(undefined);
+  const [data, setData] = useState<{ record: ReplayRecord; pkg: NonNullable<Awaited<ReturnType<typeof getReplayPackage>>> } | null | undefined>(undefined);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
@@ -62,7 +62,7 @@ function ReplayDetail({ id }: { id: string }) {
       if (!record) return setData(null);
       const pkg = await getReplayPackage(record.packageHash);
       const html = pkg?.files[pkg.manifest.entry.ui];
-      setData(pkg && html !== undefined ? { record, html } : null);
+      setData(pkg && html !== undefined ? { record, pkg } : null);
     });
   }, [id]);
   useEffect(() => {
@@ -83,7 +83,7 @@ function ReplayDetail({ id }: { id: string }) {
   }, [data, index]);
   if (data === undefined) return <Loading />;
   if (data === null) return <div className="mx-auto max-w-xl"><a href="#/replays"><FormattedMessage id="replays.back" /></a><Card className="mt-6 p-8"><FormattedMessage id="replays.missing" /></Card></div>;
-  const { record, html } = data;
+  const { record, pkg } = data;
   const step = record.steps[index];
   const port = createReplayPort(record.hostPlayerId, snapshot);
   return (
@@ -91,7 +91,7 @@ function ReplayDetail({ id }: { id: string }) {
       <a className="mb-5 block w-max text-sm text-muted-foreground hover:text-foreground" href="#/replays"><FormattedMessage id="replays.back" /></a>
       <div className="mb-5"><h1 className="text-3xl font-extrabold">{record.title}</h1><p className="mt-1 text-sm text-muted-foreground">{record.roomName}</p></div>
       <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-4 max-lg:grid-cols-1">
-        <RoomFrame key={index} html={html} port={port} label={record.roomName} role={intl.formatMessage({ id: 'peer.role.host' })} className="min-h-[min(68vh,720px)]" />
+        <RoomFrame key={index} pkg={pkg} port={port} label={record.roomName} role={intl.formatMessage({ id: 'peer.role.host' })} className="min-h-[min(68vh,720px)]" />
         <Card className="gap-3">
           <CardHeader><CardTitle><FormattedMessage id="replays.step" values={{ current: index + 1, total: record.steps.length }} /></CardTitle><CardDescription>{step ? describeStep(step, intl) : ''}</CardDescription></CardHeader>
           <CardContent><pre className="max-h-[360px] overflow-auto whitespace-pre-wrap rounded-xl bg-muted p-3 text-[11px]">{JSON.stringify(step, null, 2)}</pre></CardContent>

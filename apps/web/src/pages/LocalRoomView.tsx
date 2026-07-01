@@ -84,7 +84,7 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
         {loaded.seats.map((seat) => (
           <RoomFrame
             key={seat.label}
-            html={loaded.session.roomHtml}
+            pkg={loaded.pkg}
             port={seat.port}
             label={seat.label}
             role={seat.role}

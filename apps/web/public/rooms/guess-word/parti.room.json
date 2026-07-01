@@ -4,6 +4,7 @@
   "id": "guess-word",
   "name": "猜词游戏",
   "version": "0.1.0",
+  "packageMode": "blob",
   "description": "所有人 ready 后开始，根据提示猜词，第一个猜中者获胜。",
   "author": { "name": "Parti" },
   "entry": {

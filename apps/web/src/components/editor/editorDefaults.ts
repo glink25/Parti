@@ -44,6 +44,7 @@ export function blankManifest(locale: AppLocale): string {
     id: createDraftId(),
     name: defaults.roomName,
     version: '0.1.0',
+    packageMode: 'blob',
     description: defaults.roomDescription,
     entry: { ui: 'index.html', worker: 'room.worker.js' },
     room: { minPlayers: 1, maxPlayers: 8 },

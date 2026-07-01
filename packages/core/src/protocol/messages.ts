@@ -115,13 +115,13 @@ export interface ResumeOkPayload {
 /**
  * sys:package-data —— Host 把房间代码包分发给加入者 (GOAL §11.1 内容寻址)。
  *
- * 仅含纯数据（manifest + 文件文本），core 不依赖 room-packager。加入者收到后
+ * 仅含纯数据（manifest + base64 文件），core 不依赖 room-packager。加入者收到后
  * 自行重算 packageHash 校验内容一致，再走 sys:hello。MVP 无后端，房间文件
  * 经此消息点对点下发，而非 fetch 静态 URL。
  */
 export interface PackageDataPayload {
   manifest: unknown;
-  /** 相对路径 -> 文本内容 */
+  /** 相对路径 -> base64 编码的原始文件字节 */
   files: Record<string, string>;
 }
 

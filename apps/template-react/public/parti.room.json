@@ -1,23 +1,21 @@
 {
   "partiVersion": "0.1.0",
   "protocolVersion": 1,
-  "id": "counter",
-  "name": "多人计数器",
+  "id": "dev-template-react",
+  "name": "React 模板 · 多人计数验证",
   "version": "0.1.0",
-  "packageMode": "blob",
-  "description": "一个简单的多人计数器，验证 action / snapshot / broadcast。",
+  "packageMode": "filesystem",
+  "description": "验证 Vite + React filesystem 包加载，并测试 Parti 多人计数同步。",
   "author": { "name": "Parti" },
   "entry": {
     "ui": "index.html",
-    "worker": "room.worker.js"
+    "worker": "worker.js"
   },
   "room": {
     "minPlayers": 1,
     "maxPlayers": 8
   },
-  "sync": {
-    "mode": "snapshot"
-  },
+  "sync": { "mode": "snapshot" },
   "permissions": {
     "network": false,
     "storage": "session"

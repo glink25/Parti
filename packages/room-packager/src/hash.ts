@@ -10,19 +10,34 @@ import { stableStringify } from '@parti/core';
 
 export async function hashPackage(
   manifest: unknown,
-  files: Record<string, string>,
+  files: Record<string, Uint8Array>,
 ): Promise<string> {
-  const parts: string[] = [stableStringify(manifest)];
+  const encoder = new TextEncoder();
+  const parts: Uint8Array[] = [encoder.encode(stableStringify(manifest))];
   for (const name of Object.keys(files).sort()) {
-    parts.push(`\n@@${name}@@\n`, files[name]);
+    parts.push(encoder.encode(`\n@@${name}@@\n`), files[name]);
   }
-  return sha256Hex(parts.join(''));
+  return sha256BytesHex(concatBytes(parts));
 }
 
 export async function sha256Hex(text: string): Promise<string> {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return sha256BytesHex(new TextEncoder().encode(text));
+}
+
+export async function sha256BytesHex(bytes: Uint8Array): Promise<string> {
+  const copy = new Uint8Array(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', copy.buffer);
   return [...new Uint8Array(digest)]
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const result = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
+  }
+  return result;
 }

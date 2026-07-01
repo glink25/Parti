@@ -10,8 +10,13 @@ interface ReplayDB extends DBSchema {
   packages: { key: string; value: ReplayPackageRecord };
 }
 
-const dbPromise = openDB<ReplayDB>('parti-replays', 1, {
-  upgrade(db) {
+const dbPromise = openDB<ReplayDB>('parti-replays', 2, {
+  upgrade(db, oldVersion) {
+    if (oldVersion < 2) {
+      for (const name of ['replays', 'packages'] as const) {
+        if (db.objectStoreNames.contains(name)) db.deleteObjectStore(name);
+      }
+    }
     const replays = db.createObjectStore('replays', { keyPath: 'id' });
     replays.createIndex('by-started-at', 'startedAt');
     db.createObjectStore('packages', { keyPath: 'hash' });

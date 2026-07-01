@@ -102,17 +102,14 @@ export class UISandboxBridge {
   }
 }
 
-/** 把房间 UI HTML 包进注入了 Client SDK 的完整文档，用于 iframe.srcdoc。 */
+/** 向完整 HTML 或旧式 fragment 注入 Client SDK，供 URL loader 使用。 */
 export function buildRoomDocument(roomHtml: string): string {
-  return `<!doctype html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport"
-    content="width=device-width,initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" /></head>
-<body>
-<script>${CLIENT_SDK_SCRIPT}</script>
-${roomHtml}
-</body>
-</html>`;
+  const injected = `<meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"><script>${CLIENT_SDK_SCRIPT}</script>`;
+  if (/<html[\s>]/i.test(roomHtml)) {
+    if (/<head[\s>]/i.test(roomHtml)) return roomHtml.replace(/<head([^>]*)>/i, `<head$1>${injected}`);
+    return roomHtml.replace(/<html([^>]*)>/i, `<html$1><head>${injected}</head>`);
+  }
+  return `<!doctype html><html><head><meta charset="utf-8">${injected}</head><body>${roomHtml}</body></html>`;
 }
 
 // --- 端口适配器 ---

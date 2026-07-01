@@ -19,6 +19,7 @@ import { type RoomClientPort } from '@parti/client-sdk';
 import {
   getRoomHtml,
   getWorkerSource,
+  encodeFilesBase64,
   type RoomPackage,
 } from '@parti/room-packager';
 import { createWebWorkerHost } from './roomWorker.js';
@@ -97,7 +98,7 @@ export async function createPeerHost(
     roomSource: getWorkerSource(pkg),
     manifest: pkg.manifest,
     // 透传全部文件，使 host 能响应加入者的 sys:package-request 点对点下发房间代码。
-    packageFiles: pkg.files,
+    packageFiles: encodeFilesBase64(pkg.files),
     hostName: user.name,
     hostClientId: user.id,
     store,

@@ -18,6 +18,7 @@ export interface RoomEntry {
   baseUrl: string;
   /** 模板封面图（缺失时 UI 回退渐变占位） */
   cover?: string;
+  files: string[];
 }
 
 /**
@@ -35,7 +36,7 @@ function resolveCover(baseUrl: string, cover?: string): string | undefined {
 }
 
 export const ROOMS: RoomEntry[] = registry
-  .map(({ dir, manifest }) => {
+  .map(({ dir, manifest, files }) => {
     const baseUrl = `/rooms/${dir}`;
     return {
       id: manifest.id ?? dir,
@@ -43,6 +44,7 @@ export const ROOMS: RoomEntry[] = registry
       description: manifest.description ?? '',
       baseUrl,
       cover: resolveCover(baseUrl, manifest.cover),
+      files,
     };
   })
   .sort((a, b) => a.id.localeCompare(b.id));
@@ -62,14 +64,14 @@ export function findRoom(id: string): RoomEntry | undefined {
  */
 export async function resolvePackage(id: string): Promise<RoomPackage> {
   const official = findRoom(id);
-  if (official) return loadPackageFromUrl(official.baseUrl);
+  if (official) return loadPackageFromUrl(official.baseUrl, official.files);
 
   const pointer = await getRoomPointer(id);
   if (pointer) {
     const tplId = pointer.templateId;
     const officialTpl = findRoom(tplId);
     const base = officialTpl
-      ? await loadPackageFromUrl(officialTpl.baseUrl)
+      ? await loadPackageFromUrl(officialTpl.baseUrl, officialTpl.files)
       : await createPackageFromTemplate(tplId);
     return createPackage({
       manifest: { ...base.manifest, id },

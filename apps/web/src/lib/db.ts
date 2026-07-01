@@ -15,7 +15,7 @@ import type { RoomManifest } from '@parti/room-packager';
 export interface TemplateRecord {
   id: string;
   manifest: RoomManifest;
-  files: Record<string, string>;
+  files: Record<string, Uint8Array>;
   listed: boolean;
   source?: { type: 'zip' | 'github'; ref?: string };
   createdAt: number;
@@ -39,14 +39,19 @@ interface PartiDB extends DBSchema {
 }
 
 const DB_NAME = 'parti';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<PartiDB>> | null = null;
 
 export function getDb(): Promise<IDBPDatabase<PartiDB>> {
   if (!dbPromise) {
     dbPromise = openDB<PartiDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 2) {
+          for (const name of ['templates', 'rooms', 'usage'] as const) {
+            if (db.objectStoreNames.contains(name)) db.deleteObjectStore(name);
+          }
+        }
         if (!db.objectStoreNames.contains('templates')) {
           db.createObjectStore('templates', { keyPath: 'id' });
         }

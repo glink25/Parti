@@ -11,7 +11,7 @@ import {
   type RoomErrorPayload,
   type RoomMessage,
 } from '@parti/core';
-import { createPackage, type RoomPackage } from '@parti/room-packager';
+import { createPackage, decodeFilesBase64, type RoomPackage } from '@parti/room-packager';
 import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
 
 const PACKAGE_FETCH_TIMEOUT_MS = 15_000;
@@ -41,7 +41,7 @@ export async function fetchPackageOverPeer(
 
   try {
     const data = await requestPackageData(transport, roomId, options);
-    return await createPackage({ manifest: data.manifest, files: data.files });
+    return await createPackage({ manifest: data.manifest, files: decodeFilesBase64(data.files) });
   } finally {
     transport.close();
   }

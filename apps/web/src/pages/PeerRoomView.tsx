@@ -428,7 +428,7 @@ function PeerHostSession({
           <div className="grid grid-cols-1">
             <RoomFrame
               key={state.portVersion}
-              html={state.roomHtml}
+              pkg={pkg}
               port={state.port}
               label={intl.formatMessage({ id: 'peer.host.hostView' })}
               role={intl.formatMessage({ id: 'peer.role.host' })}
@@ -472,7 +472,7 @@ function PeerJoinView({
   const [passwordInput, setPasswordInput] = useState(initialCredential ?? '');
   const [attempt, setAttempt] = useState(0);
   const [needsPassword, setNeedsPassword] = useState(false);
-  const [state, setState] = useState<{ roomHtml: string; port: RoomClientPort; roomTitle: string } | null>(null);
+  const [state, setState] = useState<{ pkg: RoomPackage; port: RoomClientPort; roomTitle: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('connecting');
   const [controlsOpen, setControlsOpen] = useState(false);
@@ -521,7 +521,7 @@ function PeerJoinView({
           },
           credential || undefined,
         );
-        setState({ roomHtml: joined.roomHtml, port: joined.port, roomTitle: pkg.manifest.name });
+        setState({ pkg, port: joined.port, roomTitle: pkg.manifest.name });
       })
       .catch((reason: Error & { code?: string }) => {
         if (reason instanceof FetchPackageError) {
@@ -634,7 +634,7 @@ function PeerJoinView({
   return (
     <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-black" data-connection-status={status}>
       <RoomFrame
-        html={state.roomHtml}
+        pkg={state.pkg}
         port={state.port}
         label={intl.formatMessage({ id: 'peer.playerView' })}
         role={intl.formatMessage({ id: 'peer.role.player' })}

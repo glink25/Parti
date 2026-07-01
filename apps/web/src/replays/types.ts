@@ -24,6 +24,7 @@ export interface ReplayRecord {
 
 export interface ReplayPackageRecord {
   hash: string;
+  packageHash: string;
   manifest: RoomManifest;
-  files: Record<string, string>;
+  files: Record<string, Uint8Array>;
 }

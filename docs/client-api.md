@@ -86,9 +86,13 @@ button.onclick = () => parti.action('mark', { cell: 4 });
 
 ## 2. 沙箱限制
 
-UI 运行在 `sandbox="allow-scripts"` 的 iframe 中：
+Blob 与 filesystem package 统一运行在
+`sandbox="allow-scripts allow-same-origin"` 的 iframe 中：
 
-- 只能通过 `parti` 与外界通信；**不能直接访问网络、存储、父页面或其他玩家**。
+- 两种 package 都与宿主页保持同源；当前应仅运行可信 package，游戏通信仍应使用 `parti`。
+- `packageMode` 只决定资源加载方式，不改变 iframe 权限。更严格的安全限制将由独立机制提供。
+- 沙箱不等于网络防火墙。外部请求仍服从浏览器 CORS，`permissions.network` 当前仅为声明。
+- `packageMode: "filesystem"` 时可以用普通相对路径加载 package 内文件；`blob` 模式不提供该能力。
 - 不需要、也不能 `import` SDK——`parti` 是注入的全局对象。
 - 普通的 DOM 操作、内联 `<style>`、`<script>` 都正常可用。
 

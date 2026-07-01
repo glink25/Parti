@@ -50,6 +50,7 @@ my-room/
   "id": "counter",
   "name": "多人计数器",
   "version": "0.1.0",
+  "packageMode": "blob",
   "entry": {
     "ui": "index.html",
     "worker": "room.worker.js"

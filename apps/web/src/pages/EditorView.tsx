@@ -12,7 +12,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { createPackage, type RoomPackageInput } from '@parti/room-packager';
+import { createPackage, decodeText, encodeText, type RoomPackageInput } from '@parti/room-packager';
 import { Button } from '@/components/ui/button.js';
 import { Card } from '@/components/ui/card.js';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs.js';
@@ -49,7 +49,7 @@ export function EditorView() {
   const [manifestText, setManifestText] = useState(() => blankManifest(locale));
   const [htmlText, setHtmlText] = useState(() => getDefaultHtml(locale));
   const [workerText, setWorkerText] = useState(DEFAULT_WORKER);
-  const [extraFiles, setExtraFiles] = useState<Record<string, string>>({});
+  const [extraFiles, setExtraFiles] = useState<Record<string, Uint8Array>>({});
   const [activeFile, setActiveFile] = useState<EditorFile>('manifest');
   const [templates, setTemplates] = useState<TemplateListEntry[]>([]);
   const [activeTemplate, setActiveTemplate] = useState<string>('blank');
@@ -94,8 +94,8 @@ export function EditorView() {
         const uiName = pkg.manifest.entry.ui;
         const workerName = pkg.manifest.entry.worker;
         setManifestText(JSON.stringify(pkg.manifest, null, 2));
-        setHtmlText(pkg.files[uiName] ?? '');
-        setWorkerText(pkg.files[workerName] ?? '');
+        setHtmlText(pkg.files[uiName] ? decodeText(pkg.files[uiName]) : '');
+        setWorkerText(pkg.files[workerName] ? decodeText(pkg.files[workerName]) : '');
         setExtraFiles(
           Object.fromEntries(
             Object.entries(pkg.files).filter(([name]) => name !== uiName && name !== workerName),
@@ -137,7 +137,7 @@ export function EditorView() {
     const workerName = entry?.worker ?? 'room.worker.js';
     const input: RoomPackageInput = {
       manifest,
-      files: { ...extraFiles, [uiName]: htmlText, [workerName]: workerText },
+      files: { ...extraFiles, [uiName]: encodeText(htmlText), [workerName]: encodeText(workerText) },
     };
     try {
       await createPackage(input);
@@ -173,8 +173,8 @@ export function EditorView() {
   async function onUpload(event: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const list = event.target.files;
     if (!list) return;
-    const next: Record<string, string> = {};
-    for (const file of Array.from(list)) next[file.name] = await file.text();
+    const next: Record<string, Uint8Array> = {};
+    for (const file of Array.from(list)) next[file.webkitRelativePath || file.name] = new Uint8Array(await file.arrayBuffer());
     setExtraFiles((previous) => ({ ...previous, ...next }));
     setDirty(true);
     event.target.value = '';

@@ -2,6 +2,7 @@
 
 export type SyncMode = 'snapshot' | 'patch';
 export type StoragePermission = 'none' | 'session' | 'local';
+export type PackageMode = 'blob' | 'filesystem';
 
 export interface RoomManifest {
   partiVersion: string;
@@ -9,6 +10,7 @@ export interface RoomManifest {
   id: string;
   name: string;
   version: string;
+  packageMode: PackageMode;
   description?: string;
   /** 模板封面图，相对房间目录的路径（如 "cover.png"）或绝对 URL；缺省时 UI 回退渐变占位 */
   cover?: string;
@@ -55,6 +57,9 @@ export function validateManifest(input: unknown): RoomManifest {
   requireString(m, 'name');
   requireString(m, 'version');
   requireString(m, 'partiVersion');
+  if (m.packageMode !== 'blob' && m.packageMode !== 'filesystem') {
+    throw new ManifestError('manifest.packageMode 必须是 blob 或 filesystem');
+  }
   if (typeof m.protocolVersion !== 'number') {
     throw new ManifestError('manifest.protocolVersion 必须是数字');
   }

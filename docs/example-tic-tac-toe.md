@@ -31,6 +31,7 @@ Parti 的核心能力：
   "id": "tic-tac-toe",
   "name": "井字棋",
   "version": "0.1.0",
+  "packageMode": "blob",
   "description": "经典双人井字棋：前两位玩家执 X / O，轮流落子，连成一线获胜。",
   "author": { "name": "Parti" },
   "entry": {

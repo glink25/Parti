@@ -1,17 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { Maximize2Icon } from 'lucide-react';
 import {
   UISandboxBridge,
-  buildRoomDocument,
   type RoomClientPort,
 } from '@parti/client-sdk';
+import type { RoomPackage } from '@parti/room-packager';
 import { Button } from '@/components/ui/button.js';
 import { RoomImmersiveCapsule } from '@/components/RoomImmersiveCapsule.js';
 import { cn } from '@/lib/utils.js';
+import { createPackageUrl } from '@/lib/packageUiLoader.js';
 
 export function RoomFrame({
-  html,
+  pkg,
   port,
   label,
   role,
@@ -24,7 +25,7 @@ export function RoomFrame({
   exitAriaLabelId,
   exitTitleId,
 }: {
-  html: string;
+  pkg: RoomPackage;
   port: RoomClientPort;
   label: string;
   role: string;
@@ -39,16 +40,32 @@ export function RoomFrame({
 }) {
   const intl = useIntl();
   const ref = useRef<HTMLIFrameElement>(null);
-  const roomDocument = buildRoomDocument(html);
+  const [frameUrl, setFrameUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let dispose: (() => void) | undefined;
+    setFrameUrl(null);
+    setLoadError(null);
+    void createPackageUrl(pkg).then((handle) => {
+      if (cancelled) return handle.dispose();
+      dispose = handle.dispose;
+      setFrameUrl(handle.url);
+    }).catch((reason: unknown) => {
+      if (!cancelled) setLoadError(reason instanceof Error ? reason.message : String(reason));
+    });
+    return () => { cancelled = true; dispose?.(); };
+  }, [pkg]);
 
   useEffect(() => {
     const iframe = ref.current;
-    if (!iframe) return;
+    if (!iframe || !frameUrl) return;
     const bridge = new UISandboxBridge(iframe, port, {
       ...(onLog ? { onLog } : {}),
     });
     return () => bridge.dispose();
-  }, [html, port, onLog]);
+  }, [frameUrl, port, onLog]);
 
   useEffect(() => {
     if (!fullscreen || !onExitFullscreen) return;
@@ -97,7 +114,8 @@ export function RoomFrame({
           exitTitleId={exitTitleId}
         />
       )}
-      <iframe ref={ref} srcDoc={roomDocument} sandbox="allow-scripts" title={label} className="w-full flex-1 border-0 bg-white" />
+      {loadError ? <div className="flex flex-1 items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
+      {frameUrl ? <iframe ref={ref} src={frameUrl} sandbox="allow-scripts allow-same-origin" title={label} className="w-full flex-1 border-0 bg-white" /> : null}
     </div>
   );
 }
