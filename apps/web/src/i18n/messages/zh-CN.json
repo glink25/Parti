@@ -158,7 +158,13 @@
       "passwordAria": "4 位房间密码",
       "passwordPlaceholder": "4 位数字密码",
       "wrongPassword": "密码错误，请重试",
-      "join": "加入房间"
+      "join": "加入房间",
+      "exitAria": "退出房间",
+      "exitTitle": "返回大厅",
+      "leaveTitle": "确定退出房间？",
+      "leaveDescription": "退出后将返回大厅，当前联机连接会断开。",
+      "leaveConfirm": "退出并返回大厅",
+      "leaveCancel": "继续留在房间"
     },
     "playerView": "房间画面",
     "role": {
@@ -203,6 +209,10 @@
       "makePublic": "公开到大厅",
       "sheetTitle": "房间设置",
       "sheetDescription": "邀请朋友加入，或调整标题、密码和公开状态。"
+    },
+    "share": {
+      "sheetTitle": "分享房间",
+      "sheetDescription": "复制链接或二维码，邀请朋友加入。"
     },
     "fullscreen": {
       "enter": "全屏展示",

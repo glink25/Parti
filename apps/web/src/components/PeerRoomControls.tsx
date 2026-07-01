@@ -29,7 +29,7 @@ export type RoomControlsProps = {
   onTogglePublic: () => void;
 };
 
-function InviteCard({ props }: { props: RoomControlsProps }) {
+function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControlsProps; showAdmissionStatus?: boolean }) {
   const { settings, admission, inviteUrl, copied, onCopyInvite, onOpenQr } = props;
   return (
     <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
@@ -55,10 +55,12 @@ function InviteCard({ props }: { props: RoomControlsProps }) {
             </Button>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground">
-          <span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />
-          <FormattedMessage id={admission.joinable ? 'peer.invite.joinable' : 'peer.invite.full'} />
-        </div>
+        {showAdmissionStatus && (
+          <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground">
+            <span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />
+            <FormattedMessage id={admission.joinable ? 'peer.invite.joinable' : 'peer.invite.full'} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -108,26 +110,49 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
   );
 }
 
-function ControlsContent({ props }: { props: RoomControlsProps }) {
-  return <><InviteCard props={props} /><SettingsCard props={props} /></>;
+function ControlsContent({ props, showSettings = true, showAdmissionStatus = true }: { props: RoomControlsProps; showSettings?: boolean; showAdmissionStatus?: boolean }) {
+  return (
+    <>
+      <InviteCard props={props} showAdmissionStatus={showAdmissionStatus} />
+      {showSettings && <SettingsCard props={props} />}
+    </>
+  );
 }
 
-export function ResponsiveRoomControls({ open, onOpenChange, props }: { open: boolean; onOpenChange: (open: boolean) => void; props: RoomControlsProps }) {
+export function ResponsiveRoomControls({ open, onOpenChange, props, showSettings = true }: { open: boolean; onOpenChange: (open: boolean) => void; props: RoomControlsProps; showSettings?: boolean }) {
   const mobile = useMediaQuery('(max-width: 767px)');
-  if (!mobile) return <aside className="flex flex-col gap-3.5 max-lg:grid max-lg:grid-cols-2"><ControlsContent props={props} /></aside>;
-  return <RoomControlsSheet open={open} onOpenChange={onOpenChange} props={props} />;
+  if (!mobile) return <aside className="flex flex-col gap-3.5 max-lg:grid max-lg:grid-cols-2"><ControlsContent props={props} showSettings={showSettings} /></aside>;
+  return <RoomControlsSheet open={open} onOpenChange={onOpenChange} props={props} showSettings={showSettings} />;
 }
 
-export function RoomControlsSheet({ open, onOpenChange, props }: { open: boolean; onOpenChange: (open: boolean) => void; props: RoomControlsProps }) {
+export function RoomControlsSheet({
+  open,
+  onOpenChange,
+  props,
+  showSettings = true,
+  showAdmissionStatus = true,
+  sheetTitleId = 'peer.settings.sheetTitle',
+  sheetDescriptionId = 'peer.settings.sheetDescription',
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  props: RoomControlsProps;
+  showSettings?: boolean;
+  showAdmissionStatus?: boolean;
+  sheetTitleId?: string;
+  sheetDescriptionId?: string;
+}) {
   if (!open) return null;
   return (
     <Sheet open onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
         <SheetHeader className="border-b px-5 py-4 text-left">
-          <SheetTitle><FormattedMessage id="peer.settings.sheetTitle" /></SheetTitle>
-          <SheetDescription><FormattedMessage id="peer.settings.sheetDescription" /></SheetDescription>
+          <SheetTitle><FormattedMessage id={sheetTitleId} /></SheetTitle>
+          <SheetDescription><FormattedMessage id={sheetDescriptionId} /></SheetDescription>
         </SheetHeader>
-        <div className="grid gap-3 overflow-y-auto px-4 pb-5 sm:grid-cols-2"><ControlsContent props={props} /></div>
+        <div className={cn('grid gap-3 overflow-y-auto px-4 pb-5', showSettings && 'sm:grid-cols-2')}>
+          <ControlsContent props={props} showSettings={showSettings} showAdmissionStatus={showAdmissionStatus} />
+        </div>
       </SheetContent>
     </Sheet>
   );

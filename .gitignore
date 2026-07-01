@@ -7,3 +7,5 @@ coverage
 .claude
 .pnpm-store
 .env
+.agents
+skills-lock.json

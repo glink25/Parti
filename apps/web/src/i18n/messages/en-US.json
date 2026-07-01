@@ -158,7 +158,13 @@
       "passwordAria": "4-digit room password",
       "passwordPlaceholder": "4-digit password",
       "wrongPassword": "Wrong password, please try again",
-      "join": "Join room"
+      "join": "Join room",
+      "exitAria": "Leave room",
+      "exitTitle": "Back to lobby",
+      "leaveTitle": "Leave this room?",
+      "leaveDescription": "You will return to the lobby and disconnect from this session.",
+      "leaveConfirm": "Leave and go to lobby",
+      "leaveCancel": "Stay in room"
     },
     "playerView": "Room view",
     "role": {
@@ -203,6 +209,10 @@
       "makePublic": "List in lobby",
       "sheetTitle": "Room settings",
       "sheetDescription": "Invite friends or adjust title, password, and visibility."
+    },
+    "share": {
+      "sheetTitle": "Share room",
+      "sheetDescription": "Copy the link or QR code to invite friends."
     },
     "fullscreen": {
       "enter": "Fullscreen",

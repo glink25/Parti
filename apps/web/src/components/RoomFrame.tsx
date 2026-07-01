@@ -21,6 +21,8 @@ export function RoomFrame({
   onFullscreenMore,
   onLog,
   className,
+  exitAriaLabelId,
+  exitTitleId,
 }: {
   html: string;
   port: RoomClientPort;
@@ -32,6 +34,8 @@ export function RoomFrame({
   onFullscreenMore?: () => void;
   onLog?: (args: unknown[]) => void;
   className?: string;
+  exitAriaLabelId?: string;
+  exitTitleId?: string;
 }) {
   const intl = useIntl();
   const ref = useRef<HTMLIFrameElement>(null);
@@ -59,7 +63,7 @@ export function RoomFrame({
     <div
       className={cn(
         'flex min-h-[300px] flex-col overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_22px_65px_rgba(91,72,15,0.12)]',
-        fullscreen && 'h-[100dvh] w-[100dvw] min-h-0 rounded-none border-0 bg-black shadow-none',
+        fullscreen && 'relative h-[100dvh] w-[100dvw] min-h-0 rounded-none border-0 bg-black shadow-none',
         className,
       )}
     >
@@ -89,6 +93,8 @@ export function RoomFrame({
         <RoomImmersiveCapsule
           onMore={onFullscreenMore}
           onExit={onExitFullscreen}
+          exitAriaLabelId={exitAriaLabelId}
+          exitTitleId={exitTitleId}
         />
       )}
       <iframe ref={ref} srcDoc={roomDocument} sandbox="allow-scripts" title={label} className="w-full flex-1 border-0 bg-white" />

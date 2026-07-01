@@ -20,10 +20,14 @@ export function RoomImmersiveCapsule({
   onMore,
   onExit,
   className,
+  exitAriaLabelId = 'peer.fullscreen.exitAria',
+  exitTitleId = 'peer.fullscreen.exitTitle',
 }: {
   onMore?: () => void;
   onExit: () => void;
   className?: string;
+  exitAriaLabelId?: string;
+  exitTitleId?: string;
 }) {
   const intl = useIntl();
   const buttonClass =
@@ -54,8 +58,8 @@ export function RoomImmersiveCapsule({
       <button
         type="button"
         className={buttonClass}
-        aria-label={intl.formatMessage({ id: 'peer.fullscreen.exitAria' })}
-        title={intl.formatMessage({ id: 'peer.fullscreen.exitTitle' })}
+        aria-label={intl.formatMessage({ id: exitAriaLabelId })}
+        title={intl.formatMessage({ id: exitTitleId })}
         onClick={onExit}
       >
         <ExitImmersiveIcon />

@@ -11,6 +11,7 @@ import { DevTools } from '../components/DevTools.js';
 import {
   createPeerHost,
   createPeerJoin,
+  clearRoomSession,
   registerRoomDisposer,
 } from '../lib/PeerRoomSession.js';
 import { resolvePackage } from '../lib/rooms.js';
@@ -39,6 +40,14 @@ import { copyTextToClipboard } from '@/lib/clipboard.js';
 import { usePageFullscreen } from '@/components/PageFullscreen.js';
 import { ResponsiveRoomControls, RoomControlsSheet, type RoomControlsProps } from '@/components/PeerRoomControls.js';
 import { Logo } from '@/components/Logo.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -314,10 +323,15 @@ function PeerJoinView({
   const [passwordInput, setPasswordInput] = useState(initialCredential ?? '');
   const [attempt, setAttempt] = useState(0);
   const [needsPassword, setNeedsPassword] = useState(false);
-  const [state, setState] = useState<{ roomHtml: string; port: RoomClientPort } | null>(null);
+  const [state, setState] = useState<{ roomHtml: string; port: RoomClientPort; roomTitle: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('connecting');
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const activeAttempt = useRef('');
+  const localUser = loadLocalUser(undefined, locale);
 
   useEffect(() => {
     if (!initialCredential) return;
@@ -353,7 +367,7 @@ function PeerJoinView({
           },
           credential || undefined,
         );
-        setState({ roomHtml: joined.roomHtml, port: joined.port });
+        setState({ roomHtml: joined.roomHtml, port: joined.port, roomTitle: pkg.manifest.name });
       })
       .catch((reason: Error & { code?: string }) => {
         if (reason instanceof FetchPackageError) {
@@ -408,7 +422,7 @@ function PeerJoinView({
     );
   }
   if (error) return <RoomError message={error} />;
-  if (!state) {
+  if (!state || !roomId || !hostPeerId) {
     return (
       <div className={playerGate}>
         <Logo size="md" className="mb-2.5" />
@@ -421,6 +435,42 @@ function PeerJoinView({
     );
   }
 
+  const inviteUrl = buildInviteUrl(
+    location.origin,
+    location.pathname,
+    roomId,
+    hostPeerId,
+    credential,
+  );
+
+  async function copyInvite(): Promise<void> {
+    const ok = await copyTextToClipboard(inviteUrl);
+    if (!ok) return;
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  }
+
+  function leaveRoom(): void {
+    if (!roomId) return;
+    clearRoomSession(roomId);
+    location.replace(`${location.pathname}${location.search}#/`);
+  }
+
+  const shareControlsProps: RoomControlsProps = {
+    settings: { title: state.roomTitle, password: credential, isPublic: false },
+    passwordDraft: credential,
+    admission: { activePlayers: 0, reservedPlayers: 0, maxPlayers: null, joinable: true },
+    lobbyStatus: 'private',
+    lobbyError: null,
+    inviteUrl,
+    copied,
+    onCopyInvite: () => void copyInvite(),
+    onOpenQr: () => setQrOpen(true),
+    onPasswordDraftChange: () => {},
+    onApplySettings: () => {},
+    onTogglePublic: () => {},
+  };
+
   return (
     <div className="h-[100dvh] w-[100dvw] overflow-hidden bg-black" data-connection-status={status}>
       <RoomFrame
@@ -429,8 +479,62 @@ function PeerJoinView({
         label={intl.formatMessage({ id: 'peer.playerView' })}
         role={intl.formatMessage({ id: 'peer.role.player' })}
         fullscreen
+        onExitFullscreen={() => setLeaveConfirmOpen(true)}
+        onFullscreenMore={() => setControlsOpen(true)}
+        exitAriaLabelId="peer.join.exitAria"
+        exitTitleId="peer.join.exitTitle"
+      />
+      <RoomControlsSheet
+        open={controlsOpen}
+        onOpenChange={setControlsOpen}
+        props={shareControlsProps}
+        showSettings={false}
+        showAdmissionStatus={false}
+        sheetTitleId="peer.share.sheetTitle"
+        sheetDescriptionId="peer.share.sheetDescription"
+      />
+      <InviteQrDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        inviteUrl={inviteUrl}
+        inviterName={localUser.name}
+        roomTitle={state.roomTitle}
+      />
+      <LeaveRoomConfirmDialog
+        open={leaveConfirmOpen}
+        onOpenChange={setLeaveConfirmOpen}
+        onConfirm={leaveRoom}
       />
     </div>
+  );
+}
+
+function LeaveRoomConfirmDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle><FormattedMessage id="peer.join.leaveTitle" /></DialogTitle>
+          <DialogDescription><FormattedMessage id="peer.join.leaveDescription" /></DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <FormattedMessage id="peer.join.leaveCancel" />
+          </Button>
+          <Button onClick={onConfirm}>
+            <FormattedMessage id="peer.join.leaveConfirm" />
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
