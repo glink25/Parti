@@ -44,7 +44,12 @@
       "save": "保存用户名",
       "saved": "已保存，将在下次进入或重连房间时生效。",
       "languageLabel": "语言",
-      "languageHint": "界面显示语言，保存在当前浏览器中。"
+      "languageHint": "界面显示语言，保存在当前浏览器中。",
+      "clearData": "清除数据",
+      "clearDataTitle": "确定清除所有本地数据？",
+      "clearDataDescription": "这将删除本浏览器中保存的所有数据（包括用户信息、模版、房间、回放等），且无法找回。是否继续？",
+      "clearDataCancel": "取消",
+      "clearDataConfirm": "清除并刷新"
     },
     "validation": {
       "empty": "用户名不能为空",

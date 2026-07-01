@@ -44,7 +44,12 @@
       "save": "Save name",
       "saved": "Saved. It will apply on your next visit or reconnect.",
       "languageLabel": "Language",
-      "languageHint": "Interface language, saved in this browser."
+      "languageHint": "Interface language, saved in this browser.",
+      "clearData": "Clear data",
+      "clearDataTitle": "Clear all local data?",
+      "clearDataDescription": "This will permanently delete all data saved in this browser (including your profile, templates, rooms, and replays). This cannot be undone. Continue?",
+      "clearDataCancel": "Cancel",
+      "clearDataConfirm": "Clear and reload"
     },
     "validation": {
       "empty": "Display name cannot be empty",

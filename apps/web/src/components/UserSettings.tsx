@@ -3,6 +3,14 @@ import { useIntl } from 'react-intl';
 import { UserRoundIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
 import { Input } from '@/components/ui/input.js';
 import { Label } from '@/components/ui/label.js';
 import {
@@ -24,6 +32,7 @@ import { LOCALE_LABELS, LOCALES, type AppLocale } from '@/i18n/locales.js';
 import { useLocale } from '@/i18n/LocaleProvider.js';
 import { formatUserNameError } from '@/i18n/formatErrors.js';
 import { TransportProfilesDialog } from './TransportProfilesDialog.js';
+import { clearAllBrowserStorage } from '../lib/clearLocalData.js';
 import {
   MAX_USER_NAME_LENGTH,
   saveLocalUserName,
@@ -43,6 +52,8 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
   const [message, setMessage] = useState<string | null>(null);
   const [profilesVersion, setProfilesVersion] = useState(0);
   const [profilesOpen, setProfilesOpen] = useState(false);
+  const [clearDataOpen, setClearDataOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const profiles = getTransportProfiles();
   const selectedProfile = getSelectedTransportProfile();
 
@@ -51,6 +62,16 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
     if (next) {
       setDraft(user.name);
       setMessage(null);
+    }
+  }
+
+  async function handleClearData(): Promise<void> {
+    setClearing(true);
+    try {
+      await clearAllBrowserStorage();
+      window.location.reload();
+    } catch {
+      setClearing(false);
     }
   }
 
@@ -66,7 +87,10 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
           <span className="truncate sm:inline">{user.name}</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent
+        className="w-full sm:max-w-md"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
         <SheetHeader>
           <SheetTitle>{intl.formatMessage({ id: 'user.settings.sheetTitle' })}</SheetTitle>
           <SheetDescription>{intl.formatMessage({ id: 'user.settings.sheetDescription' })}</SheetDescription>
@@ -175,6 +199,12 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
               <p className="text-xs text-muted-foreground">{intl.formatMessage({ id: 'user.settings.languageHint' })}</p>
             </CardContent>
           </Card>
+
+          <div className="border-t border-border pt-4">
+            <Button type="button" variant="destructive" className="w-full" onClick={() => setClearDataOpen(true)}>
+              {intl.formatMessage({ id: 'user.settings.clearData' })}
+            </Button>
+          </div>
         </div>
       </SheetContent>
       <TransportProfilesDialog
@@ -183,6 +213,22 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
         onOpenChange={setProfilesOpen}
         onProfilesChange={() => setProfilesVersion((current) => current + 1)}
       />
+      <Dialog open={clearDataOpen} onOpenChange={setClearDataOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{intl.formatMessage({ id: 'user.settings.clearDataTitle' })}</DialogTitle>
+            <DialogDescription>{intl.formatMessage({ id: 'user.settings.clearDataDescription' })}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearDataOpen(false)} disabled={clearing}>
+              {intl.formatMessage({ id: 'user.settings.clearDataCancel' })}
+            </Button>
+            <Button variant="destructive" onClick={() => void handleClearData()} disabled={clearing}>
+              {intl.formatMessage({ id: 'user.settings.clearDataConfirm' })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
