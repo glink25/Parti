@@ -110,7 +110,7 @@
     "dock": {
       "readyTitle": "Ready to go?",
       "readyDescription": "After creating, you can set title, password, and visibility.",
-      "localPreview": "Local preview",
+      "localPreview": "Local Debug",
       "creating": "Creating…",
       "createPeer": "Create online room",
       "continueCreate": "Continue"

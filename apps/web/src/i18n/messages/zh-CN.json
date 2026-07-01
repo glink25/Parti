@@ -110,7 +110,7 @@
     "dock": {
       "readyTitle": "准备好了吗？",
       "readyDescription": "创建后可继续设置标题、密码和公开状态。",
-      "localPreview": "本地预览",
+      "localPreview": "本地调试",
       "creating": "正在创建…",
       "createPeer": "创建联机房间",
       "continueCreate": "继续创建"
