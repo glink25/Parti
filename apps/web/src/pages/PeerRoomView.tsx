@@ -136,6 +136,13 @@ function PeerHostSession({
   const recordingRef = useRef<ReplayRecordingController | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
   const started = useRef(false);
+  const lastLobbySyncAtRef = useRef(0);
+  const lobbySyncTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastPublicToggleAtRef = useRef(0);
+  const [publicToggleBusy, setPublicToggleBusy] = useState(false);
+
+  const LOBBY_SYNC_INTERVAL_MS = 2000;
+  const PUBLIC_TOGGLE_COOLDOWN_MS = 2000;
 
   useEffect(() => {
     if (started.current) return;
@@ -252,14 +259,46 @@ function PeerHostSession({
     return () => window.removeEventListener('hashchange', finishWhenLeavingRoom);
   }, [roomId]);
 
-  function applySettings(next: HostRoomSettings): void {
+  useEffect(() => () => {
+    if (lobbySyncTimerRef.current) clearTimeout(lobbySyncTimerRef.current);
+  }, []);
+
+  function runLobbySync(): void {
+    if (!state || !publisherRef.current) return;
+    const current = settingsRef.current;
+    if (!current.isPublic) return;
+    void publisherRef.current.sync(
+      lobbyInput(pkg, state.hostPeerId, transportConfig, current, state.host.getAdmissionStatus()),
+    );
+    lastLobbySyncAtRef.current = Date.now();
+  }
+
+  function scheduleLobbySync(): void {
+    if (!state || !publisherRef.current || !settingsRef.current.isPublic) return;
+    const elapsed = Date.now() - lastLobbySyncAtRef.current;
+    if (elapsed >= LOBBY_SYNC_INTERVAL_MS) {
+      if (lobbySyncTimerRef.current) {
+        clearTimeout(lobbySyncTimerRef.current);
+        lobbySyncTimerRef.current = undefined;
+      }
+      runLobbySync();
+      return;
+    }
+    if (lobbySyncTimerRef.current) clearTimeout(lobbySyncTimerRef.current);
+    lobbySyncTimerRef.current = setTimeout(() => {
+      lobbySyncTimerRef.current = undefined;
+      runLobbySync();
+    }, LOBBY_SYNC_INTERVAL_MS - elapsed);
+  }
+
+  function applySettings(next: HostRoomSettings, options?: { skipLobbySync?: boolean }): void {
     if (!state || (next.password && !/^\d{4}$/.test(next.password))) return;
     settingsRef.current = next;
     setSettings(next);
     saveHostRoomSettings(roomId, next);
     state.host.setAdmissionController(createPasswordAdmissionController(next.password));
-    if (next.isPublic && admission && publisherRef.current) {
-      void publisherRef.current.sync(lobbyInput(pkg, state.hostPeerId, transportConfig, next, admission));
+    if (!options?.skipLobbySync && next.isPublic && publisherRef.current) {
+      scheduleLobbySync();
     }
   }
 
@@ -278,28 +317,36 @@ function PeerHostSession({
   }
 
   async function togglePublic(): Promise<void> {
-    if (!state || !admission) return;
-    if (settings.isPublic) {
-      await publisherRef.current?.unpublish();
-      applySettings({ ...settings, isPublic: false });
-      return;
-    }
-    const baseUrl = lobbyServiceUrl();
-    if (!baseUrl) {
-      setLobbyStatus('lobbyUnavailableStillPrivate');
-      return;
-    }
-    const publisher = publisherRef.current ?? new LobbyPublisher(roomId, new LobbyClient(baseUrl), (status) => {
-      setLobbyStatus(status);
-      setLobbyError(null);
-    });
-    publisherRef.current = publisher;
+    if (!state || !admission || publicToggleBusy) return;
+    if (Date.now() - lastPublicToggleAtRef.current < PUBLIC_TOGGLE_COOLDOWN_MS) return;
+    setPublicToggleBusy(true);
     try {
-      await publisher.publish(lobbyInput(pkg, state.hostPeerId, transportConfig, settings, admission));
-      applySettings({ ...settings, isPublic: true });
-    } catch (reason) {
-      await publisher.unpublish();
-      setLobbyError(reason instanceof Error ? reason.message : String(reason));
+      if (settings.isPublic) {
+        await publisherRef.current?.unpublish();
+        applySettings({ ...settings, isPublic: false }, { skipLobbySync: true });
+        return;
+      }
+      const baseUrl = lobbyServiceUrl();
+      if (!baseUrl) {
+        setLobbyStatus('lobbyUnavailableStillPrivate');
+        return;
+      }
+      const publisher = publisherRef.current ?? new LobbyPublisher(roomId, new LobbyClient(baseUrl), (status) => {
+        setLobbyStatus(status);
+        setLobbyError(null);
+      });
+      publisherRef.current = publisher;
+      try {
+        await publisher.publish(lobbyInput(pkg, state.hostPeerId, transportConfig, settings, admission));
+        lastLobbySyncAtRef.current = Date.now();
+        applySettings({ ...settings, isPublic: true }, { skipLobbySync: true });
+      } catch (reason) {
+        await publisher.unpublish();
+        setLobbyError(reason instanceof Error ? reason.message : String(reason));
+      }
+    } finally {
+      lastPublicToggleAtRef.current = Date.now();
+      setPublicToggleBusy(false);
     }
   }
 
@@ -340,6 +387,7 @@ function PeerHostSession({
     onPasswordDraftChange: updatePasswordDraft,
     onApplySettings: applySettings,
     onTogglePublic: () => void togglePublic(),
+    publicToggleBusy,
     replayBusy,
     replayError,
     onToggleReplay: toggleReplay,
@@ -577,6 +625,7 @@ function PeerJoinView({
     onPasswordDraftChange: () => {},
     onApplySettings: () => {},
     onTogglePublic: () => {},
+    publicToggleBusy: false,
     replayBusy: false,
     replayError: null,
     onToggleReplay: () => {},

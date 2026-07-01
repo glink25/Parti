@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CircleIcon, CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
@@ -32,6 +32,7 @@ export type RoomControlsProps = {
   onPasswordDraftChange: (value: string) => void;
   onApplySettings: (settings: HostRoomSettings) => void;
   onTogglePublic: () => void;
+  publicToggleBusy: boolean;
   replayBusy: boolean;
   replayError: string | null;
   onToggleReplay: () => void;
@@ -87,7 +88,14 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
 
 function SettingsCard({ props }: { props: RoomControlsProps }) {
   const intl = useIntl();
-  const { settings, passwordDraft, lobbyStatus, lobbyError, replayBusy, replayError, onPasswordDraftChange, onApplySettings, onTogglePublic, onToggleReplay } = props;
+  const { settings, passwordDraft, lobbyStatus, lobbyError, publicToggleBusy, replayBusy, replayError, onPasswordDraftChange, onApplySettings, onTogglePublic, onToggleReplay } = props;
+  const [titleDraft, setTitleDraft] = useState(settings.title);
+  useEffect(() => { setTitleDraft(settings.title); }, [settings.title]);
+
+  function commitTitleDraft(): void {
+    if (titleDraft !== settings.title) onApplySettings({ ...settings, title: titleDraft });
+  }
+
   return (
     <Card className="gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
       <CardHeader className="flex items-start justify-between gap-3">
@@ -104,7 +112,13 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
       <CardContent className="flex flex-col gap-4">
         <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
           <FormattedMessage id="peer.settings.roomTitle" />
-          <Input value={settings.title} maxLength={80} onChange={(event) => onApplySettings({ ...settings, title: event.target.value })} />
+          <Input
+            value={titleDraft}
+            maxLength={80}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={commitTitleDraft}
+            onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+          />
         </Label>
         <Label className="flex flex-col items-stretch gap-2 text-muted-foreground">
           <FormattedMessage id="peer.settings.passwordLabel" />
@@ -116,7 +130,7 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
           </div>
         </Label>
         <div>
-          <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} onClick={onTogglePublic}>
+          <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} disabled={publicToggleBusy} onClick={onTogglePublic}>
             <FormattedMessage id={settings.isPublic ? 'peer.settings.makePrivate' : 'peer.settings.makePublic'} />
           </Button>
         </div>
