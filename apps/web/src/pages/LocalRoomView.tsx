@@ -5,7 +5,7 @@ import { type RoomPackage } from '@parti/room-packager';
 import { RoomFrame } from '../components/RoomFrame.js';
 import { DevTools } from '../components/DevTools.js';
 import { LocalRoomSession } from '../lib/LocalRoomSession.js';
-import { resolvePackage } from '../lib/rooms.js';
+import { loadRoomSnapshot } from '../lib/customRooms.js';
 import { Button } from '@/components/ui/button.js';
 import { Card } from '@/components/ui/card.js';
 
@@ -32,7 +32,7 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
     let session: LocalRoomSession | undefined;
 
     (async () => {
-      const pkg = await resolvePackage(roomId);
+      const pkg = await loadRoomSnapshot(roomId);
       session = await LocalRoomSession.create(pkg);
       const hostPort = session.hostPort();
       const p1 = await session.addPlayer('Alice');

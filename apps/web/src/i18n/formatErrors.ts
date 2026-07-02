@@ -3,7 +3,8 @@ import { ImportRoomError } from '@/lib/importRoom.js';
 import type { FetchPackageError } from '@/lib/fetchPackageOverPeer.js';
 import type { LobbyStatusKey } from '@/lib/lobbyApi.js';
 import type { UserNameValidationError } from '@/lib/localUser.js';
-import { RoomNotFoundError } from '@/lib/rooms.js';
+import { PackageSourceNotFoundError } from '@/lib/rooms.js';
+import { RoomSnapshotNotFoundError } from '@/lib/customRooms.js';
 
 export function formatLobbyStatus(intl: IntlShape, status: LobbyStatusKey): string {
   return intl.formatMessage({ id: `lobby.status.${status}` });
@@ -43,8 +44,11 @@ export function formatRoomError(intl: IntlShape, message: string): string {
 }
 
 export function formatResolveError(intl: IntlShape, reason: unknown): string {
-  if (reason instanceof RoomNotFoundError) {
-    return intl.formatMessage({ id: 'rooms.unknown' }, { id: reason.templateId });
+  if (reason instanceof PackageSourceNotFoundError) {
+    return intl.formatMessage({ id: 'rooms.unknown' }, { id: reason.sourceId });
+  }
+  if (reason instanceof RoomSnapshotNotFoundError) {
+    return intl.formatMessage({ id: 'rooms.unknown' }, { id: reason.roomId });
   }
   if (reason instanceof ImportRoomError) return formatImportError(intl, reason);
   return reason instanceof Error ? reason.message : String(reason);

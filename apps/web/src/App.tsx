@@ -9,6 +9,7 @@ import { UserSettings } from './components/UserSettings.js';
 import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen.js';
 import { useLocale } from './i18n/LocaleProvider.js';
 import { ENABLE_REPLAYS } from './lib/featureFlags.js';
+import { deleteRoomSnapshot } from './lib/customRooms.js';
 
 const EditorView = lazy(() => import('./pages/EditorView.js').then((module) => ({ default: module.EditorView })));
 const LocalRoomView = lazy(() => import('./pages/LocalRoomView.js').then((module) => ({ default: module.LocalRoomView })));
@@ -34,6 +35,16 @@ function peerRoomIdOf(hash: string): string | null {
   return parts[0] === 'peer' || parts[0] === 'online' ? (parts[2] ?? null) : null;
 }
 
+/** 仅返回当前浏览器拥有的房间；加入别人的房间不拥有其 snapshot。 */
+function ownedRoomIdOf(hash: string): string | null {
+  const parts = hash.replace(/^#/, '').split('/').filter(Boolean);
+  if (parts[0] === 'local') return parts[1] ?? null;
+  if ((parts[0] === 'peer' || parts[0] === 'online') && parts[1] === 'host') {
+    return parts[2] ?? null;
+  }
+  return null;
+}
+
 function AppLayout() {
   const hash = useHashRoute();
   const { locale } = useLocale();
@@ -53,6 +64,7 @@ function AppLayout() {
   // 离开联机房间（回大厅 / 进入其它房间）时清除该房间的会话，
   // 使后续再进入使用全新数据。刷新是整页重载、不触发 hashchange，故不受影响。
   const prevPeerRoom = useRef<string | null>(peerRoomIdOf(hash));
+  const prevOwnedRoom = useRef<string | null>(ownedRoomIdOf(hash));
   useEffect(() => {
     const cur = peerRoomIdOf(hash);
     const prev = prevPeerRoom.current;
@@ -60,6 +72,13 @@ function AppLayout() {
       void import('./lib/PeerRoomSession.js').then(({ clearRoomSession }) => clearRoomSession(prev));
     }
     prevPeerRoom.current = cur;
+
+    const owned = ownedRoomIdOf(hash);
+    const previousOwned = prevOwnedRoom.current;
+    if (previousOwned && previousOwned !== owned) {
+      void deleteRoomSnapshot(previousOwned);
+    }
+    prevOwnedRoom.current = owned;
   }, [hash]);
 
   const route = hash.replace(/^#/, '');
@@ -70,7 +89,7 @@ function AppLayout() {
   let view;
   if (parts[0] === 'editor') {
     view = <EditorView />;
-  } else if (import.meta.env.DEV && parts[0] === 'local' && parts[1]) {
+  } else if (parts[0] === 'local' && parts[1]) {
     view = <LocalRoomView roomId={parts[1]} />;
   } else if (parts[0] === 'peer' || parts[0] === 'online') {
     view = <PeerRoomView />;

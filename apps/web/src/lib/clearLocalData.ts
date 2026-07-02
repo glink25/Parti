@@ -1,4 +1,4 @@
-const KNOWN_DATABASES = ['parti', 'parti-replays'] as const;
+const KNOWN_DATABASES = ['parti', 'parti-replays', 'parti-room-packages-v1'] as const;
 
 function deleteIndexedDatabase(name: string): Promise<void> {
   return new Promise((resolve, reject) => {

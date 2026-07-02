@@ -19,10 +19,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs.js';
 import { Textarea } from '@/components/ui/textarea.js';
 import { cn } from '@/lib/utils.js';
 import { copyTextToClipboard } from '@/lib/clipboard.js';
-import { createRoom } from '../lib/customRooms.js';
+import { createRoomSnapshot } from '../lib/customRooms.js';
 import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom.js';
-import { deleteImportedTemplate, recordTemplateUsage, saveDerivedTemplate } from '../lib/templates.js';
-import { getTemplateList, resolvePackage, type TemplateListEntry } from '../lib/rooms.js';
+import { deleteImportedTemplate } from '../lib/templates.js';
+import { getTemplateList, loadPackageSource, type TemplateListEntry } from '../lib/rooms.js';
 import { useLocale } from '@/i18n/LocaleProvider.js';
 import { formatResolveError, templateDescription } from '@/i18n/formatErrors.js';
 import {
@@ -90,7 +90,7 @@ export function EditorView() {
         setWorkerText(DEFAULT_WORKER);
         setExtraFiles({});
       } else {
-        const pkg = await resolvePackage(template.id);
+        const pkg = await loadPackageSource(template.id);
         const uiName = pkg.manifest.entry.ui;
         const workerName = pkg.manifest.entry.worker;
         setManifestText(JSON.stringify(pkg.manifest, null, 2));
@@ -148,20 +148,25 @@ export function EditorView() {
     }
   }
 
-  async function resolveTemplateId(): Promise<string | null> {
-    if (!dirty && activeTemplate !== 'blank') return activeTemplate;
-    const input = await buildEditorInput();
-    if (!input) return null;
-    return saveDerivedTemplate(input);
-  }
-
   async function onCreate(target: 'local' | 'peer'): Promise<void> {
     setBusy(true);
     try {
-      const templateId = await resolveTemplateId();
-      if (!templateId) return;
-      const roomId = await createRoom(templateId);
-      if (activeTemplate !== 'blank') await recordTemplateUsage(activeTemplate);
+      const created = !dirty && activeTemplate !== 'blank'
+        ? await createRoomSnapshot({ sourceId: activeTemplate, target })
+        : await (async () => {
+            const input = await buildEditorInput();
+            if (!input) return null;
+            return createRoomSnapshot({
+              input,
+              target,
+              source: {
+                type: 'editor',
+                ...(activeTemplate !== 'blank' ? { basedOn: activeTemplate } : {}),
+              },
+            });
+          })();
+      if (!created) return;
+      const { roomId } = created;
       window.location.hash = target === 'local' ? `#/local/${roomId}` : `#/online/host/${roomId}`;
     } catch (reason) {
       setError(formatError(intl, reason));

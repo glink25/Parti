@@ -14,7 +14,7 @@ import {
   clearRoomSession,
   registerRoomDisposer,
 } from '../lib/PeerRoomSession.js';
-import { resolvePackage } from '../lib/rooms.js';
+import { loadRoomSnapshot } from '../lib/customRooms.js';
 import { FetchPackageError, fetchPackageOverPeer } from '../lib/fetchPackageOverPeer.js';
 import {
   createPasswordAdmissionController,
@@ -75,7 +75,7 @@ function PeerHostView({ roomId, transportConfig }: { roomId?: string; transportC
 
   useEffect(() => {
     if (!roomId) return;
-    resolvePackage(roomId).then(setPkg).catch((reason) => {
+    loadRoomSnapshot(roomId).then(setPkg).catch((reason) => {
       setError(formatResolveError(intl, reason));
     });
   }, [intl, roomId]);

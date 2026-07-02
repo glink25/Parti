@@ -1,68 +1,102 @@
-/**
- * 房间指针存储 —— 一个房间 = roomId → templateId 的指针，不存任何文件。
- *
- * 完整包源只存在 templates 表（见 templates.ts）。host/本地预览侧用 resolvePackage(roomId)
- * 顺指针取到模版包，并在内存里把 manifest.id 覆盖为 roomId（见 rooms.ts），从而：
- * 多个房间复用同一模版、零重复存储，刷新后仍可解析。
- */
-import { rooms as registry } from 'virtual:room-registry';
-import { getDb } from './db.js';
+/** 已开启房间的不可变 Package 快照。 */
+import { createPackage, type RoomPackage, type RoomPackageInput } from '@parti/room-packager';
+import { getDb, type PackageSourceInfo, type RoomSnapshotRecord } from './db.js';
 import { createDraftId } from './ids.js';
+import { findRoom, loadPackageSource } from './rooms.js';
+import { prepareCustomPackageRecord } from './templates.js';
 
-/** 大厅/首页展示用的轻量条目。 */
 export interface CustomRoomEntry {
   id: string;
   name: string;
   description: string;
-  descriptionFallback?: 'customRoom';
+  target: 'local' | 'peer';
+  createdAt: number;
 }
 
-const BUILTIN = new Map(
-  registry.map(({ dir, manifest }) => {
-    const m = manifest as { id?: string; name?: string; description?: string };
-    return [m.id ?? dir, { name: m.name ?? dir, description: m.description ?? '' }] as const;
-  }),
-);
+type CreateRoomSnapshotOptions =
+  | { sourceId: string; target: 'local' | 'peer' }
+  | {
+      input: RoomPackageInput;
+      target: 'local' | 'peer';
+      source: { type: 'editor'; basedOn?: string };
+    };
 
-async function templateMeta(templateId: string): Promise<{ name: string; description: string }> {
-  const builtin = BUILTIN.get(templateId);
-  if (builtin) return builtin;
+export interface CreatedRoomSnapshot {
+  roomId: string;
+  customPackageId?: string;
+}
+
+export async function createRoomSnapshot(
+  options: CreateRoomSnapshotOptions,
+): Promise<CreatedRoomSnapshot> {
+  let sourcePackage: RoomPackage;
+  let source: PackageSourceInfo;
+  let customRecord;
+
+  if ('sourceId' in options) {
+    sourcePackage = await loadPackageSource(options.sourceId);
+    source = findRoom(options.sourceId)
+      ? { type: 'builtin', id: options.sourceId }
+      : { type: 'custom', id: options.sourceId };
+  } else {
+    customRecord = await prepareCustomPackageRecord(options.input, options.source);
+    sourcePackage = await createPackage({ manifest: customRecord.manifest, files: customRecord.files });
+    source = { type: 'custom', id: customRecord.id };
+  }
+
   const db = await getDb();
-  const record = await db.get('templates', templateId);
-  return {
-    name: record?.manifest.name ?? templateId,
-    description: record?.manifest.description ?? '',
-    ...(record?.manifest.description ? {} : { descriptionFallback: 'customRoom' as const }),
+  const prefix = sourcePackage.manifest.id.split('-')[0] || 'room';
+  let roomId = createDraftId(prefix);
+  while (await db.get('roomSnapshots', roomId)) roomId = createDraftId(prefix);
+  const snapshotPackage = await createPackage({
+    manifest: { ...sourcePackage.manifest, id: roomId },
+    files: sourcePackage.files,
+  });
+  const snapshot: RoomSnapshotRecord = {
+    id: roomId,
+    manifest: snapshotPackage.manifest,
+    files: snapshotPackage.files,
+    packageHash: snapshotPackage.packageHash,
+    source,
+    target: options.target,
+    createdAt: Date.now(),
   };
+
+  const tx = db.transaction(['customPackages', 'roomSnapshots', 'usage'], 'readwrite');
+  if (customRecord) await tx.objectStore('customPackages').put(customRecord);
+  await tx.objectStore('roomSnapshots').put(snapshot);
+  const usage = await tx.objectStore('usage').get(source.id);
+  await tx.objectStore('usage').put({ id: source.id, count: (usage?.count ?? 0) + 1 });
+  await tx.done;
+  return { roomId, ...(customRecord ? { customPackageId: customRecord.id } : {}) };
 }
 
-/** 新建一个房间指针，返回 roomId。 */
-export async function createRoom(templateId: string): Promise<string> {
-  const id = createDraftId(templateId.split('-')[0] || 'room');
-  const db = await getDb();
-  await db.put('rooms', { id, templateId, createdAt: Date.now() });
-  return id;
+export async function loadRoomSnapshot(roomId: string): Promise<RoomPackage> {
+  const record = await (await getDb()).get('roomSnapshots', roomId);
+  if (!record) throw new RoomSnapshotNotFoundError(roomId);
+  return { manifest: record.manifest, files: record.files, packageHash: record.packageHash };
 }
 
-export async function getRoomPointer(roomId: string): Promise<{ templateId: string } | undefined> {
-  const db = await getDb();
-  const record = await db.get('rooms', roomId);
-  return record ? { templateId: record.templateId } : undefined;
-}
-
-/** 列出全部房间（用于大厅），联表取模版名称/描述。 */
 export async function listCustomRooms(): Promise<CustomRoomEntry[]> {
-  const db = await getDb();
-  const all = await db.getAll('rooms');
-  return Promise.all(
-    all.map(async (room) => {
-      const meta = await templateMeta(room.templateId);
-      return { id: room.id, name: meta.name, description: meta.description };
-    }),
-  );
+  const all = await (await getDb()).getAll('roomSnapshots');
+  return all.map((room) => ({
+    id: room.id,
+    name: room.manifest.name,
+    description: room.manifest.description ?? '',
+    target: room.target,
+    createdAt: room.createdAt,
+  }));
 }
 
-export async function deleteCustomRoom(roomId: string): Promise<void> {
-  const db = await getDb();
-  await db.delete('rooms', roomId);
+export async function deleteRoomSnapshot(roomId: string): Promise<void> {
+  await (await getDb()).delete('roomSnapshots', roomId);
+}
+
+export const deleteCustomRoom = deleteRoomSnapshot;
+
+export class RoomSnapshotNotFoundError extends Error {
+  constructor(readonly roomId: string) {
+    super(roomId);
+    this.name = 'RoomSnapshotNotFoundError';
+  }
 }
