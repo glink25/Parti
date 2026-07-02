@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "pnpm --filter @parti/web dev --host",
     "room:dev": "node scripts/room-dev.mjs",
-    "build": "pnpm --filter @parti/web build",
+    "build": "node scripts/room-build.mjs",
     "preview": "pnpm --filter @parti/web preview",
     "test": "vitest run",
     "test:watch": "vitest",

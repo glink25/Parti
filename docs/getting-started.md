@@ -181,12 +181,19 @@ pnpm room:dev template-react
 Web Worker 和本地多人 Runtime 中检查效果。源代码变化后，Room 会重新打包，Web 会在
 本轮产物稳定后刷新。停止命令时，临时目录会自动删除。
 
-可接入 Harness 的应用需要满足以下约定：
+Room 应用分为两类：
 
-- 位于 `apps/<room-app>/`，并包含 `public/parti.room.json`；
-- manifest 的 `id` 以 `dev-` 开头；
-- `package.json` 提供 `dev:room` 脚本；
-- `dev:room` 将完整 Room Package 输出到环境变量 `PARTI_ROOM_DEV_OUT_DIR` 指定的目录。
+- `apps/template-*` 是脚手架或示例，只参与开发和自身的独立打包；其开发 manifest ID
+  需要以 `dev-` 开头。
+- `apps/room-*` 是 Web 自带 Room，开发方式与模板相同，并会在根目录执行 `pnpm build`
+  时先构建到 `apps/web/public/rooms/<room-app>/`，随后一同进入 Web 生产产物。
+
+两类应用都需要包含 `public/parti.room.json`，并在 `package.json` 提供 `dev:room` 脚本。
+该脚本将完整 Room Package 输出到 `PARTI_ROOM_DEV_OUT_DIR`。`room-*` 还必须提供
+`build:room`，将生产 Package 输出到 `PARTI_ROOM_BUILD_OUT_DIR`。输出目录由 Harness 管理，
+Room 应用不应硬编码到 Web 的相对路径。`room-*` 的生成目录已被 Git 忽略，Room 源码以
+`apps/room-*` 为唯一来源。每次根构建都会先清理旧的 `public/rooms/room-*`，因此该目录
+前缀保留给构建产物，不应再用于手写内置 Room。
 
 本地多人预览中的 Host、Alice、Bob 分别使用桌面、平板和手机比例。三个 iframe 都会
 随页面宽度响应式缩放，用于观察不同布局比例，而不是模拟固定型号或固定像素分辨率。

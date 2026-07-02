@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
-import { readFile, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { loadRoomApp } from './room-app.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const roomApp = process.argv[2];
@@ -13,32 +14,10 @@ function fail(message) {
 }
 
 if (!roomApp) fail('Usage: pnpm room:dev <room-app>');
-if (!/^[a-z0-9][a-z0-9_-]*$/.test(roomApp)) fail(`Invalid room app name: ${roomApp}`);
-
-const appDir = path.join(rootDir, 'apps', roomApp);
-const packagePath = path.join(appDir, 'package.json');
-const manifestPath = path.join(appDir, 'public', 'parti.room.json');
-
-async function readJson(file, label) {
-  try {
-    return JSON.parse(await readFile(file, 'utf8'));
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    fail(`Cannot read ${label} at ${path.relative(rootDir, file)}: ${detail}`);
-  }
-}
-
-const packageJson = await readJson(packagePath, 'package.json');
-const manifest = await readJson(manifestPath, 'parti.room.json');
-
-if (!packageJson.scripts?.['dev:room']) {
-  fail(`${path.relative(rootDir, packagePath)} must define a dev:room script`);
-}
-if (typeof manifest.id !== 'string' || !/^dev-[a-z0-9][a-z0-9_-]*$/.test(manifest.id)) {
-  fail('The development manifest id must start with "dev-" and contain only lowercase letters, numbers, "-", or "_"');
-}
-
-const outputDir = path.join(rootDir, 'apps', 'web', 'public', 'rooms', manifest.id);
+const room = await loadRoomApp(rootDir, roomApp, 'dev:room').catch((error) => {
+  fail(error instanceof Error ? error.message : String(error));
+});
+const outputDir = path.join(rootDir, 'apps', 'web', 'public', 'rooms', room.outputName);
 await rm(outputDir, { recursive: true, force: true });
 
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -48,13 +27,13 @@ const children = [
     stdio: 'inherit',
   }),
   spawn(pnpm, ['run', 'dev:room'], {
-    cwd: appDir,
+    cwd: room.appDir,
     stdio: 'inherit',
     env: { ...process.env, PARTI_ROOM_DEV_OUT_DIR: outputDir },
   }),
 ];
 
-console.log(`[room:dev] ${roomApp} -> /rooms/${manifest.id}/`);
+console.log(`[room:dev] ${roomApp} -> /rooms/${room.outputName}/ (id: ${room.manifest.id})`);
 
 let shuttingDown = false;
 let exitCode = 0;

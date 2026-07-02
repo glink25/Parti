@@ -105,7 +105,7 @@ pnpm install
 pnpm dev        # Start the web app at http://localhost:5173
 pnpm test       # Run protocol and runtime tests
 pnpm typecheck  # Type-check the complete monorepo
-pnpm build      # Build the web app
+pnpm build      # Build apps/room-* first, then bundle them with the web app
 ```
 
 Development mode includes local multiplayer preview and DevTools; these are excluded from production builds. Private rooms and invitation links continue to work without a configured lobby service.

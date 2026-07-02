@@ -106,7 +106,7 @@ pnpm install
 pnpm dev        # 启动 Web 应用：http://localhost:5173
 pnpm test       # 运行协议与 Runtime 测试
 pnpm typecheck  # 检查整个 monorepo 的类型
-pnpm build      # 构建 Web 应用
+pnpm build      # 先构建 apps/room-*，再构建包含这些 Room 的 Web 应用
 ```
 
 开发环境提供本地多人预览和 DevTools；它们不会出现在生产构建中。即使没有配置大厅服务，仍然可以创建私密房间并通过邀请链接加入。
