@@ -20,9 +20,9 @@ importers:
       '@parti/worker-sdk':
         specifier: workspace:*
         version: link:../../packages/worker-sdk
-      phaser:
-        specifier: ^3.90.0
-        version: 3.90.0
+      littlejsengine:
+        specifier: 1.18.15
+        version: 1.18.15
     devDependencies:
       esbuild:
         specifier: ^0.25.0
@@ -2224,9 +2224,6 @@ packages:
   eventemitter3@4.0.7:
     resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
 
-  eventemitter3@5.0.4:
-    resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
-
   eventsource-parser@3.1.0:
     resolution: {integrity: sha512-kJezFj9YFAMLeORyi7aCLxLbD5/qWMQnoMVlVPyHIll7lgRJCc3JVln9Vgl9nwQi0YkMnhdGTMNn7CkRRAptMg==}
     engines: {node: '>=18.0.0'}
@@ -2659,6 +2656,10 @@ packages:
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
+  littlejsengine@1.18.15:
+    resolution: {integrity: sha512-ym1noMK4kT8iwA8cWa84/IuieARCcufI30Q805qeKUC1v/VDpgYmU0AlqHIRJwychgk2H/ls781NxeXR2g1S3Q==}
+    engines: {node: '>=18'}
+
   locate-path@3.0.0:
     resolution: {integrity: sha512-7AO748wWnIhNqAuaty2ZWHkQHRSNfPVIsPIfwEOWO22AmaoVrWavlOcMR5nzTLNYvp36X220/maaRsrec1G65A==}
     engines: {node: '>=6'}
@@ -2875,9 +2876,6 @@ packages:
   peerjs@1.5.5:
     resolution: {integrity: sha512-viMUCPDL6CSfOu0ZqVcFqbWRXNHIbv2lPqNbrBIjbFYrflebOjItJ4hPfhjnuUCstqciHVu9vVJ7jFqqKi/EuQ==}
     engines: {node: '>= 14'}
-
-  phaser@3.90.0:
-    resolution: {integrity: sha512-/cziz/5ZIn02uDkC9RzN8VF9x3Gs3XdFFf9nkiMEQT3p7hQlWuyjy4QWosU802qqno2YSLn2BfqwOKLv/sSVfQ==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -5419,8 +5417,6 @@ snapshots:
 
   eventemitter3@4.0.7: {}
 
-  eventemitter3@5.0.4: {}
-
   eventsource-parser@3.1.0: {}
 
   eventsource@3.0.7:
@@ -5813,6 +5809,8 @@ snapshots:
 
   lines-and-columns@1.2.4: {}
 
+  littlejsengine@1.18.15: {}
+
   locate-path@3.0.0:
     dependencies:
       p-locate: 3.0.0
@@ -5999,10 +5997,6 @@ snapshots:
       eventemitter3: 4.0.7
       peerjs-js-binarypack: 2.1.0
       webrtc-adapter: 9.0.6
-
-  phaser@3.90.0:
-    dependencies:
-      eventemitter3: 5.0.4
 
   picocolors@1.1.1: {}
 

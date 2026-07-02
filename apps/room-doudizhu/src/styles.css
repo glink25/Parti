@@ -19,3 +19,7 @@ body {
     sans-serif;
   touch-action: none;
 }
+
+#game canvas {
+  display: block;
+}

@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@parti/worker-sdk": "workspace:*",
-    "phaser": "^3.90.0"
+    "littlejsengine": "1.18.15"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
