@@ -1,21 +1,21 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { GithubIcon } from '@/components/icons/GithubIcon.js';
-import { Logo } from '@/components/Logo.js';
-import { Button } from '@/components/ui/button.js';
-import { Lobby } from './pages/Lobby.js';
-import { loadLocalUser } from './lib/localUser.js';
-import { UserSettings } from './components/UserSettings.js';
-import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen.js';
-import { useLocale } from './i18n/LocaleProvider.js';
-import { ENABLE_REPLAYS } from './lib/featureFlags.js';
-import { deleteRoomSnapshot } from './lib/customRooms.js';
+import { GithubIcon } from '@/components/icons/GithubIcon';
+import { Logo } from '@/components/Logo';
+import { Button } from '@/components/ui/button';
+import { Lobby } from './pages/Lobby';
+import { loadLocalUser } from './lib/localUser';
+import { UserSettings } from './components/UserSettings';
+import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen';
+import { useLocale } from './i18n/LocaleProvider';
+import { ENABLE_REPLAYS } from './lib/featureFlags';
+import { deleteRoomSnapshot } from './lib/customRooms';
 
-const EditorView = lazy(() => import('./pages/EditorView.js').then((module) => ({ default: module.EditorView })));
-const LocalRoomView = lazy(() => import('./pages/LocalRoomView.js').then((module) => ({ default: module.LocalRoomView })));
-const PeerRoomView = lazy(() => import('./pages/PeerRoomView.js').then((module) => ({ default: module.PeerRoomView })));
+const EditorView = lazy(() => import('./pages/EditorView').then((module) => ({ default: module.EditorView })));
+const LocalRoomView = lazy(() => import('./pages/LocalRoomView').then((module) => ({ default: module.LocalRoomView })));
+const PeerRoomView = lazy(() => import('./pages/PeerRoomView').then((module) => ({ default: module.PeerRoomView })));
 const ReplayPage = ENABLE_REPLAYS
-  ? lazy(() => import('./replays/ReplayPage.js'))
+  ? lazy(() => import('./replays/ReplayPage'))
   : null;
 
 /** 极简 hash 路由：#/ 大厅 / #/editor 创作 / #/peer/... 联机。 */
@@ -69,7 +69,7 @@ function AppLayout() {
     const cur = peerRoomIdOf(hash);
     const prev = prevPeerRoom.current;
     if (prev && prev !== cur) {
-      void import('./lib/PeerRoomSession.js').then(({ clearRoomSession }) => clearRoomSession(prev));
+      void import('./lib/PeerRoomSession').then(({ clearRoomSession }) => clearRoomSession(prev));
     }
     prevPeerRoom.current = cur;
 

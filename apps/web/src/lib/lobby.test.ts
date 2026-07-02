@@ -5,9 +5,9 @@ import {
   LobbyPublisher,
   type LobbyLease,
   type LobbyRoomInput,
-} from './lobbyApi.js';
-import { buildInviteUrl, parseInviteInput, parsePeerRoute } from './peerRoutes.js';
-import type { TransportConfig } from './transportConfig.js';
+} from './lobbyApi';
+import { buildInviteUrl, parseInviteInput, parsePeerRoute } from './peerRoutes';
+import type { TransportConfig } from './transportConfig';
 
 const input: LobbyRoomInput = {
   roomId: 'counter',

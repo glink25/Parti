@@ -5,9 +5,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.js';
-import { cn } from '@/lib/utils.js';
-import { LOGO_URL } from './Logo.js';
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { LOGO_URL } from './Logo';
 
 const QR_SIZE = 240;
 

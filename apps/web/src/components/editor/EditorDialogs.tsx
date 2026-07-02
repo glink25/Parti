@@ -1,8 +1,8 @@
 import { FormattedMessage, useIntl } from 'react-intl';
 import { BotIcon, CheckIcon, CopyIcon, RotateCcwIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button.js';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.js';
-import type { SelectableTemplate } from './editorDefaults.js';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { SelectableTemplate } from './editorDefaults';
 
 export function TemplateReplaceDialog({ pending, onCancel, onConfirm }: { pending: SelectableTemplate | null; onCancel: () => void; onConfirm: () => void }) {
   const intl = useIntl();

@@ -9,7 +9,7 @@
  * 这在房主浏览器的 Worker 内运行，房间代码默认不可信，因此 Worker 自身已被
  * 沙箱限制（无网络/存储授权，§12.2）。后续可替换为真正的打包/ESM import。
  */
-import { defineRoom, type RoomDefinition } from './defineRoom.js';
+import { defineRoom, type RoomDefinition } from './defineRoom';
 
 export function loadRoomDefinition(source: string): RoomDefinition {
   const transformed = transformSource(source);

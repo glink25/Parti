@@ -1,10 +1,10 @@
 import type { IntlShape } from 'react-intl';
-import { ImportRoomError } from '@/lib/importRoom.js';
-import type { FetchPackageError } from '@/lib/fetchPackageOverPeer.js';
-import type { LobbyStatusKey } from '@/lib/lobbyApi.js';
-import type { UserNameValidationError } from '@/lib/localUser.js';
-import { PackageSourceNotFoundError } from '@/lib/rooms.js';
-import { RoomSnapshotNotFoundError } from '@/lib/customRooms.js';
+import { ImportRoomError } from '@/lib/importRoom';
+import type { FetchPackageError } from '@/lib/fetchPackageOverPeer';
+import type { LobbyStatusKey } from '@/lib/lobbyApi';
+import type { UserNameValidationError } from '@/lib/localUser';
+import { PackageSourceNotFoundError } from '@/lib/rooms';
+import { RoomSnapshotNotFoundError } from '@/lib/customRooms';
 
 export function formatLobbyStatus(intl: IntlShape, status: LobbyStatusKey): string {
   return intl.formatMessage({ id: `lobby.status.${status}` });

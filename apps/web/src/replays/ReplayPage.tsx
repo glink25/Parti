@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { FormattedDate, FormattedMessage, FormattedTime, useIntl } from 'react-intl';
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon, Trash2Icon } from 'lucide-react';
 import type { RoomClientPort } from '@parti/client-sdk';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.js';
-import { Badge } from '@/components/ui/badge.js';
-import { Button } from '@/components/ui/button.js';
-import { RoomFrame } from '@/components/RoomFrame.js';
-import { deleteReplay, getReplay, getReplayPackage, listReplays } from './storage.js';
-import type { ReplayRecord, ReplayStep } from './types.js';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { RoomFrame } from '@/components/RoomFrame';
+import { deleteReplay, getReplay, getReplayPackage, listReplays } from './storage';
+import type { ReplayRecord, ReplayStep } from './types';
 
 export default function ReplayPage() {
   const id = window.location.hash.replace(/^#\/replays\/?/, '') || null;

@@ -1,6 +1,6 @@
 /** 准备态 Package 来源：内置模板走静态目录，自定义模板走 IndexedDB。 */
 import { createPackage, loadPackageFromUrl, type RoomPackage } from '@parti/room-packager';
-import { getTemplatePackage, getUsageCounts, listImportedTemplates } from './templates.js';
+import { getTemplatePackage, getUsageCounts, listImportedTemplates } from './templates';
 import { rooms as registry } from 'virtual:room-registry';
 
 export interface RoomEntry {

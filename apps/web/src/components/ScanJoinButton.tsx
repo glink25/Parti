@@ -1,24 +1,24 @@
 import { Component, lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 import { ScanQrCodeIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button.js';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.js';
+} from '@/components/ui/dialog';
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet.js';
-import { useMediaQuery } from '@/hooks/useMediaQuery.js';
+} from '@/components/ui/sheet';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
-const JoinRoomQrScanner = lazy(() => import('./JoinRoomQrScanner.js'));
+const JoinRoomQrScanner = lazy(() => import('./JoinRoomQrScanner'));
 
 class QrScannerErrorBoundary extends Component<
   { fallback: ReactNode; children: ReactNode },

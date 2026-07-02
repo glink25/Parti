@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { IntlProvider, useIntl } from 'react-intl';
-import { detectLocale, LOCALE_STORAGE_KEY, type AppLocale } from './locales.js';
-import { messagesByLocale } from './messages.js';
+import { detectLocale, LOCALE_STORAGE_KEY, type AppLocale } from './locales';
+import { messagesByLocale } from './messages';
 
 interface LocaleContextValue {
   locale: AppLocale;
@@ -53,4 +53,4 @@ export function useLocale(): LocaleContextValue {
   return value;
 }
 
-export { getRandomNamePools, rawMessagesByLocale } from './messages.js';
+export { getRandomNamePools, rawMessagesByLocale } from './messages';

@@ -9,9 +9,9 @@
  *
  * 创作者代码（room.worker.js）完全感知不到 transport / seq / ack（§9.1）。
  */
-import { RoomError } from '../errors.js';
-import { PlayerManager, type Player } from '../players.js';
-import { createMessage, generateId, SeqCounter } from '../protocol/factory.js';
+import { RoomError } from '../errors';
+import { PlayerManager, type Player } from '../players';
+import { createMessage, generateId, SeqCounter } from '../protocol/factory';
 import {
   PROTOCOL_VERSION,
   type ActionPayload,
@@ -25,21 +25,21 @@ import {
   type SnapshotPayload,
   type WelcomePayload,
   redactRoomMessage,
-} from '../protocol/messages.js';
-import { StateSyncEngine } from '../state/sync.js';
-import type { SessionStore } from '../session/SessionStore.js';
+} from '../protocol/messages';
+import { StateSyncEngine } from '../state/sync';
+import type { SessionStore } from '../session/SessionStore';
 import type {
   HostTransportSession,
   PeerId,
   TransportMessage,
-} from '../transport/types.js';
-import { Emitter } from '../util/emitter.js';
-import type { RoomWorkerHost } from './worker-host.js';
-import type { MessageLogEntry } from './types.js';
+} from '../transport/types';
+import { Emitter } from '../util/emitter';
+import type { RoomWorkerHost } from './worker-host';
+import type { MessageLogEntry } from './types';
 import type {
   RoomAdmissionController,
   RoomAdmissionStatus,
-} from './admission.js';
+} from './admission';
 
 export interface HostRuntimeOptions {
   roomId: string;

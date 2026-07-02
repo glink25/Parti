@@ -17,8 +17,8 @@ import {
   getWorkerSource,
   type RoomPackage,
 } from '@parti/room-packager';
-import { createWebWorkerHost } from './roomWorker.js';
-import { loadLocalUser } from './localUser.js';
+import { createWebWorkerHost } from './roomWorker';
+import { loadLocalUser } from './localUser';
 
 const ROOM_ID = 'local-preview';
 

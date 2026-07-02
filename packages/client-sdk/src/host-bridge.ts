@@ -6,8 +6,8 @@
  * 因此同一段 Room UI 代码在 host 与 player 端运行完全一致。
  */
 import type { HostRuntime, ClientRuntime } from '@parti/core';
-import { CLIENT_SDK_SCRIPT } from './bootstrap.js';
-import type { HostToUi, UiToHost } from './protocol.js';
+import { CLIENT_SDK_SCRIPT } from './bootstrap';
+import type { HostToUi, UiToHost } from './protocol';
 
 /** Runtime 暴露给 UI 的统一端口 */
 export interface RoomClientPort {

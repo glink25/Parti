@@ -13,8 +13,8 @@ import type {
   RoomWorkerCallbacks,
   WorkerInitOptions,
 } from '@parti/core';
-import type { RoomPlayer } from './defineRoom.js';
-import type { MainToWorker, WorkerToMain } from './bridge.js';
+import type { RoomPlayer } from './defineRoom';
+import type { MainToWorker, WorkerToMain } from './bridge';
 
 function toRoomPlayer(p: Player): RoomPlayer {
   return { id: p.id, name: p.name, role: p.role };

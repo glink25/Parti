@@ -1,10 +1,10 @@
 import type { HostRuntime, MessageLogEntry, Player, SnapshotPayload } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
 import type { RoomPackage } from '@parti/room-packager';
-import { getReplay, putReplay, putReplayPackage } from './storage.js';
-import type { ReplayRecord, ReplayStep } from './types.js';
-import { createRecordingPort } from './recordingPort.js';
-import { createReplayId } from './replayId.js';
+import { getReplay, putReplay, putReplayPackage } from './storage';
+import type { ReplayRecord, ReplayStep } from './types';
+import { createRecordingPort } from './recordingPort';
+import { createReplayId } from './replayId';
 
 const SESSION_PREFIX = 'parti:replay-recording:';
 type ReplayStepInput = ReplayStep extends infer Step

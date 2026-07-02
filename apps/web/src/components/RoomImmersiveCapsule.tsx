@@ -1,6 +1,6 @@
 import { useIntl } from 'react-intl';
 import { MoreHorizontalIcon } from 'lucide-react';
-import { cn } from '@/lib/utils.js';
+import { cn } from '@/lib/utils';
 
 function ExitImmersiveIcon({ className }: { className?: string }) {
   return (

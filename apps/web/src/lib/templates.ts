@@ -1,8 +1,8 @@
 /** 准备态自定义 Package 存储。内置模板只由 rooms.ts 从静态目录加载。 */
 import { createPackage, type RoomPackageInput } from '@parti/room-packager';
 import { rooms as registry } from 'virtual:room-registry';
-import { getDb, type CustomPackageRecord } from './db.js';
-import { createDraftId } from './ids.js';
+import { getDb, type CustomPackageRecord } from './db';
+import { createDraftId } from './ids';
 
 const BUILTIN_IDS = new Set(registry.map(({ dir, manifest }) => manifest.id ?? dir));
 

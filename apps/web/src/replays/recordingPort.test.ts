@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RoomClientPort } from '@parti/client-sdk';
-import { createRecordingPort } from './recordingPort.js';
+import { createRecordingPort } from './recordingPort';
 
 describe('createRecordingPort', () => {
   it('observes and forwards a host action exactly once', () => {

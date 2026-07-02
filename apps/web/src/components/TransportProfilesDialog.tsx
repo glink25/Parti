@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { useIntl } from 'react-intl';
-import { Button } from '@/components/ui/button.js';
+import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog.js';
-import { Input } from '@/components/ui/input.js';
-import { Label } from '@/components/ui/label.js';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.js';
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   deleteCustomTransportProfile, getTransportProfiles, saveCustomTransportProfile,
   type TransportConfig, type TransportProfile,
-} from '@/lib/transportConfig.js';
+} from '@/lib/transportConfig';
 
 type FormType = 'peerjs' | 'supabase';
 interface Draft { id?: string; name: string; type: FormType; serverUrl: string; supabaseUrl: string; publishableKey: string }

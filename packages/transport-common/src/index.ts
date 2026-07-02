@@ -1,4 +1,4 @@
-export { CommonTransportAdapter } from './CommonTransportAdapter.js';
-export type { CommonProviderConnection, CommonProviderMessage, CommonTransportProvider } from './CommonTransportAdapter.js';
-export { SupabaseRealtimeProvider } from './SupabaseRealtimeProvider.js';
-export type { SupabaseRealtimeProviderOptions } from './SupabaseRealtimeProvider.js';
+export { CommonTransportAdapter } from './CommonTransportAdapter';
+export type { CommonProviderConnection, CommonProviderMessage, CommonTransportProvider } from './CommonTransportAdapter';
+export { SupabaseRealtimeProvider } from './SupabaseRealtimeProvider';
+export type { SupabaseRealtimeProviderOptions } from './SupabaseRealtimeProvider';

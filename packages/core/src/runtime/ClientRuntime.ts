@@ -5,7 +5,7 @@
  * 接收 state:snapshot / game:event，并向 UI 暴露简洁的订阅接口。
  * 玩家只提交意图（game:action），不直接修改最终状态（§6.1 Host Authoritative）。
  */
-import { generateId, SeqCounter } from '../protocol/factory.js';
+import { generateId, SeqCounter } from '../protocol/factory';
 import {
   PROTOCOL_VERSION,
   type EventPayload,
@@ -15,14 +15,14 @@ import {
   type SnapshotPayload,
   type WelcomePayload,
   redactRoomMessage,
-} from '../protocol/messages.js';
-import { ClientStateCache } from '../state/sync.js';
+} from '../protocol/messages';
+import { ClientStateCache } from '../state/sync';
 import type {
   ClientTransportSession,
   TransportMessage,
-} from '../transport/types.js';
-import { Emitter } from '../util/emitter.js';
-import type { ConnectionStatus, MessageLogEntry } from './types.js';
+} from '../transport/types';
+import { Emitter } from '../util/emitter';
+import type { ConnectionStatus, MessageLogEntry } from './types';
 
 export interface ClientRuntimeOptions {
   roomId: string;

@@ -7,8 +7,8 @@
  *
  * 该文件被 apps/web 以 `?worker` 方式实例化为 Worker。
  */
-import { RoomEngine, type EngineEffects } from './RoomEngine.js';
-import type { MainToWorker, WorkerToMain } from './bridge.js';
+import { RoomEngine, type EngineEffects } from './RoomEngine';
+import type { MainToWorker, WorkerToMain } from './bridge';
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 

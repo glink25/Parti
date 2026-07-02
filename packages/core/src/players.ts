@@ -1,7 +1,7 @@
 /** 玩家模型与玩家管理 (GOAL.md §4, §15) */
-import type { WelcomePlayer } from './protocol/messages.js';
-import type { PlayerRole, PlayerStatus } from './protocol/messages.js';
-import type { PeerId } from './transport/types.js';
+import type { WelcomePlayer } from './protocol/messages';
+import type { PlayerRole, PlayerStatus } from './protocol/messages';
+import type { PeerId } from './transport/types';
 
 export type { PlayerRole, PlayerStatus };
 

@@ -6,8 +6,8 @@
  *
  * Patch / event-sourcing 留到后续阶段，接口此处先不暴露。
  */
-import type { SnapshotPayload } from '../protocol/messages.js';
-import { stateHash } from './hash.js';
+import type { SnapshotPayload } from '../protocol/messages';
+import { stateHash } from './hash';
 
 export class StateSyncEngine {
   private version = 0;

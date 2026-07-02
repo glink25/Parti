@@ -1,4 +1,4 @@
-import type { PeerId } from '../transport/types.js';
+import type { PeerId } from '../transport/types';
 
 export type AdmissionPhase = 'package' | 'join';
 

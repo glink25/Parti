@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { UserRoundIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button.js';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.js';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -10,16 +10,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.js';
-import { Input } from '@/components/ui/input.js';
-import { Label } from '@/components/ui/label.js';
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select.js';
+} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -27,19 +27,19 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet.js';
-import { LOCALE_LABELS, LOCALES, type AppLocale } from '@/i18n/locales.js';
-import { useLocale } from '@/i18n/LocaleProvider.js';
-import { formatUserNameError } from '@/i18n/formatErrors.js';
-import { TransportProfilesDialog } from './TransportProfilesDialog.js';
-import { clearAllBrowserStorage } from '../lib/clearLocalData.js';
+} from '@/components/ui/sheet';
+import { LOCALE_LABELS, LOCALES, type AppLocale } from '@/i18n/locales';
+import { useLocale } from '@/i18n/LocaleProvider';
+import { formatUserNameError } from '@/i18n/formatErrors';
+import { TransportProfilesDialog } from './TransportProfilesDialog';
+import { clearAllBrowserStorage } from '../lib/clearLocalData';
 import {
   MAX_USER_NAME_LENGTH,
   saveLocalUserName,
   UserNameValidationError,
   type LocalUser,
-} from '../lib/localUser.js';
-import { getSelectedTransportProfile, getTransportProfiles, selectTransportProfile } from '../lib/transportConfig.js';
+} from '../lib/localUser';
+import { getSelectedTransportProfile, getTransportProfiles, selectTransportProfile } from '../lib/transportConfig';
 
 const sectionCardClass =
   'gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] flex-shrink-0';

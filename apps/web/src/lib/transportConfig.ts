@@ -1,5 +1,5 @@
 import type { TransportAdapter } from '@parti/core';
-import { createUuid } from './ids.js';
+import { createUuid } from './ids';
 
 export type TransportConfig =
   | { adapter: 'peerjs'; serverUrl?: string }

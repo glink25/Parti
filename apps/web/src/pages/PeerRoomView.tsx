@@ -5,41 +5,41 @@ import type { HostRuntime, RoomAdmissionStatus } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
 import { createHostLocalPort } from '@parti/client-sdk';
 import { type RoomPackage } from '@parti/room-packager';
-import { InviteQrDialog } from '../components/InviteQrDialog.js';
-import { RoomFrame } from '../components/RoomFrame.js';
-import { DevTools } from '../components/DevTools.js';
+import { InviteQrDialog } from '../components/InviteQrDialog';
+import { RoomFrame } from '../components/RoomFrame';
+import { DevTools } from '../components/DevTools';
 import {
   createPeerHost,
   createPeerJoin,
   clearRoomSession,
   registerRoomDisposer,
-} from '../lib/PeerRoomSession.js';
-import { loadRoomSnapshot } from '../lib/customRooms.js';
-import { FetchPackageError, fetchPackageOverPeer } from '../lib/fetchPackageOverPeer.js';
+} from '../lib/PeerRoomSession';
+import { loadRoomSnapshot } from '../lib/customRooms';
+import { FetchPackageError, fetchPackageOverPeer } from '../lib/fetchPackageOverPeer';
 import {
   createPasswordAdmissionController,
   loadHostRoomSettings,
   saveHostRoomSettings,
   type HostRoomSettings,
-} from '../lib/roomSettings.js';
+} from '../lib/roomSettings';
 import {
   LobbyClient,
   LobbyPublisher,
   lobbyServiceUrl,
   type LobbyRoomInput,
   type LobbyStatusKey,
-} from '../lib/lobbyApi.js';
-import { buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes.js';
-import { loadLocalUser } from '../lib/localUser.js';
-import { useLocale } from '@/i18n/LocaleProvider.js';
-import { formatFetchPackageError, formatResolveError, formatRoomError } from '@/i18n/formatErrors.js';
-import { Button } from '@/components/ui/button.js';
-import { Card } from '@/components/ui/card.js';
-import { Input } from '@/components/ui/input.js';
-import { copyTextToClipboard } from '@/lib/clipboard.js';
-import { usePageFullscreen } from '@/components/PageFullscreen.js';
-import { ResponsiveRoomControls, RoomControlsSheet, type RoomControlsProps } from '@/components/PeerRoomControls.js';
-import { Logo } from '@/components/Logo.js';
+} from '../lib/lobbyApi';
+import { buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes';
+import { loadLocalUser } from '../lib/localUser';
+import { useLocale } from '@/i18n/LocaleProvider';
+import { formatFetchPackageError, formatResolveError, formatRoomError } from '@/i18n/formatErrors';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { usePageFullscreen } from '@/components/PageFullscreen';
+import { ResponsiveRoomControls, RoomControlsSheet, type RoomControlsProps } from '@/components/PeerRoomControls';
+import { Logo } from '@/components/Logo';
 import {
   Dialog,
   DialogContent,
@@ -47,10 +47,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.js';
-import type { ReplayRecordingController } from '../replays/recorder.js';
-import { ENABLE_REPLAYS } from '../lib/featureFlags.js';
-import { configuredTransport, type TransportConfig } from '../lib/transportConfig.js';
+} from '@/components/ui/dialog';
+import type { ReplayRecordingController } from '../replays/recorder';
+import { ENABLE_REPLAYS } from '../lib/featureFlags';
+import { configuredTransport, type TransportConfig } from '../lib/transportConfig';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -201,7 +201,7 @@ function PeerHostSession({
     let cancelled = false;
     setReplayBusy(true);
     setReplayError(null);
-    import('../replays/recorder.js')
+    import('../replays/recorder')
       .then(({ startReplayRecording }) => startReplayRecording({
         host: state.host,
         port: state.basePort,

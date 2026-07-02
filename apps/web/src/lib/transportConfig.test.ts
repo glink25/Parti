@@ -3,7 +3,7 @@ import {
   BUILTIN_PEERJS_ID, BUILTIN_SUPABASE_ID, deleteCustomTransportProfile,
   createTransportAdapter, getSelectedTransportProfile, getTransportProfiles, peerOptionsFromServerUrl,
   saveCustomTransportProfile, selectTransportProfile, validateTransportConfig,
-} from './transportConfig.js';
+} from './transportConfig';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();

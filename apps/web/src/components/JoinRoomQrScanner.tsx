@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useIntl, type IntlShape } from 'react-intl';
-import { navigateToPeerJoin, parseInviteInput } from '../lib/peerRoutes.js';
+import { navigateToPeerJoin, parseInviteInput } from '../lib/peerRoutes';
 
 type ScannerLike = {
   getState: () => number;

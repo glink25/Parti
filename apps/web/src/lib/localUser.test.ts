@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadLocalUser, saveLocalUserName, UserNameValidationError } from './localUser.js';
+import { loadLocalUser, saveLocalUserName, UserNameValidationError } from './localUser';
 
 class TestStorage implements Storage {
   private readonly values = new Map<string, string>();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createReplayId } from './replayId.js';
+import { createReplayId } from './replayId';
 
 describe('createReplayId', () => {
   it('does not require crypto.randomUUID', () => {

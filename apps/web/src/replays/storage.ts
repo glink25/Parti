@@ -1,5 +1,5 @@
 import { openDB, type DBSchema } from 'idb';
-import type { ReplayPackageRecord, ReplayRecord } from './types.js';
+import type { ReplayPackageRecord, ReplayRecord } from './types';
 
 interface ReplayDB extends DBSchema {
   replays: {

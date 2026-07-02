@@ -4,8 +4,8 @@
  * 一个房间包 = manifest + 一组文件（HTML / worker / css / 资源）。
  * MVP 通过静态 URL 加载（无后端）；内容寻址 hash 见 hash.ts。
  */
-import { validateManifest, type RoomManifest } from './manifest.js';
-import { hashPackage } from './hash.js';
+import { validateManifest, type RoomManifest } from './manifest';
+import { hashPackage } from './hash';
 
 export interface RoomPackage {
   manifest: RoomManifest;

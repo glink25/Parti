@@ -1,5 +1,5 @@
-import type { AppLocale } from '@/i18n/locales.js';
-import { getRandomNamePools } from '@/i18n/messages.js';
+import type { AppLocale } from '@/i18n/locales';
+import { getRandomNamePools } from '@/i18n/messages';
 
 export interface LocalUser {
   id: string;

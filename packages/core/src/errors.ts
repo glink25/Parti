@@ -1,5 +1,5 @@
 /** 统一房间错误 (GOAL.md §8.12) */
-import type { RoomErrorCode, RoomErrorPayload } from './protocol/messages.js';
+import type { RoomErrorCode, RoomErrorPayload } from './protocol/messages';
 
 export class RoomError extends Error {
   readonly code: RoomErrorCode;

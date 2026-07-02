@@ -1,5 +1,5 @@
 /** @parti/worker-sdk —— 创作者 API + 房间逻辑执行宿主 */
-export { defineRoom } from './defineRoom.js';
+export { defineRoom } from './defineRoom';
 export type {
   RoomDefinition,
   RoomContext,
@@ -7,12 +7,12 @@ export type {
   RoomMeta,
   ActionHandler,
   InitialContext,
-} from './defineRoom.js';
+} from './defineRoom';
 
-export { RoomEngine } from './RoomEngine.js';
-export type { EngineEffects } from './RoomEngine.js';
-export { loadRoomDefinition } from './loader.js';
+export { RoomEngine } from './RoomEngine';
+export type { EngineEffects } from './RoomEngine';
+export { loadRoomDefinition } from './loader';
 
-export { InProcessWorkerHost } from './InProcessWorkerHost.js';
-export { WebWorkerHost } from './WebWorkerHost.js';
-export type { WorkerFactory } from './WebWorkerHost.js';
+export { InProcessWorkerHost } from './InProcessWorkerHost';
+export { WebWorkerHost } from './WebWorkerHost';
+export type { WorkerFactory } from './WebWorkerHost';

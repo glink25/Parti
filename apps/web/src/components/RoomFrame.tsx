@@ -6,10 +6,10 @@ import {
   type RoomClientPort,
 } from '@parti/client-sdk';
 import type { RoomPackage } from '@parti/room-packager';
-import { Button } from '@/components/ui/button.js';
-import { RoomImmersiveCapsule } from '@/components/RoomImmersiveCapsule.js';
-import { cn } from '@/lib/utils.js';
-import { createPackageUrl } from '@/lib/packageUiLoader.js';
+import { Button } from '@/components/ui/button';
+import { RoomImmersiveCapsule } from '@/components/RoomImmersiveCapsule';
+import { cn } from '@/lib/utils';
+import { createPackageUrl } from '@/lib/packageUiLoader';
 
 export interface RoomFrameViewport {
   aspectRatio?: string;

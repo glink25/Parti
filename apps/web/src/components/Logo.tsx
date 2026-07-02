@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils.js';
+import { cn } from '@/lib/utils';
 
 export const LOGO_URL = '/icon-512.png';
 

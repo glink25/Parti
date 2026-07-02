@@ -2,7 +2,7 @@
  * 内部桥协议 —— 主线程 WorkerHost ↔ Web Worker (worker-entry) 之间私有协议。
  * 对创作者不可见 (§9.1)。
  */
-import type { RoomPlayer } from './defineRoom.js';
+import type { RoomPlayer } from './defineRoom';
 
 export type MainToWorker =
   | { kind: 'init'; roomId: string; roomSource: string; manifest?: unknown; host: RoomPlayer; restoreState?: unknown }

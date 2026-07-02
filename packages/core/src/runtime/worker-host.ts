@@ -5,7 +5,7 @@
  * @parti/worker-sdk 提供具体实现）。这样 HostRuntime 不依赖任何环境特定 API，
  * 也符合 §9.1：内部桥协议对创作者不可见。
  */
-import type { Player } from '../players.js';
+import type { Player } from '../players';
 
 /** worker 在处理某个输入后产生的副作用回调 */
 export interface RoomWorkerCallbacks {

@@ -1,5 +1,5 @@
 /** Runtime 共享类型 + DevTools 事件 */
-import type { RoomMessage } from '../protocol/messages.js';
+import type { RoomMessage } from '../protocol/messages';
 
 /** 消息日志条目（DevTools §15.1） */
 export interface MessageLogEntry {

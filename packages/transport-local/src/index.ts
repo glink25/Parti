@@ -1,1 +1,1 @@
-export { LocalTransportAdapter } from './LocalTransportAdapter.js';
+export { LocalTransportAdapter } from './LocalTransportAdapter';

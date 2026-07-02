@@ -10,13 +10,13 @@
  */
 import {
   loadRoomDefinition,
-} from './loader.js';
+} from './loader';
 import type {
   InitialContext,
   RoomContext,
   RoomDefinition,
   RoomPlayer,
-} from './defineRoom.js';
+} from './defineRoom';
 
 export interface EngineEffects {
   /** 每次输入处理完后回传当前权威 state */

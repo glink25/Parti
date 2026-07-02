@@ -9,7 +9,7 @@
  *   刷新后据此恢复，房间 id（邀请链接）不变。
  * - 玩家：持久化稳定 clientId，刷新/掉线后凭它重连回同一玩家身份。
  */
-import type { SnapshotPayload, PlayerRole } from '../protocol/messages.js';
+import type { SnapshotPayload, PlayerRole } from '../protocol/messages';
 
 /** 房主侧持久化的房间会话记录。 */
 export interface RoomSessionRecord {

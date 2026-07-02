@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CommonTransportAdapter, type CommonProviderConnection, type CommonProviderMessage, type CommonTransportProvider } from './CommonTransportAdapter.js';
+import { CommonTransportAdapter, type CommonProviderConnection, type CommonProviderMessage, type CommonTransportProvider } from './CommonTransportAdapter';
 
 class MemoryProvider implements CommonTransportProvider {
   private topics = new Map<string, Map<string, Parameters<CommonTransportProvider['connect']>[0]>>();

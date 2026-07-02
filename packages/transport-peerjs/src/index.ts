@@ -1,2 +1,2 @@
-export { PeerJSTransportAdapter } from './PeerJSTransportAdapter.js';
-export type { PeerJSAdapterOptions } from './PeerJSTransportAdapter.js';
+export { PeerJSTransportAdapter } from './PeerJSTransportAdapter';
+export type { PeerJSAdapterOptions } from './PeerJSTransportAdapter';

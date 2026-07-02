@@ -1,7 +1,7 @@
-import { createDraftId } from '@/lib/ids.js';
-import type { AppLocale } from '@/i18n/locales.js';
-import { rawMessagesByLocale } from '@/i18n/messages.js';
-import type { TemplateListEntry } from '@/lib/rooms.js';
+import { createDraftId } from '@/lib/ids';
+import type { AppLocale } from '@/i18n/locales';
+import { rawMessagesByLocale } from '@/i18n/messages';
+import type { TemplateListEntry } from '@/lib/rooms';
 
 export type EditorFile = 'manifest' | 'html' | 'worker';
 export type BlankChoice = { id: 'blank'; name: string; description: string };

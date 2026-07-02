@@ -1,5 +1,5 @@
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
-import type { CommonProviderConnection, CommonProviderMessage, CommonTransportProvider } from './CommonTransportAdapter.js';
+import type { CommonProviderConnection, CommonProviderMessage, CommonTransportProvider } from './CommonTransportAdapter';
 
 export interface SupabaseRealtimeProviderOptions { url: string; publishableKey: string }
 

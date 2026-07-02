@@ -6,9 +6,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.js';
-import { Button } from '@/components/ui/button.js';
-import type { TransportConfig } from '@/lib/transportConfig.js';
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import type { TransportConfig } from '@/lib/transportConfig';
 
 export function InviteJoinHelpDialog({
   open,

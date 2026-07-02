@@ -1,4 +1,4 @@
-import { validateTransportConfig, type TransportConfig } from './transportConfig.js';
+import { validateTransportConfig, type TransportConfig } from './transportConfig';
 
 export interface PeerRoute {
   mode: 'host' | 'join'; roomId?: string; hostPeerId?: string; credential?: string; transportConfig: TransportConfig;

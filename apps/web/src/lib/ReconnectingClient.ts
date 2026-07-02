@@ -14,7 +14,7 @@ import {
   type ClientTransportSession,
 } from '@parti/core';
 import type { RoomClientPort } from '@parti/client-sdk';
-import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
+import { createTransportAdapter, type TransportConfig } from './transportConfig';
 
 export interface ReconnectingClientOptions {
   roomId: string;

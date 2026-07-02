@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { CloudIcon, PlusIcon, SparklesIcon } from 'lucide-react';
-import { Badge } from '@/components/ui/badge.js';
-import { Button } from '@/components/ui/button.js';
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.js';
-import { JoinLinkInput } from '@/components/JoinLinkInput.js';
-import { ScanJoinButton } from '@/components/ScanJoinButton.js';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { JoinLinkInput } from '@/components/JoinLinkInput';
+import { ScanJoinButton } from '@/components/ScanJoinButton';
 import {
   LobbyClient,
   lobbyServiceUrl,
   type LobbyRoom,
-} from '../lib/lobbyApi.js';
-import { buildJoinHashRoute, navigateToPeerJoin } from '../lib/peerRoutes.js';
-import { ENABLE_REPLAYS } from '../lib/featureFlags.js';
+} from '../lib/lobbyApi';
+import { buildJoinHashRoute, navigateToPeerJoin } from '../lib/peerRoutes';
+import { ENABLE_REPLAYS } from '../lib/featureFlags';
 
 /** 面向玩家的在线大厅。创作草稿与开发预览不在这里展示。 */
 export function Lobby() {

@@ -10,7 +10,7 @@ export interface LobbyRoom {
   listingId: string;
   roomId: string;
   connectionInfo?: string;
-  transportConfig?: import('./transportConfig.js').TransportConfig;
+  transportConfig?: import('./transportConfig').TransportConfig;
   /** v1 compatibility */
   hostPeerId?: string;
   title: string;

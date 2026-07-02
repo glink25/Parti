@@ -13,18 +13,18 @@ import {
   XIcon,
 } from 'lucide-react';
 import { createPackage, decodeText, encodeText, type RoomPackageInput } from '@parti/room-packager';
-import { Button } from '@/components/ui/button.js';
-import { Card } from '@/components/ui/card.js';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs.js';
-import { Textarea } from '@/components/ui/textarea.js';
-import { cn } from '@/lib/utils.js';
-import { copyTextToClipboard } from '@/lib/clipboard.js';
-import { createRoomSnapshot } from '../lib/customRooms.js';
-import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom.js';
-import { deleteImportedTemplate } from '../lib/templates.js';
-import { getTemplateList, loadPackageSource, type TemplateListEntry } from '../lib/rooms.js';
-import { useLocale } from '@/i18n/LocaleProvider.js';
-import { formatResolveError, templateDescription } from '@/i18n/formatErrors.js';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { createRoomSnapshot } from '../lib/customRooms';
+import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom';
+import { deleteImportedTemplate } from '../lib/templates';
+import { getTemplateList, loadPackageSource, type TemplateListEntry } from '../lib/rooms';
+import { useLocale } from '@/i18n/LocaleProvider';
+import { formatResolveError, templateDescription } from '@/i18n/formatErrors';
 import {
   blankManifest,
   getAiRoomPrompt,
@@ -33,9 +33,9 @@ import {
   DEFAULT_WORKER,
   type EditorFile,
   type SelectableTemplate,
-} from '@/components/editor/editorDefaults.js';
-import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs.js';
-import { EditorActionDock } from '@/components/editor/EditorActionDock.js';
+} from '@/components/editor/editorDefaults';
+import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs';
+import { EditorActionDock } from '@/components/editor/EditorActionDock';
 
 function formatError(intl: ReturnType<typeof useIntl>, reason: unknown): string {
   return formatResolveError(intl, reason);

@@ -1,5 +1,5 @@
-import type { AppLocale } from './locales.js';
-import { flattenMessages } from './flattenMessages.js';
+import type { AppLocale } from './locales';
+import { flattenMessages } from './flattenMessages';
 import zhCN from './messages/zh-CN.json';
 import enUS from './messages/en-US.json';
 

@@ -1,9 +1,9 @@
 /** 已开启房间的不可变 Package 快照。 */
 import { createPackage, type RoomPackage, type RoomPackageInput } from '@parti/room-packager';
-import { getDb, type PackageSourceInfo, type RoomSnapshotRecord } from './db.js';
-import { createDraftId } from './ids.js';
-import { findRoom, loadPackageSource } from './rooms.js';
-import { prepareCustomPackageRecord } from './templates.js';
+import { getDb, type PackageSourceInfo, type RoomSnapshotRecord } from './db';
+import { createDraftId } from './ids';
+import { findRoom, loadPackageSource } from './rooms';
+import { prepareCustomPackageRecord } from './templates';
 
 export interface CustomRoomEntry {
   id: string;

@@ -2,7 +2,7 @@
  * 从 ZIP 文件或 GitHub 地址导入房间模版。
  */
 import { createPackage, decodeText, validateManifest, type RoomPackageInput } from '@parti/room-packager';
-import { saveImportedTemplate } from './templates.js';
+import { saveImportedTemplate } from './templates';
 
 const MANIFEST_NAME = 'parti.room.json';
 

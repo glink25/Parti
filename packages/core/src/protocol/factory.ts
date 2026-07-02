@@ -2,7 +2,7 @@
  * RoomMessage 工厂 —— 负责生成 envelope，管理连接内 seq 自增。
  * 创作者不接触这一层 (§9.1)；Runtime 内部使用。
  */
-import type { Channel, RoomMessage } from './messages.js';
+import type { Channel, RoomMessage } from './messages';
 
 let idCounter = 0;
 

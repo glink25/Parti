@@ -6,7 +6,7 @@ import {
   encodeText,
   getRoomHtml,
   normalizePackagePath,
-} from './RoomPackage.js';
+} from './RoomPackage';
 
 const manifest = {
   partiVersion: '0.1.0',

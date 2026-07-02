@@ -22,11 +22,11 @@ import {
   encodeFilesBase64,
   type RoomPackage,
 } from '@parti/room-packager';
-import { createWebWorkerHost } from './roomWorker.js';
-import { ReconnectingClient } from './ReconnectingClient.js';
-import { clearHostRoomSettings } from './roomSettings.js';
-import { loadLocalUser } from './localUser.js';
-import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
+import { createWebWorkerHost } from './roomWorker';
+import { ReconnectingClient } from './ReconnectingClient';
+import { clearHostRoomSettings } from './roomSettings';
+import { loadLocalUser } from './localUser';
+import { createTransportAdapter, type TransportConfig } from './transportConfig';
 
 /**
  * 当前页面内活跃的房间会话清理器（host 或 client），key = roomId。

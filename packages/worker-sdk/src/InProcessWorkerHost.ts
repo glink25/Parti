@@ -5,8 +5,8 @@
  * 的场景。生产浏览器使用 WebWorkerHost 真正沙箱化。
  */
 import type { Player, RoomWorkerHost, RoomWorkerCallbacks, WorkerInitOptions } from '@parti/core';
-import type { RoomPlayer } from './defineRoom.js';
-import { RoomEngine, type EngineEffects } from './RoomEngine.js';
+import type { RoomPlayer } from './defineRoom';
+import { RoomEngine, type EngineEffects } from './RoomEngine';
 
 function toRoomPlayer(p: Player): RoomPlayer {
   return { id: p.id, name: p.name, role: p.role };

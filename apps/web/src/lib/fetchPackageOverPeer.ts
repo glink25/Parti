@@ -12,7 +12,7 @@ import {
   type RoomMessage,
 } from '@parti/core';
 import { createPackage, decodeFilesBase64, type RoomPackage } from '@parti/room-packager';
-import { createTransportAdapter, type TransportConfig } from './transportConfig.js';
+import { createTransportAdapter, type TransportConfig } from './transportConfig';
 
 const PACKAGE_FETCH_TIMEOUT_MS = 15_000;
 

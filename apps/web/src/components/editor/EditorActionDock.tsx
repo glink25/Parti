@@ -1,6 +1,6 @@
 import { FormattedMessage, useIntl } from 'react-intl';
 import { ArrowRightIcon, EyeIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button.js';
+import { Button } from '@/components/ui/button';
 
 export function EditorActionDock({ canCreate, busy, templateBusy, onEdit, onCreate }: { canCreate: boolean; busy: boolean; templateBusy: boolean; onEdit: () => void; onCreate: (target: 'local' | 'peer') => void }) {
   const intl = useIntl();

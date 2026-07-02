@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { ArrowRightIcon, ClipboardPasteIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button.js';
-import { cn } from '@/lib/utils.js';
-import { readTextFromClipboard } from '@/lib/clipboard.js';
-import { navigateToPeerJoin, parseInviteInput } from '../lib/peerRoutes.js';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { readTextFromClipboard } from '@/lib/clipboard';
+import { navigateToPeerJoin, parseInviteInput } from '../lib/peerRoutes';
 
 export function JoinLinkInput() {
   const intl = useIntl();

@@ -7,10 +7,10 @@ import type {
   RoomErrorPayload,
   SnapshotPayload,
 } from '@parti/core';
-import { Badge } from '@/components/ui/badge.js';
-import { Button } from '@/components/ui/button.js';
-import { Card } from '@/components/ui/card.js';
-import { Input } from '@/components/ui/input.js';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 /** 房间调试面板 (GOAL.md §15.1) —— 订阅 HostRuntime 的事件总线。 */
 export function DevTools({

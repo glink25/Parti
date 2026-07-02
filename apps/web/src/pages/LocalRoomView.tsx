@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomClientPort } from '@parti/client-sdk';
 import { type RoomPackage } from '@parti/room-packager';
-import { ROOM_FRAME_GRID_AREAS, RoomFrame, type RoomFrameGridKey } from '../components/RoomFrame.js';
-import { DevTools } from '../components/DevTools.js';
-import { LocalRoomSession } from '../lib/LocalRoomSession.js';
-import { loadRoomSnapshot } from '../lib/customRooms.js';
-import { Button } from '@/components/ui/button.js';
-import { Card } from '@/components/ui/card.js';
+import { ROOM_FRAME_GRID_AREAS, RoomFrame, type RoomFrameGridKey } from '../components/RoomFrame';
+import { DevTools } from '../components/DevTools';
+import { LocalRoomSession } from '../lib/LocalRoomSession';
+import { loadRoomSnapshot } from '../lib/customRooms';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 interface Seat {
   label: string;
