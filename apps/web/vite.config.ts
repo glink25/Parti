@@ -48,15 +48,23 @@ function roomRegistryPlugin(): Plugin {
     configureServer(server) {
       // dev 下增删模板目录或改 manifest 时，让虚拟模块失效以触发热更新。
       server.watcher.add(roomsDir);
+      let reloadTimer: ReturnType<typeof setTimeout> | undefined;
       const invalidate = (file: string) => {
-        if (!file.startsWith(roomsDir)) return;
-        const mod = server.moduleGraph.getModuleById(resolvedId);
-        if (mod) server.moduleGraph.invalidateModule(mod);
-        server.ws.send({ type: 'full-reload' });
+        if (file !== roomsDir && !file.startsWith(`${roomsDir}${path.sep}`)) return;
+        if (reloadTimer) clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(() => {
+          reloadTimer = undefined;
+          const mod = server.moduleGraph.getModuleById(resolvedId);
+          if (mod) server.moduleGraph.invalidateModule(mod);
+          server.ws.send({ type: 'full-reload' });
+        }, 150);
       };
       server.watcher.on('add', invalidate);
       server.watcher.on('unlink', invalidate);
       server.watcher.on('change', invalidate);
+      server.httpServer?.once('close', () => {
+        if (reloadTimer) clearTimeout(reloadTimer);
+      });
     },
   };
 }

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build && cd dist/package && zip -q -FS -r ../dev-template-react.zip .",
+    "dev:room": "vite build --watch --mode room-dev",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

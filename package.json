@@ -6,6 +6,7 @@
   "description": "Parti — Web 多人互动房间 Runtime",
   "scripts": {
     "dev": "pnpm --filter @parti/web dev --host",
+    "room:dev": "node scripts/room-dev.mjs",
     "build": "pnpm --filter @parti/web build",
     "preview": "pnpm --filter @parti/web preview",
     "test": "vitest run",

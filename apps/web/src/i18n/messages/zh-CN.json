@@ -304,6 +304,11 @@
       "host": "Host",
       "alice": "Alice",
       "bob": "Bob"
+    },
+    "device": {
+      "desktop": "桌面",
+      "tablet": "平板",
+      "mobile": "手机"
     }
   },
   "devTools": {

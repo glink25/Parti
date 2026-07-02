@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomClientPort } from '@parti/client-sdk';
 import { type RoomPackage } from '@parti/room-packager';
-import { RoomFrame } from '../components/RoomFrame.js';
+import { ROOM_FRAME_GRID_AREAS, RoomFrame, type RoomFrameGridKey } from '../components/RoomFrame.js';
 import { DevTools } from '../components/DevTools.js';
 import { LocalRoomSession } from '../lib/LocalRoomSession.js';
 import { loadRoomSnapshot } from '../lib/customRooms.js';
@@ -13,6 +13,7 @@ interface Seat {
   label: string;
   role: string;
   port: RoomClientPort;
+  gridKey: RoomFrameGridKey;
 }
 
 interface Loaded {
@@ -45,9 +46,21 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
         session,
         pkg,
         seats: [
-          { label: intl.formatMessage({ id: 'local.seat.host' }), role: 'host', port: hostPort },
-          { label: intl.formatMessage({ id: 'local.seat.alice' }), role: 'player', port: p1 },
-          { label: intl.formatMessage({ id: 'local.seat.bob' }), role: 'player', port: p2 },
+          {
+            label: `${intl.formatMessage({ id: 'local.seat.host' })} · ${intl.formatMessage({ id: 'local.device.desktop' })}`,
+            role: 'host', port: hostPort,
+            gridKey: 'desktop',
+          },
+          {
+            label: `${intl.formatMessage({ id: 'local.seat.alice' })} · ${intl.formatMessage({ id: 'local.device.tablet' })}`,
+            role: 'player', port: p1,
+            gridKey: 'tablet',
+          },
+          {
+            label: `${intl.formatMessage({ id: 'local.seat.bob' })} · ${intl.formatMessage({ id: 'local.device.mobile' })}`,
+            role: 'player', port: p2,
+            gridKey: 'phone',
+          },
         ],
       });
     })().catch((e) => {
@@ -80,7 +93,10 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
         </h2>
         <Button asChild variant="outline"><a href="#/"><FormattedMessage id="editor.backToLobby" /></a></Button>
       </div>
-      <div className="mb-4 grid grid-cols-3 gap-3.5 max-lg:grid-cols-2 max-md:grid-cols-1">
+      <div
+        className="mb-4 grid w-full grid-cols-10 grid-rows-10 gap-2"
+        style={{ aspectRatio: '1 / 1', maxHeight: 'min(80vh, 900px)' }}
+      >
         {loaded.seats.map((seat) => (
           <RoomFrame
             key={seat.label}
@@ -88,6 +104,8 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
             port={seat.port}
             label={seat.label}
             role={seat.role}
+            style={ROOM_FRAME_GRID_AREAS[seat.gridKey]}
+            viewport={{ fill: true }}
           />
         ))}
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useIntl } from 'react-intl';
 import { Maximize2Icon } from 'lucide-react';
 import {
@@ -11,6 +11,20 @@ import { RoomImmersiveCapsule } from '@/components/RoomImmersiveCapsule.js';
 import { cn } from '@/lib/utils.js';
 import { createPackageUrl } from '@/lib/packageUiLoader.js';
 
+export interface RoomFrameViewport {
+  aspectRatio?: string;
+  className?: string;
+  fill?: boolean;
+}
+
+export const ROOM_FRAME_GRID_AREAS = {
+  desktop: { gridArea: '1 / 1 / span 7 / span 7' },
+  phone: { gridArea: '1 / 8 / span 7 / span 3' },
+  tablet: { gridArea: '8 / 1 / span 3 / span 10' },
+} as const satisfies Record<string, CSSProperties>;
+
+export type RoomFrameGridKey = keyof typeof ROOM_FRAME_GRID_AREAS;
+
 export function RoomFrame({
   pkg,
   port,
@@ -22,6 +36,8 @@ export function RoomFrame({
   onFullscreenMore,
   onLog,
   className,
+  style,
+  viewport,
   exitAriaLabelId,
   exitTitleId,
 }: {
@@ -35,6 +51,8 @@ export function RoomFrame({
   onFullscreenMore?: () => void;
   onLog?: (args: unknown[]) => void;
   className?: string;
+  style?: CSSProperties;
+  viewport?: RoomFrameViewport;
   exitAriaLabelId?: string;
   exitTitleId?: string;
 }) {
@@ -78,9 +96,13 @@ export function RoomFrame({
 
   return (
     <div
+      style={style}
       className={cn(
         'flex min-h-[300px] flex-col overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_22px_65px_rgba(91,72,15,0.12)]',
+        viewport && 'min-h-0 w-full',
+        viewport?.fill && 'h-full min-h-0',
         fullscreen && 'relative h-[100dvh] w-[100dvw] min-h-0 rounded-none border-0 bg-black shadow-none',
+        viewport?.className,
         className,
       )}
     >
@@ -114,8 +136,31 @@ export function RoomFrame({
           exitTitleId={exitTitleId}
         />
       )}
-      {loadError ? <div className="flex flex-1 items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
-      {frameUrl ? <iframe ref={ref} src={frameUrl} sandbox="allow-scripts allow-same-origin" title={label} className="w-full flex-1 border-0 bg-white" /> : null}
+      {viewport ? (
+        <div
+          className={cn(
+            'relative w-full overflow-hidden bg-white',
+            viewport.fill ? 'min-h-0 flex-1' : 'shrink-0',
+          )}
+          style={viewport.aspectRatio ? { aspectRatio: viewport.aspectRatio } : undefined}
+        >
+          {loadError ? <div className="absolute inset-0 flex items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
+          {frameUrl ? (
+            <iframe
+              ref={ref}
+              src={frameUrl}
+              sandbox="allow-scripts allow-same-origin"
+              title={label}
+              className="absolute inset-0 h-full w-full border-0 bg-white"
+            />
+          ) : null}
+        </div>
+      ) : (
+        <>
+          {loadError ? <div className="flex flex-1 items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
+          {frameUrl ? <iframe ref={ref} src={frameUrl} sandbox="allow-scripts allow-same-origin" title={label} className="w-full flex-1 border-0 bg-white" /> : null}
+        </>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ dist
 .DS_Store
 .vite
 coverage
+apps/web/public/rooms/dev-*
 .claude
 .pnpm-store
 .env
