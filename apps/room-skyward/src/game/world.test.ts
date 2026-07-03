@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { canReachPlatform, MAX_ROUTE_RISE } from './physics';
-import { generateChunk, isBossExitActive } from './world';
+import { generateChunk, isBossExitActive, platformTransform } from './world';
 
 describe('skyward world entity placement', () => {
   it('anchors every enemy and pickup to a platform', () => {
@@ -48,9 +48,27 @@ describe('skyward world entity placement', () => {
 
   it('keeps boss exits locked until that boss is defeated', () => {
     const bossChunk = generateChunk(42, 6, 4);
-    const exits = bossChunk.platforms.filter((platform) => platform.kind === 'boss-exit');
-    expect(exits).toHaveLength(2);
+    const exits = bossChunk.platforms.filter((platform) => platform.kind === 'boss-reveal');
+    expect(exits).toHaveLength(3);
     expect(exits.every((platform) => !isBossExitActive(platform, 1))).toBe(true);
     expect(exits.every((platform) => isBossExitActive(platform, 2))).toBe(true);
+  });
+
+  it('is deterministic and avoids repeating a route skeleton in the same region kind', () => {
+    for (const seed of [1, 42, 987654, 0xffffffff]) {
+      const first = Array.from({ length: 50 }, (_, index) => generateChunk(seed, index, 3));
+      const second = Array.from({ length: 50 }, (_, index) => generateChunk(seed, index, 3));
+      expect(second).toEqual(first);
+      for (let index = 1; index < first.length; index += 1) {
+        if (first[index].regionKind === first[index - 1].regionKind && first[index].regionKind !== 'boss') expect(first[index].moduleId).not.toBe(first[index - 1].moduleId);
+      }
+      expect(new Set(first.filter((chunk) => chunk.regionKind !== 'boss').map((chunk) => chunk.moduleId)).size).toBeGreaterThanOrEqual(8);
+    }
+  });
+
+  it('keeps dynamic platform transforms deterministic', () => {
+    const moving = { id: 'x', x: 100, y: 200, width: 150, kind: 'normal' as const, behavior: { type: 'move' as const, axis: 'x' as const, range: 80, periodMs: 2000, phase: .25 } };
+    expect(platformTransform(moving, 12345)).toEqual(platformTransform(moving, 12345));
+    expect(platformTransform(moving, 12345).x).not.toBe(platformTransform(moving, 12845).x);
   });
 });

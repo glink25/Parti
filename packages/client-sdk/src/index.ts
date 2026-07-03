@@ -7,4 +7,4 @@ export {
   createClientPort,
 } from './host-bridge';
 export type { RoomClientPort, UISandboxBridgeOptions } from './host-bridge';
-export type { UiToHost, HostToUi } from './protocol';
+export type { UiToHost, HostToUi, OrientationData, OrientationStatus } from './protocol';

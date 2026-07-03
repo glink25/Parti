@@ -90,7 +90,13 @@ function gaSnippetPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [roomRegistryPlugin(), gaSnippetPlugin(), react(), tailwindcss()],
-  server: { port: 5157 },
+  server: {
+    port: 5157,
+    headers: { 'Permissions-Policy': 'accelerometer=(self), gyroscope=(self), magnetometer=(self)' },
+  },
+  preview: {
+    headers: { 'Permissions-Policy': 'accelerometer=(self), gyroscope=(self), magnetometer=(self)' },
+  },
   resolve: {
     alias: [
       { find: '@', replacement: path.resolve(__dirname, './src') },

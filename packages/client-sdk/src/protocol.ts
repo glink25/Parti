@@ -9,6 +9,7 @@ export type UiToHost =
   | { __parti: true; type: 'action'; action: string; payload: unknown }
   | { __parti: true; type: 'ready' }
   | { __parti: true; type: 'leave' }
+  | { __parti: true; type: 'orientation-request'; requestId: number }
   | { __parti: true; type: 'log'; args: unknown[] };
 
 /** 宿主页 -> iframe */
@@ -16,4 +17,22 @@ export type HostToUi =
   | { __parti: true; type: 'init'; playerId: string; state: unknown }
   | { __parti: true; type: 'state'; state: unknown }
   | { __parti: true; type: 'event'; event: string; payload: unknown }
+  | { __parti: true; type: 'orientation-status'; status: OrientationStatus; requestId?: number }
+  | { __parti: true; type: 'orientation-data'; data: OrientationData }
   | { __parti: true; type: 'error'; code: string; message: string };
+
+export type OrientationStatus =
+  | 'unsupported'
+  | 'needs-permission'
+  | 'requesting'
+  | 'active'
+  | 'denied'
+  | 'blocked-by-policy'
+  | 'no-data';
+
+export interface OrientationData {
+  beta: number;
+  gamma: number;
+  screenAngle: number;
+  timestamp: number;
+}

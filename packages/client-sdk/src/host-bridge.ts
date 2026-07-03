@@ -7,7 +7,128 @@
  */
 import type { HostRuntime, ClientRuntime } from '@parti/core';
 import { CLIENT_SDK_SCRIPT } from './bootstrap';
-import type { HostToUi, UiToHost } from './protocol';
+import type { HostToUi, OrientationData, OrientationStatus, UiToHost } from './protocol';
+
+type OrientationEventConstructor = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<'granted' | 'denied'>;
+};
+
+class HostOrientationController {
+  private status: OrientationStatus;
+  private noDataTimer: ReturnType<typeof setTimeout> | undefined;
+  private listening = false;
+  private pendingRequestId: number | undefined;
+
+  constructor(
+    private readonly emit: (msg: HostToUi) => void,
+    private readonly needsHostGesture: () => void,
+  ) {
+    this.status = this.detectInitialStatus();
+    if (this.status === 'no-data') this.startListening();
+  }
+
+  announce(): void { this.emit({ __parti: true, type: 'orientation-status', status: this.status }); }
+
+  request(requestId: number, hostGesture = false): void {
+    if (this.status === 'unsupported' || this.status === 'blocked-by-policy') {
+      this.emitStatus(this.status, requestId);
+      return;
+    }
+    const Orientation = window.DeviceOrientationEvent as OrientationEventConstructor | undefined;
+    const requestPermission = Orientation?.requestPermission;
+    if (!requestPermission) {
+      this.startListening();
+      this.emitStatus(this.status, requestId);
+      return;
+    }
+    if (!hostGesture && !navigator.userActivation?.isActive) {
+      this.pendingRequestId = requestId;
+      this.emitStatus('needs-permission');
+      this.needsHostGesture();
+      return;
+    }
+    this.pendingRequestId = undefined;
+    this.emitStatus('requesting');
+    // Deliberately invoke this immediately in the message event task. Waiting first loses
+    // Safari's transient user activation when the request originated from an iframe click.
+    void requestPermission.call(Orientation).then((result) => {
+      if (result !== 'granted') return this.emitStatus('denied', requestId);
+      this.startListening();
+      this.emitStatus('no-data', requestId);
+    }).catch(() => this.emitStatus('denied', requestId));
+  }
+
+  requestFromHostGesture(): void {
+    if (this.pendingRequestId !== undefined) this.request(this.pendingRequestId, true);
+  }
+
+  private detectInitialStatus(): OrientationStatus {
+    if (!window.isSecureContext) return 'blocked-by-policy';
+    if (!('DeviceOrientationEvent' in window)) return 'unsupported';
+    const policy = document as Document & {
+      permissionsPolicy?: { allowsFeature(feature: string): boolean };
+      featurePolicy?: { allowsFeature(feature: string): boolean };
+    };
+    const permissions = policy.permissionsPolicy ?? policy.featurePolicy;
+    if (permissions && !permissions.allowsFeature('gyroscope')) return 'blocked-by-policy';
+    const Orientation = window.DeviceOrientationEvent as OrientationEventConstructor;
+    return Orientation.requestPermission ? 'needs-permission' : 'no-data';
+  }
+
+  private startListening(): void {
+    if (!this.listening) {
+      window.addEventListener('deviceorientation', this.onOrientation, { passive: true });
+      document.addEventListener('visibilitychange', this.onVisibility);
+      this.listening = true;
+    }
+    this.armNoDataTimer();
+  }
+
+  private onOrientation = (event: DeviceOrientationEvent): void => {
+    if (event.beta == null || event.gamma == null || document.hidden) return;
+    if (this.noDataTimer) clearTimeout(this.noDataTimer);
+    this.emitStatus('active');
+    const orientation = screen.orientation?.angle ?? (window as Window & { orientation?: number }).orientation ?? 0;
+    const data: OrientationData = {
+      beta: event.beta,
+      gamma: event.gamma,
+      screenAngle: orientation,
+      timestamp: performance.timeOrigin + event.timeStamp,
+    };
+    this.emit({ __parti: true, type: 'orientation-data', data });
+    this.armNoDataTimer();
+  };
+
+  private onVisibility = (): void => {
+    if (document.hidden) {
+      if (this.noDataTimer) clearTimeout(this.noDataTimer);
+      this.emitStatus('no-data');
+    } else {
+      this.armNoDataTimer();
+    }
+  };
+
+  private armNoDataTimer(): void {
+    if (this.noDataTimer) clearTimeout(this.noDataTimer);
+    this.noDataTimer = setTimeout(() => this.emitStatus('no-data'), 1500);
+  }
+
+  private emitStatus(status: OrientationStatus, requestId?: number): void {
+    const changed = status !== this.status;
+    this.status = status;
+    if (changed || requestId !== undefined) {
+      this.emit({ __parti: true, type: 'orientation-status', status, ...(requestId === undefined ? {} : { requestId }) });
+    }
+  }
+
+  dispose(): void {
+    if (this.noDataTimer) clearTimeout(this.noDataTimer);
+    if (this.listening) {
+      window.removeEventListener('deviceorientation', this.onOrientation);
+      document.removeEventListener('visibilitychange', this.onVisibility);
+    }
+  }
+}
 
 /** Runtime 暴露给 UI 的统一端口 */
 export interface RoomClientPort {
@@ -24,6 +145,8 @@ export interface RoomClientPort {
 
 export interface UISandboxBridgeOptions {
   onLog?: (args: unknown[]) => void;
+  /** iframe 的点击无法把 transient activation 传给 Safari 时，请宿主显示真实按钮。 */
+  onOrientationHostGestureRequired?: () => void;
 }
 
 export class UISandboxBridge {
@@ -34,6 +157,7 @@ export class UISandboxBridge {
   private helloSeen = false;
   private initSent = false;
   private readonly messageListener: (e: MessageEvent) => void;
+  private readonly orientation: HostOrientationController;
 
   constructor(
     iframe: HTMLIFrameElement,
@@ -43,6 +167,10 @@ export class UISandboxBridge {
     this.iframe = iframe;
     this.port = port;
     this.opts = opts;
+    this.orientation = new HostOrientationController(
+      (msg) => this.post(msg),
+      () => this.opts.onOrientationHostGestureRequired?.(),
+    );
 
     this.messageListener = (e: MessageEvent) => this.onMessage(e);
     window.addEventListener('message', this.messageListener);
@@ -75,6 +203,9 @@ export class UISandboxBridge {
       case 'leave':
         this.port.leave();
         break;
+      case 'orientation-request':
+        this.orientation.request(msg.requestId);
+        break;
       case 'log':
         this.opts.onLog?.(msg.args);
         break;
@@ -90,15 +221,22 @@ export class UISandboxBridge {
       playerId: this.port.getPlayerId(),
       state: this.port.getState(),
     });
+    this.orientation.announce();
   }
 
   private post(msg: HostToUi): void {
     this.iframe.contentWindow?.postMessage(msg, '*');
   }
 
+  /** 必须由顶层页面的 click/pointer handler 同步调用。 */
+  requestOrientationPermission(): void {
+    this.orientation.requestFromHostGesture();
+  }
+
   dispose(): void {
     window.removeEventListener('message', this.messageListener);
     for (const off of this.unsubscribers) off();
+    this.orientation.dispose();
   }
 }
 

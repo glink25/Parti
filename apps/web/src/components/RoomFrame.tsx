@@ -58,8 +58,10 @@ export function RoomFrame({
 }) {
   const intl = useIntl();
   const ref = useRef<HTMLIFrameElement>(null);
+  const bridgeRef = useRef<UISandboxBridge | null>(null);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showMotionPermission, setShowMotionPermission] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,8 +83,13 @@ export function RoomFrame({
     if (!iframe || !frameUrl) return;
     const bridge = new UISandboxBridge(iframe, port, {
       ...(onLog ? { onLog } : {}),
+      onOrientationHostGestureRequired: () => setShowMotionPermission(true),
     });
-    return () => bridge.dispose();
+    bridgeRef.current = bridge;
+    return () => {
+      bridgeRef.current = null;
+      bridge.dispose();
+    };
   }, [frameUrl, port, onLog]);
 
   useEffect(() => {
@@ -98,7 +105,7 @@ export function RoomFrame({
     <div
       style={style}
       className={cn(
-        'flex min-h-[300px] flex-col overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_22px_65px_rgba(91,72,15,0.12)]',
+        'relative flex min-h-[300px] flex-col overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_22px_65px_rgba(91,72,15,0.12)]',
         viewport && 'min-h-0 w-full',
         viewport?.fill && 'h-full min-h-0',
         fullscreen && 'relative h-[100dvh] w-[100dvw] min-h-0 rounded-none border-0 bg-black shadow-none',
@@ -136,6 +143,20 @@ export function RoomFrame({
           exitTitleId={exitTitleId}
         />
       )}
+      {showMotionPermission && (
+        <Button
+          type="button"
+          size="sm"
+          className="absolute top-3 right-3 z-50 rounded-full shadow-lg"
+          onClick={() => {
+            // Keep this call synchronous: iOS consumes transient activation immediately.
+            bridgeRef.current?.requestOrientationPermission();
+            setShowMotionPermission(false);
+          }}
+        >
+          {intl.formatMessage({ id: 'room.motion.enable', defaultMessage: 'Enable motion controls' })}
+        </Button>
+      )}
       {viewport ? (
         <div
           className={cn(
@@ -149,7 +170,7 @@ export function RoomFrame({
             <iframe
               ref={ref}
               src={frameUrl}
-              allow="accelerometer; gyroscope"
+              allow="accelerometer; gyroscope; magnetometer"
               title={label}
               className="absolute inset-0 h-full w-full border-0 bg-white"
             />
@@ -158,7 +179,7 @@ export function RoomFrame({
       ) : (
         <>
           {loadError ? <div className="flex flex-1 items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
-          {frameUrl ? <iframe ref={ref} src={frameUrl} title={label} className="w-full flex-1 border-0 bg-white" allow="accelerometer; gyroscope" /> : null}
+          {frameUrl ? <iframe ref={ref} src={frameUrl} title={label} className="w-full flex-1 border-0 bg-white" allow="accelerometer; gyroscope; magnetometer" /> : null}
         </>
       )}
     </div>

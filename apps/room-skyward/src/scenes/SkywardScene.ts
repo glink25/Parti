@@ -2,8 +2,8 @@ import { mainCanvas, mainContext } from 'littlejsengine';
 import { animationFrame, assets, characterSkinForIndex, enemySkins, PICKUP_VISUALS, projectileVariant, projectileVisuals, themeForBiome, uiThemes, type BiomeTheme, type ProjectileVariant } from '../assets/catalog';
 import { SoundPlayer } from '../assets/registry';
 import { GRAVITY, JUMP_SPEED, MOVE_SPEED } from '../game/physics';
-import { CHUNK_HEIGHT, PLAYER_RADIUS, VIEW_HEIGHT, WORLD_WIDTH, type EnemySpawn, type GameState, type PickupSpawn, type Platform, type PublicPlayer, type TerrainChunk } from '../game/types';
-import { biomeFor, gateY, generateChunk, isBossExitActive } from '../game/world';
+import { CHUNK_HEIGHT, PLAYER_RADIUS, VIEW_HEIGHT, WORLD_WIDTH, type BossAttack, type EnemySpawn, type GameState, type PickupSpawn, type Platform, type PublicPlayer, type TerrainChunk } from '../game/types';
+import { biomeFor, generateChunk, isBossExitActive, platformTransform } from '../game/world';
 
 type Bullet = { shotId: string; projectileIndex: number; x: number; y: number; vy: number; life: number; cosmetic: boolean; color: string; variant: ProjectileVariant };
 type UiHit = { x: number; y: number; w: number; h: number; action: () => void };
@@ -13,7 +13,7 @@ const FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-ser
 export class SkywardScene {
   private state: GameState | null = null;
   private local = { x: WORLD_WIDTH / 2, y: 150, vy: 0, cameraBottom: 0, viewBottom: 0, alive: true };
-  private direction: -1 | 0 | 1 = 0;
+  private direction = 0;
   private keyDirection: -1 | 0 | 1 = 0;
   private touchDirections = new Map<number, -1 | 1>();
   private bullets: Bullet[] = [];
@@ -29,7 +29,13 @@ export class SkywardScene {
   private flash = '';
   private flashUntil = 0;
   private tiltEnabled = false;
-  private tiltDirection: -1 | 0 | 1 = 0;
+  private tiltDirection = 0;
+  private tiltNeutral: number | null = null;
+  private tiltFiltered = 0;
+  private tiltAngle: number | null = null;
+  private tiltDataAt = 0;
+  private crumbledPlatforms = new Map<string, number>();
+  private bossRevealAt = 0;
   private remoteVisuals: Record<string, { x: number; y: number }> = {};
   private pendingDeath = false;
   private appliedPositionEpoch = -1;
@@ -46,9 +52,13 @@ export class SkywardScene {
       parti.onState((value) => this.receiveState(value as GameState)),
       parti.onEvent('skyward:pickup', (value) => { this.sounds.play('sound.pickup', 140); this.notify(`${this.playerName((value as { playerId: string }).playerId)} 获得了增益`); }),
       parti.onEvent('skyward:death', (value) => { this.sounds.play('sound.hurt', 250); this.notify(`${this.playerName((value as { playerId: string }).playerId)} 倒下了`); }),
-      parti.onEvent('skyward:boss-defeated', () => { this.sounds.play('sound.vanish', 300); this.notify('天空之门开启！'); }),
+      parti.onEvent('skyward:boss-defeated', () => { this.bossRevealAt = performance.now(); this.sounds.play('sound.vanish', 300); this.notify('道路正在云层中展开！'); }),
       parti.onEvent('skyward:shield', () => { this.sounds.play('sound.select', 180); this.notify('团队护盾挡住了伤害'); }),
       parti.onEvent('skyward:shot', (value) => this.spawnRemoteShot(value as { shotId: string; playerId: string; x: number; y: number; spread: boolean; power: boolean })),
+    );
+    if (parti.orientation) this.disposers.push(
+      parti.orientation.onStatus((status) => { if (status !== 'active') this.tiltDirection = 0; }),
+      parti.orientation.onData((data) => this.onOrientationData(data)),
     );
     void assets.preloadImages();
     mainCanvas.addEventListener('pointerdown', this.onPointerDown);
@@ -56,7 +66,6 @@ export class SkywardScene {
     mainCanvas.addEventListener('pointercancel', this.onPointerUp);
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('keyup', this.onKey);
-    window.addEventListener('deviceorientation', this.onOrientation);
     window.addEventListener('pagehide', this.destroy, { once: true });
     parti.ready();
   }
@@ -65,6 +74,7 @@ export class SkywardScene {
     const now = performance.now();
     const dt = Math.min(0.04, Math.max(0.001, (now - this.previousTime) / 1000));
     this.previousTime = now;
+    if (this.tiltEnabled && performance.now() - this.tiltDataAt > 1500) this.tiltDirection = 0;
     this.pixelRatio = mainCanvas.width / Math.max(1, mainCanvas.clientWidth);
     this.viewport = this.computeViewport();
     if (!this.state || (this.state.phase !== 'running' && this.state.phase !== 'boss')) return;
@@ -140,12 +150,21 @@ export class SkywardScene {
     this.local.vy += GRAVITY * dt;
     this.local.y += this.local.vy * dt;
     if (this.local.vy <= 0) {
-      const platforms = this.visibleChunks().flatMap((chunk) => chunk.platforms).filter((item) => this.isPlatformActive(item));
+      const platforms = this.visibleChunks().flatMap((chunk) => chunk.platforms).filter((item) => this.isPlatformActive(item)).map((item) => ({ ...item, ...platformTransform(item, Date.now()) }));
       const landing = platforms.find((item) => previousY - PLAYER_RADIUS >= item.y && this.local.y - PLAYER_RADIUS <= item.y && Math.abs(this.local.x - item.x) <= item.width / 2 + PLAYER_RADIUS * 0.45);
-      if (landing) {
+        if (landing) {
           this.local.y = landing.y + PLAYER_RADIUS; this.local.vy = JUMP_SPEED; this.sounds.play('sound.jump', 150, .22);
         if (landing.kind === 'relay-trigger') void parti.action('activateRelay', { chunkIndex: Number(landing.id.split(':')[0]) });
+        if (landing.behavior?.type === 'crumble') this.crumbledPlatforms.set(landing.id, performance.now() + landing.behavior.delayMs);
+        if (landing.hazard === 'spikes') this.reportLocalDeath('enemy');
       }
+    }
+    const bossChunk = this.visibleChunks().find((chunk) => chunk.regionKind === 'boss' && chunk.bossCeilingY && this.state?.nextGate === Math.floor(chunk.index / 7) + 1);
+    if (bossChunk?.bossCeilingY && this.local.y > bossChunk.bossCeilingY - PLAYER_RADIUS) {
+      this.local.y = bossChunk.bossCeilingY - PLAYER_RADIUS; this.local.vy = Math.min(-120, this.local.vy);
+    }
+    for (const hazard of this.visibleChunks().flatMap((chunk) => chunk.hazards)) if (Math.abs(this.local.x - hazard.x) < hazard.width / 2 && Math.abs(this.local.y - hazard.y) < hazard.height / 2) {
+      if (hazard.kind === 'wind') this.local.x = (this.local.x + (hazard.strength ?? 0) * dt + WORLD_WIDTH) % WORLD_WIDTH;
     }
     this.local.cameraBottom = Math.max(this.local.cameraBottom, this.local.y - VIEW_HEIGHT * 0.56);
     const upperLine = this.local.viewBottom + VIEW_HEIGHT * .56;
@@ -161,8 +180,8 @@ export class SkywardScene {
     for (const bullet of this.bullets) {
       if (bullet.cosmetic) continue;
       if (this.state?.boss) {
-        const bossY = gateY(this.state.boss.gate) + 270;
-        if (Math.abs(bullet.x - WORLD_WIDTH / 2) < 150 && Math.abs(bullet.y - bossY) < 130) {
+        const boss = this.state.boss;
+        if (Math.abs(bullet.x - boss.x) < 150 && Math.abs(bullet.y - boss.y) < 130) {
           bullet.life = 0;
           this.bossHitUntil = performance.now() + 110;
           void parti.action('resolveHit', { shotId: bullet.shotId, projectileIndex: bullet.projectileIndex, targetId: `boss:${this.state.boss.gate}` });
@@ -192,8 +211,29 @@ export class SkywardScene {
       }
     }
     for (const pickup of this.activePickups()) {
-      if (Math.abs(this.local.x - pickup.x) < 58 && Math.abs(this.local.y - pickup.y) < 70) void parti.action('claimPickup', { pickupId: pickup.id });
+      const position = this.pickupPosition(pickup);
+      if (Math.abs(this.local.x - position.x) < 58 && Math.abs(this.local.y - position.y) < 70) void parti.action('claimPickup', { pickupId: pickup.id });
     }
+    this.checkBossInteractions();
+  }
+
+  private checkBossInteractions() {
+    const boss = this.state?.boss; if (!boss || performance.now() < this.hitAt) return;
+    if (Math.abs(this.local.x - boss.x) < 115 && Math.abs(this.local.y - boss.y) < 115) { this.reportBossDamage(`boss-contact:${boss.gate}`); return; }
+    const now = Date.now();
+    for (const attack of boss.attacks) {
+      const duration = Math.max(1, attack.endsAt - attack.startedAt); const progress = Math.max(0, Math.min(1, (now - attack.startedAt) / duration));
+      let x = boss.x; let y = boss.y; let radius = 42;
+      if (attack.kind === 'lightning') { if (progress < .55) continue; x = attack.targetX; y = attack.targetY; radius = 85; }
+      else if (attack.kind === 'trail') { x = attack.targetX; y = attack.targetY; radius = 115; }
+      else { x += (attack.targetX - x) * progress; y += (attack.targetY - y) * progress; radius = attack.kind === 'dive' ? 105 : attack.kind === 'fan' || attack.kind === 'summon' ? 105 : 45; }
+      if (Math.abs(this.local.x - x) < radius && Math.abs(this.local.y - y) < radius) { this.reportBossDamage(attack.id); return; }
+    }
+  }
+
+  private reportBossDamage(attackId: string) {
+    this.hitAt = performance.now() + 1200;
+    void parti.action('reportBossDamage', { attackId });
   }
 
   private shoot() {
@@ -236,7 +276,7 @@ export class SkywardScene {
 
   private activePickups(): PickupSpawn[] {
     const claimed = new Set(this.state?.claimedPickups ?? []);
-    return this.visibleChunks().flatMap((chunk) => chunk.pickups).filter((pickup) => !claimed.has(pickup.id));
+    return this.visibleChunks().flatMap((chunk) => chunk.pickups).filter((pickup) => !claimed.has(pickup.id) && (this.platformFor(pickup.platformId) ? this.isPlatformActive(this.platformFor(pickup.platformId)!) : true));
   }
 
   private drawWorld() {
@@ -260,10 +300,13 @@ export class SkywardScene {
       context.globalAlpha = 0.26; context.fillStyle = '#fff'; context.beginPath(); context.arc(x, y, (3 + i % 4) * view.scale, 0, Math.PI * 2); context.fill();
     }
     context.globalAlpha = 1;
-    for (const chunk of this.visibleChunks()) for (const item of chunk.platforms) if (this.isPlatformActive(item)) this.drawPlatform(item, theme, biome.platform);
+    for (const chunk of this.visibleChunks()) {
+      for (const hazard of chunk.hazards) this.drawHazard(hazard);
+      for (const item of chunk.platforms) if (this.isPlatformActive(item)) this.drawPlatform(item, theme, biome.platform);
+    }
     for (const pickup of this.activePickups()) this.drawPickup(pickup);
     for (const enemy of this.activeEnemies()) this.drawEnemy(enemy);
-    if (this.state?.boss) this.drawBoss();
+    if (this.state?.boss) { for (const attack of this.state.boss.attacks) this.drawBossAttack(attack); this.drawBoss(); }
     for (const player of Object.values(this.state?.players ?? {})) if (player.id !== parti.playerId && player.connected) {
       const visual = this.remoteVisuals[player.id] ?? player;
       this.drawPlayer(visual.x, visual.y, player, this.playerIndex(player.id), false);
@@ -276,11 +319,12 @@ export class SkywardScene {
   }
 
   private drawPlatform(item: Platform, theme: BiomeTheme, fallbackColor: string) {
-    const context = mainContext; const p = this.toScreen(item.x, item.y); const width = item.width * this.viewport.scale; const height = 72 * this.viewport.scale;
+    const transformed = platformTransform(item, Date.now());
+    const context = mainContext; const p = this.toScreen(transformed.x, transformed.y); const width = item.width * this.viewport.scale; const height = 72 * this.viewport.scale;
     const terrain = item.kind.startsWith('relay') ? { left: theme.relay, middle: theme.relay, right: theme.relay } : theme.terrain;
     const left = assets.image(terrain.left); const middle = assets.image(terrain.middle); const right = assets.image(terrain.right);
     if (!left || !middle || !right) {
-      context.fillStyle = item.kind === 'gate' ? '#f6ca67' : item.kind.startsWith('relay') ? '#77f2d1' : fallbackColor;
+      context.fillStyle = item.kind === 'boss-reveal' ? '#f6ca67' : item.kind.startsWith('relay') ? '#77f2d1' : fallbackColor;
       context.fillRect(p.x - width / 2, p.y - 12 * this.viewport.scale, width, 24 * this.viewport.scale);
       return;
     }
@@ -292,10 +336,7 @@ export class SkywardScene {
     const innerStart = start + cap; const innerEnd = start + width - cap;
     for (let x = innerStart; x < innerEnd; x += cap) context.drawImage(middle, 0, 0, middle.naturalWidth, middle.naturalHeight, x, textureTop, Math.min(cap, innerEnd - x), height);
     context.drawImage(right, start + width - cap, textureTop, cap, height);
-    if (item.kind === 'gate') {
-      const gate = assets.image(theme.gate);
-      if (gate) context.drawImage(gate, p.x - 50 * this.viewport.scale, p.y - 112 * this.viewport.scale, 100 * this.viewport.scale, 112 * this.viewport.scale);
-    }
+    if (item.hazard === 'spikes') { context.fillStyle = '#ff6685'; for (let x = start; x < start + width; x += 18 * this.viewport.scale) { context.beginPath(); context.moveTo(x, p.y); context.lineTo(x + 9 * this.viewport.scale, p.y - 18 * this.viewport.scale); context.lineTo(x + 18 * this.viewport.scale, p.y); context.fill(); } }
   }
 
   private drawBullet(bullet: Bullet) {
@@ -315,9 +356,9 @@ export class SkywardScene {
   }
 
   private drawPickup(pickup: PickupSpawn) {
-    const context = mainContext; const p = this.toScreen(pickup.x, pickup.y); const visual = PICKUP_VISUALS[pickup.kind]; const sprite = assets.image(visual.icon);
+    const position = this.pickupPosition(pickup); const context = mainContext; const p = this.toScreen(position.x, position.y); const visual = PICKUP_VISUALS[pickup.kind]; const sprite = assets.image(visual.icon);
     const pulse = 1 + Math.sin(performance.now() / 180) * .08; const size = visual.size * this.viewport.scale * pulse;
-    const platform = this.platformFor(pickup.platformId); const surfaceY = platform ? this.toScreen(platform.x, platform.y).y : p.y + 76 * this.viewport.scale;
+    const platform = this.platformFor(pickup.platformId); const transformed = platform ? platformTransform(platform, Date.now()) : null; const surfaceY = transformed ? this.toScreen(transformed.x, transformed.y).y : p.y + 76 * this.viewport.scale;
     const visualBottom = surfaceY - visual.hover * this.viewport.scale; const top = visualBottom - size + size * visual.bottomInset;
     context.save(); context.shadowColor = pickup.kind === 'team-shield' ? '#70e1ff' : '#ffdc73'; context.shadowBlur = 18 * this.viewport.scale;
     if (sprite) context.drawImage(sprite, p.x - size / 2, top, size, size);
@@ -326,12 +367,29 @@ export class SkywardScene {
   }
 
   private drawBoss() {
-    const boss = this.state!.boss!; const y = gateY(boss.gate) + 270; const p = this.toScreen(WORLD_WIDTH / 2, y); const context = mainContext;
+    const boss = this.state!.boss!; const p = this.toScreen(boss.x, boss.y); const context = mainContext;
     const skin = enemySkins.require('boss'); const sprite = assets.image(animationFrame(skin.move, performance.now(), 300));
-    const bob = Math.sin(performance.now() / 280) * 8 * this.viewport.scale; const size = 118 * skin.scale * this.viewport.scale;
-    context.save(); context.shadowColor = '#ff665f'; context.shadowBlur = 28 * this.viewport.scale; context.globalAlpha = performance.now() < this.bossHitUntil ? .35 : 1;
+    const bob = Math.sin(performance.now() / 280) * 8 * this.viewport.scale; const size = (boss.id === 'sky-whale' ? 148 : 118) * skin.scale * this.viewport.scale;
+    context.save(); context.filter = boss.id === 'thunder-core' ? 'hue-rotate(85deg)' : boss.id === 'sky-whale' ? 'hue-rotate(205deg)' : 'none'; context.shadowColor = boss.id === 'thunder-core' ? '#f6e56d' : boss.id === 'sky-whale' ? '#69d6ff' : '#ff665f'; context.shadowBlur = 28 * this.viewport.scale; context.globalAlpha = performance.now() < this.bossHitUntil ? .35 : 1;
     if (sprite) context.drawImage(sprite, p.x - size / 2, p.y - size / 2 + bob + (skin.offsetY ?? 0) * this.viewport.scale, size, size);
     else { context.fillStyle = '#5c3ca8'; context.beginPath(); context.arc(p.x, p.y, 120 * this.viewport.scale, 0, Math.PI * 2); context.fill(); }
+    context.restore();
+  }
+
+  private drawHazard(hazard: TerrainChunk['hazards'][number]) {
+    if (hazard.kind !== 'wind') return;
+    const p = this.toScreen(hazard.x, hazard.y); const context = mainContext;
+    context.save(); context.strokeStyle = 'rgba(190,245,255,.42)'; context.lineWidth = 4 * this.viewport.scale;
+    for (let i = -2; i <= 2; i += 1) { context.beginPath(); context.arc(p.x, p.y + i * 35 * this.viewport.scale, hazard.width * .28 * this.viewport.scale, .15, 2.7); context.stroke(); }
+    context.restore();
+  }
+
+  private drawBossAttack(attack: BossAttack) {
+    const now = Date.now(); const context = mainContext; const target = this.toScreen(attack.targetX, attack.targetY);
+    const progress = Math.max(0, Math.min(1, (now - attack.startedAt) / Math.max(1, attack.endsAt - attack.startedAt)));
+    context.save(); context.strokeStyle = attack.kind === 'lightning' ? '#fff08a' : '#ff718f'; context.fillStyle = 'rgba(255,85,115,.18)'; context.lineWidth = 6 * this.viewport.scale;
+    if (attack.kind === 'lightning') { context.beginPath(); context.arc(target.x, target.y, 72 * this.viewport.scale, 0, Math.PI * 2); context.fill(); context.stroke(); }
+    else { const boss = this.state!.boss!; const from = this.toScreen(boss.x, boss.y); const x = from.x + (target.x - from.x) * progress; const y = from.y + (target.y - from.y) * progress; const radius = attack.kind === 'dive' ? 95 : attack.kind === 'fan' || attack.kind === 'summon' ? 100 : 30; context.beginPath(); context.arc(x, y, radius * this.viewport.scale, 0, Math.PI * 2); context.fill(); context.stroke(); }
     context.restore();
   }
 
@@ -381,7 +439,7 @@ export class SkywardScene {
       this.uiHits.push({ x: fireX - 58, y: fireY - 58, w: 116, h: 116, action: () => this.shoot() });
       const controlY = view.y + 18;
       this.iconButton(view.x + view.w - 52, controlY, 'sound', this.soundEnabled, () => this.toggleSound());
-      if ('DeviceOrientationEvent' in window) this.iconButton(view.x + view.w - 100, controlY, 'tilt', this.tiltEnabled, () => void this.toggleTilt());
+      if (parti.orientation) this.iconButton(view.x + view.w - 100, controlY, 'tilt', this.tiltEnabled, () => void this.toggleTilt());
       const me = this.me()!;
       if (!me.alive && me.respawnAt) this.overlay('正在返回云端', `${Math.max(0, Math.ceil((me.respawnAt - Date.now()) / 1000))} 秒`);
       else if (this.pendingDeath) this.overlay('正在坠入云海', '同步远征状态…');
@@ -454,7 +512,8 @@ export class SkywardScene {
 
   private updateDirection() {
     const touch = [...this.touchDirections.values()].at(-1) ?? 0;
-    const next = this.tiltEnabled ? this.tiltDirection : touch || this.keyDirection;
+    const directInput = touch || this.keyDirection;
+    const next = directInput || (this.tiltEnabled ? this.tiltDirection : 0);
     if (next === this.direction) return;
     this.direction = next; void parti.action('move', { direction: next });
   }
@@ -477,10 +536,14 @@ export class SkywardScene {
     if (event.code === 'ArrowRight' || event.code === 'KeyD') this.keyDirection = pressed ? 1 : this.keyDirection === 1 ? 0 : this.keyDirection;
   };
 
-  private onOrientation = (event: DeviceOrientationEvent) => {
-    if (!this.tiltEnabled || event.gamma == null) return;
-    this.tiltDirection = event.gamma < -5 ? -1 : event.gamma > 5 ? 1 : 0;
-  };
+  private onOrientationData(data: { beta: number | null; gamma: number | null; screenAngle: number; timestamp: number }) {
+    const angle = ((data.screenAngle % 360) + 360) % 360;
+    const raw = angle === 90 ? data.beta == null ? null : -data.beta : angle === 270 ? data.beta : angle === 180 ? data.gamma == null ? null : -data.gamma : data.gamma;
+    if (raw == null || !this.tiltEnabled) return;
+    if (this.tiltAngle !== angle || this.tiltNeutral == null) { this.tiltAngle = angle; this.tiltNeutral = raw; this.tiltFiltered = 0; }
+    const delta = raw - this.tiltNeutral; this.tiltFiltered += (delta - this.tiltFiltered) * .18; this.tiltDataAt = performance.now();
+    const magnitude = Math.abs(this.tiltFiltered); this.tiltDirection = magnitude <= 3 ? 0 : Math.sign(this.tiltFiltered) * Math.min(1, (magnitude - 3) / 15);
+  }
 
   private readSoundPreference() {
     try { return localStorage.getItem('skyward:sound') !== 'off'; }
@@ -495,11 +558,13 @@ export class SkywardScene {
   }
 
   private async toggleTilt() {
+    if (!parti.orientation) { this.notify('当前环境不支持重力感应'); return; }
     if (!this.tiltEnabled) {
-      const Orientation = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> };
-      if (Orientation.requestPermission && await Orientation.requestPermission() !== 'granted') { this.notify('未获得重力感应权限'); return; }
+      const status = await parti.orientation.requestPermission();
+      if (status !== 'active' && status !== 'no-data') { this.notify('未获得重力感应权限'); return; }
+      if (status === 'no-data') this.notify('正在等待传感器数据，触控仍可使用');
     }
-    this.tiltEnabled = !this.tiltEnabled; this.tiltDirection = 0;
+    this.tiltEnabled = !this.tiltEnabled; this.tiltDirection = 0; this.tiltNeutral = null;
     void parti.action('enableTilt', { enabled: this.tiltEnabled });
   }
 
@@ -540,11 +605,20 @@ export class SkywardScene {
     const chunk = this.chunks.get(chunkIndex);
     return chunk?.platforms.find((platform) => platform.id === id) ?? null;
   }
+  private pickupPosition(pickup: PickupSpawn) {
+    const owner = this.platformFor(pickup.platformId); if (!owner) return pickup;
+    const transformed = platformTransform(owner, Date.now()); return { x: transformed.x, y: transformed.y + 76 };
+  }
   private isPlatformActive(platform: Platform) {
     const chunkIndex = Number(platform.id.split(':')[0]);
     if (platform.kind === 'relay-bridge') return this.state?.activeRelays.includes(`relay:${chunkIndex}`) ?? false;
-    if (platform.kind === 'boss-exit') return isBossExitActive(platform, this.state?.nextGate ?? 1);
-    return true;
+    if (platform.kind === 'boss-reveal') {
+      if (!isBossExitActive(platform, this.state?.nextGate ?? 1)) return false;
+      const order = Number(platform.id.match(/reveal(\d+)/)?.[1] ?? 0);
+      if (this.bossRevealAt && performance.now() < this.bossRevealAt + order * 280) return false;
+    }
+    const crumbledAt = this.crumbledPlatforms.get(platform.id); if (crumbledAt && performance.now() >= crumbledAt) return false;
+    return platformTransform(platform, Date.now()).active;
   }
   private playerName(id: string) { return this.state?.players[id]?.name ?? '队友'; }
   private notify(message: string) { this.flash = message; this.flashUntil = performance.now() + 1600; }
@@ -562,6 +636,6 @@ export class SkywardScene {
   private destroy = () => {
     for (const dispose of this.disposers.splice(0)) dispose();
     mainCanvas.removeEventListener('pointerdown', this.onPointerDown); mainCanvas.removeEventListener('pointerup', this.onPointerUp); mainCanvas.removeEventListener('pointercancel', this.onPointerUp);
-    window.removeEventListener('keydown', this.onKey); window.removeEventListener('keyup', this.onKey); window.removeEventListener('deviceorientation', this.onOrientation);
+    window.removeEventListener('keydown', this.onKey); window.removeEventListener('keyup', this.onKey);
   };
 }

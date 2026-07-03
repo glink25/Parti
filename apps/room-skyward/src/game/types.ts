@@ -7,7 +7,21 @@ export const PLAYER_RADIUS = 34;
 export type Phase = 'lobby' | 'running' | 'boss' | 'gameover';
 export type RegionKind = 'normal' | 'cooperative' | 'boss';
 
-export type Platform = { id: string; x: number; y: number; width: number; kind: 'normal' | 'relay-trigger' | 'relay-bridge' | 'gate' | 'boss-exit' };
+export type PlatformBehavior =
+  | { type: 'move'; axis: 'x' | 'y'; range: number; periodMs: number; phase: number }
+  | { type: 'blink'; periodMs: number; activeMs: number; phase: number }
+  | { type: 'crumble'; delayMs: number };
+export type Platform = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  kind: 'normal' | 'relay-trigger' | 'relay-bridge' | 'boss-reveal';
+  behavior?: PlatformBehavior;
+  hazard?: 'spikes';
+  optional?: boolean;
+};
+export type HazardZone = { id: string; kind: 'wind' | 'lightning' | 'trail'; x: number; y: number; width: number; height: number; strength?: number; activeFrom?: number; activeUntil?: number };
 export type EnemySpawn = { id: string; platformId: string; x: number; y: number; kind: 'drifter' | 'spike' };
 export type PickupSpawn = { id: string; platformId: string; x: number; y: number; kind: 'rapid' | 'spread' | 'power' | 'team-shield' };
 export type Connector = { minX: number; maxX: number; minY: number; maxY: number; wrap: true };
@@ -25,6 +39,9 @@ export type TerrainChunk = {
   route: string[];
   enemies: EnemySpawn[];
   pickups: PickupSpawn[];
+  tags: string[];
+  hazards: HazardZone[];
+  bossCeilingY?: number;
 };
 
 export type PublicPlayer = {
@@ -40,7 +57,7 @@ export type PublicPlayer = {
   vy: number;
   positionEpoch: number;
   cameraBottom: number;
-  direction: -1 | 0 | 1;
+  direction: number;
   arrivedGate: number | null;
   kills: number;
   deaths: number;
@@ -49,7 +66,24 @@ export type PublicPlayer = {
   buffs: string[];
 };
 
-export type BossState = { gate: number; id: string; name: string; hp: number; maxHp: number } | null;
+export type BossKind = 'storm-eye' | 'sky-whale' | 'thunder-core';
+export type BossAttackKind = 'aimed' | 'fan' | 'dive' | 'trail' | 'lightning' | 'summon';
+export type BossAttack = { id: string; kind: BossAttackKind; startedAt: number; endsAt: number; targetX: number; targetY: number; angle?: number };
+export type BossState = {
+  gate: number;
+  id: BossKind;
+  name: string;
+  tier: number;
+  hp: number;
+  maxHp: number;
+  x: number;
+  y: number;
+  phase: number;
+  attackSequence: number;
+  attacks: BossAttack[];
+  nextAttackAt: number;
+  vulnerableFrom: number;
+} | null;
 
 export type GameState = {
   phase: Phase;
@@ -80,6 +114,12 @@ export type PartiApi = {
   ready(): void;
   leave(): void;
   log(...args: unknown[]): void;
+  orientation?: {
+    getStatus(): 'unsupported' | 'needs-permission' | 'requesting' | 'active' | 'denied' | 'blocked-by-policy' | 'no-data';
+    requestPermission(): Promise<'unsupported' | 'needs-permission' | 'requesting' | 'active' | 'denied' | 'blocked-by-policy' | 'no-data'>;
+    onStatus(handler: (status: string) => void): () => void;
+    onData(handler: (data: { beta: number | null; gamma: number | null; screenAngle: number; timestamp: number }) => void): () => void;
+  };
 };
 
 declare global { const parti: PartiApi; }

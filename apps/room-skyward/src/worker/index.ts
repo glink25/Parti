@@ -1,5 +1,5 @@
 import { defineRoom, type RoomContext } from '@parti/worker-sdk';
-import { WORLD_WIDTH, type GameState, type PublicPlayer } from '../game/types';
+import { WORLD_WIDTH, type BossAttack, type BossKind, type GameState, type PublicPlayer } from '../game/types';
 import { findEnemy, gateY, generateChunk } from '../game/world';
 
 const RESPAWN_MS = 4000;
@@ -22,6 +22,7 @@ export default defineRoom<GameState>({
     for (const player of Object.values(ctx.state.players)) {
       if (!player.alive && player.respawnAt) scheduleRespawn(ctx, player.id, Math.max(100, player.respawnAt - ctx.now()));
     }
+    if (ctx.state.phase === 'boss' && ctx.state.boss) { normalizeBoss(ctx.state); scheduleBossTick(ctx, 200); }
     ctx.state.message = ctx.state.phase === 'lobby' ? '房间已恢复，请重新准备' : '远征已恢复';
   },
 
@@ -74,8 +75,8 @@ export default defineRoom<GameState>({
       if (!isPlaying(ctx.state)) return;
       const current = activePlayer(ctx.state, player.id);
       const direction = Number(payload?.direction);
-      if (!current || ![-1, 0, 1].includes(direction)) return;
-      current.direction = direction as -1 | 0 | 1;
+      if (!current || !Number.isFinite(direction) || direction < -1 || direction > 1) return;
+      current.direction = Math.round(direction * 100) / 100;
     },
 
     telemetry(ctx, { player, payload }) {
@@ -139,7 +140,7 @@ export default defineRoom<GameState>({
       if (!current?.alive) return;
       if (targetId.startsWith('boss:')) {
         const gate = Number(targetId.slice(5));
-        if (ctx.state.phase !== 'boss' || !ctx.state.boss || ctx.state.boss.gate !== gate || current.arrivedGate !== gate) return;
+        if (ctx.state.phase !== 'boss' || !ctx.state.boss || ctx.state.boss.gate !== gate || current.arrivedGate !== gate || ctx.now() < ctx.state.boss.vulnerableFrom) return;
         const damage = shot.power ? 2 : 1;
         ctx.state.boss.hp = Math.max(0, ctx.state.boss.hp - damage);
         ctx.broadcast('skyward:hit', { playerId: current.id, boss: true, damage });
@@ -190,6 +191,20 @@ export default defineRoom<GameState>({
         if (shield >= 0) { ctx.state.teamBuffs.splice(shield, 1); ctx.send(player.id, 'skyward:shield', {}); return; }
       }
       killPlayer(ctx, current.id, reason === 'void' ? '坠入虚空' : '被怪物击倒');
+    },
+
+    reportBossDamage(ctx, { player, payload }) {
+      const current = activePlayer(ctx.state, player.id);
+      const boss = ctx.state.boss;
+      if (!current?.alive || !boss || ctx.state.phase !== 'boss' || current.invulnerableUntil > ctx.now()) return;
+      const attackId = typeof payload?.attackId === 'string' ? payload.attackId : '';
+      const validAttack = boss.attacks.some((attack) => attack.id === attackId && bossAttackHits(attack, current, boss.x, boss.y, ctx.now()));
+      const contact = attackId === `boss-contact:${boss.gate}` && Math.abs(current.x - boss.x) < 145 && Math.abs(current.y - boss.y) < 145;
+      if (!validAttack && !contact) return;
+      current.invulnerableUntil = ctx.now() + 1200;
+      const shield = ctx.state.teamBuffs.indexOf('team-shield');
+      if (shield >= 0) { ctx.state.teamBuffs.splice(shield, 1); ctx.send(player.id, 'skyward:shield', {}); return; }
+      killPlayer(ctx, current.id, '被Boss击倒');
     },
 
     enableTilt(ctx, { player, payload }) {
@@ -303,18 +318,72 @@ function tryStartBoss(ctx: RoomContext<GameState>) {
   if (ctx.state.phase !== 'running') return;
   const ready = ctx.state.startedPlayers.every((id) => { const p = ctx.state.players[id]; return p?.connected && p.alive && p.arrivedGate === ctx.state.nextGate; });
   if (!ready) return;
-  const gate = ctx.state.nextGate; const maxHp = 24 + (gate - 1) * 12 + ctx.state.startedPlayers.length * 16;
+  const gate = ctx.state.nextGate; const tier = Math.floor((gate - 1) / 3) + 1;
+  const kinds: BossKind[] = ['storm-eye', 'sky-whale', 'thunder-core']; const id = kinds[(gate - 1) % kinds.length]!;
+  const names: Record<BossKind, string> = { 'storm-eye': '风暴之眼', 'sky-whale': '巡天鲸', 'thunder-core': '雷云核心' };
+  const maxHp = 28 + (gate - 1) * 8 + ctx.state.startedPlayers.length * 14;
+  const now = ctx.now();
   ctx.state.phase = 'boss';
-  ctx.state.boss = { gate, id: gate % 2 ? 'storm-eye' : 'sky-whale', name: gate % 2 ? '风暴之眼' : '巡天鲸', hp: maxHp, maxHp };
+  ctx.state.boss = { gate, id, name: names[id], tier, hp: maxHp, maxHp, x: WORLD_WIDTH / 2, y: gateY(gate) + 270, phase: 1, attackSequence: 0, attacks: [], nextAttackAt: now + 1500, vulnerableFrom: now + 700 };
   ctx.state.message = `${ctx.state.boss.name} 出现了！集中射击`;
   ctx.broadcast('skyward:boss', { gate, name: ctx.state.boss.name });
+  scheduleBossTick(ctx, 200);
 }
 
 function defeatBoss(ctx: RoomContext<GameState>) {
   const boss = ctx.state.boss; if (!boss) return;
   ctx.state.bossCount += 1; ctx.state.nextGate += 1; ctx.state.phase = 'running'; ctx.state.boss = null;
+  ctx.clearTimer('boss:tick');
   ctx.state.teamVoidY = Math.max(ctx.state.teamVoidY, gateY(boss.gate));
   for (const id of ctx.state.startedPlayers) ctx.state.players[id].arrivedGate = null;
   ctx.state.message = 'Boss已击败，新的天空正在展开';
   ctx.broadcast('skyward:boss-defeated', { count: ctx.state.bossCount });
+}
+
+function scheduleBossTick(ctx: RoomContext<GameState>, delay = 250) {
+  ctx.setTimer('boss:tick', delay, () => {
+    const boss = ctx.state.boss; if (!boss || ctx.state.phase !== 'boss') return;
+    const now = ctx.now();
+    boss.attacks = boss.attacks.filter((attack) => attack.endsAt + 500 > now);
+    boss.x = WORLD_WIDTH / 2 + Math.sin(now / (4200 / Math.min(2, boss.tier * .15 + 1))) * (boss.id === 'sky-whale' ? 245 : 310);
+    boss.phase = boss.hp <= boss.maxHp * .35 ? 3 : boss.hp <= boss.maxHp * .7 ? 2 : 1;
+    if (now >= boss.nextAttackAt) {
+      const targets = ctx.state.startedPlayers.map((id) => ctx.state.players[id]).filter((p) => p?.connected && p.alive);
+      const target = targets[boss.attackSequence % Math.max(1, targets.length)];
+      const sequence = boss.attackSequence++;
+      const kind = attackKind(boss.id, boss.phase, sequence);
+      const warning = kind === 'lightning' ? 1100 : kind === 'dive' ? 800 : 550;
+      const duration = kind === 'trail' ? 2400 : warning + 700;
+      const attack: BossAttack = { id: `boss:${boss.gate}:${sequence}`, kind, startedAt: now, endsAt: now + duration, targetX: target?.x ?? WORLD_WIDTH / 2, targetY: target?.y ?? gateY(boss.gate) + 80 };
+      boss.attacks.push(attack);
+      boss.nextAttackAt = now + Math.max(850, 2400 - boss.tier * 130 - boss.phase * 170);
+      ctx.broadcast('skyward:boss-attack', attack);
+    }
+    scheduleBossTick(ctx);
+  });
+}
+
+function attackKind(id: BossKind, phase: number, sequence: number): BossAttack['kind'] {
+  if (id === 'storm-eye') return phase >= 2 && sequence % 3 === 2 ? 'fan' : 'aimed';
+  if (id === 'sky-whale') return phase >= 2 && sequence % 2 ? 'trail' : 'dive';
+  return phase >= 3 && sequence % 3 === 2 ? 'summon' : 'lightning';
+}
+
+function bossAttackHits(attack: BossAttack, player: PublicPlayer, bossX: number, bossY: number, now: number) {
+  if (attack.startedAt > now || attack.endsAt + 250 < now) return false;
+  const progress = Math.max(0, Math.min(1, (now - attack.startedAt) / Math.max(1, attack.endsAt - attack.startedAt)));
+  let x = bossX; let y = bossY; let radius = 55;
+  if (attack.kind === 'lightning') { if (progress < .5) return false; x = attack.targetX; y = attack.targetY; radius = 110; }
+  else if (attack.kind === 'trail') { x = attack.targetX; y = attack.targetY; radius = 140; }
+  else { x += (attack.targetX - x) * progress; y += (attack.targetY - y) * progress; radius = attack.kind === 'dive' ? 130 : attack.kind === 'fan' || attack.kind === 'summon' ? 125 : 70; }
+  return Math.abs(player.x - x) < radius && Math.abs(player.y - y) < radius;
+}
+
+function normalizeBoss(state: GameState) {
+  const boss = state.boss; if (!boss) return;
+  const now = Date.now(); const legacy = boss as Partial<NonNullable<GameState['boss']>>;
+  boss.tier ??= Math.floor((boss.gate - 1) / 3) + 1;
+  boss.x ??= WORLD_WIDTH / 2; boss.y ??= gateY(boss.gate) + 270; boss.phase ??= 1;
+  boss.attackSequence ??= 0; boss.attacks ??= []; boss.nextAttackAt ??= now + 1000; boss.vulnerableFrom ??= now;
+  if (!['storm-eye', 'sky-whale', 'thunder-core'].includes(legacy.id ?? '')) boss.id = 'storm-eye';
 }

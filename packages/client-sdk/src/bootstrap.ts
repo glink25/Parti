@@ -13,6 +13,11 @@ export const CLIENT_SDK_SCRIPT = String.raw`
   var ready = false;
   var stateHandlers = [];
   var eventHandlers = {}; // event -> [fn]
+  var orientationStatus = 'unsupported';
+  var orientationStatusHandlers = [];
+  var orientationDataHandlers = [];
+  var orientationRequests = {};
+  var nextOrientationRequestId = 1;
 
   function postToHost(msg) {
     msg[TAG] = true;
@@ -32,6 +37,19 @@ export const CLIENT_SDK_SCRIPT = String.raw`
     }
   }
 
+  function notifyOrientationStatus(status) {
+    orientationStatus = status;
+    for (var i = 0; i < orientationStatusHandlers.length; i++) {
+      try { orientationStatusHandlers[i](status); } catch (e) { console.error(e); }
+    }
+  }
+
+  function notifyOrientationData(data) {
+    for (var i = 0; i < orientationDataHandlers.length; i++) {
+      try { orientationDataHandlers[i](data); } catch (e) { console.error(e); }
+    }
+  }
+
   window.addEventListener('message', function (e) {
     var msg = e.data;
     if (!msg || msg[TAG] !== true) return;
@@ -48,6 +66,16 @@ export const CLIENT_SDK_SCRIPT = String.raw`
         break;
       case 'event':
         notifyEvent(msg.event, msg.payload);
+        break;
+      case 'orientation-status':
+        notifyOrientationStatus(msg.status);
+        if (msg.requestId !== undefined && orientationRequests[msg.requestId]) {
+          orientationRequests[msg.requestId](msg.status);
+          delete orientationRequests[msg.requestId];
+        }
+        break;
+      case 'orientation-data':
+        notifyOrientationData(msg.data);
         break;
       case 'error':
         notifyEvent('__error', { code: msg.code, message: msg.message });
@@ -93,6 +121,32 @@ export const CLIENT_SDK_SCRIPT = String.raw`
     },
 
     leave: function () { postToHost({ type: 'leave' }); },
+
+    orientation: {
+      getStatus: function () { return orientationStatus; },
+      requestPermission: function () {
+        var requestId = nextOrientationRequestId++;
+        return new Promise(function (resolve) {
+          orientationRequests[requestId] = resolve;
+          postToHost({ type: 'orientation-request', requestId: requestId });
+        });
+      },
+      onStatus: function (handler) {
+        orientationStatusHandlers.push(handler);
+        try { handler(orientationStatus); } catch (e) { console.error(e); }
+        return function () {
+          var i = orientationStatusHandlers.indexOf(handler);
+          if (i >= 0) orientationStatusHandlers.splice(i, 1);
+        };
+      },
+      onData: function (handler) {
+        orientationDataHandlers.push(handler);
+        return function () {
+          var i = orientationDataHandlers.indexOf(handler);
+          if (i >= 0) orientationDataHandlers.splice(i, 1);
+        };
+      }
+    },
 
     log: function () {
       var args = Array.prototype.slice.call(arguments);
