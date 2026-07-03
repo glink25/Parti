@@ -149,6 +149,7 @@ export function RoomFrame({
             <iframe
               ref={ref}
               src={frameUrl}
+              allow="accelerometer; gyroscope"
               title={label}
               className="absolute inset-0 h-full w-full border-0 bg-white"
             />
@@ -157,7 +158,7 @@ export function RoomFrame({
       ) : (
         <>
           {loadError ? <div className="flex flex-1 items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
-          {frameUrl ? <iframe ref={ref} src={frameUrl} sandbox="allow-scripts allow-same-origin" title={label} className="w-full flex-1 border-0 bg-white" /> : null}
+          {frameUrl ? <iframe ref={ref} src={frameUrl} title={label} className="w-full flex-1 border-0 bg-white" allow="accelerometer; gyroscope" /> : null}
         </>
       )}
     </div>
