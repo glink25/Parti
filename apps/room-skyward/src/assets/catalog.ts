@@ -59,7 +59,7 @@ image('terrain.relay', 'terrain', 'relay.png'); image('terrain.gate', 'terrain',
 for (const name of ['normal-idle', 'normal-a', 'normal-b', 'spike-idle', 'spike-a', 'spike-b', 'boss-idle', 'boss-a', 'boss-b']) image(`enemy.${name}`, 'enemies', `${name}.png`);
 for (const name of ['height', 'boss', 'fire', 'shield', 'rapid', 'spread', 'power']) image(`icon.${name}`, 'items', `${name}.png`);
 for (const name of ['normal', 'spread', 'power']) image(`projectile.${name}`, 'projectiles', `${name}.png`);
-for (const name of ['select', 'jump', 'hurt', 'shoot', 'pickup', 'vanish']) audio(`sound.${name}`, `${name}.ogg`);
+for (const name of ['select', 'jump', 'hurt', 'shoot', 'pickup', 'vanish']) audio(`sound.${name}`, `${name}.mp3`);
 
 registerBiomeTheme({ id: 'dawn', background: 'background.hills', terrain: { left: 'terrain.grass.left', middle: 'terrain.grass.middle', right: 'terrain.grass.right' }, relay: 'terrain.relay', gate: 'terrain.gate', palette: { sky: '#3498cf', haze: '#b9e8f4', panel: '#173b59dd', accent: '#ffd166' } });
 registerBiomeTheme({ id: 'garden', background: 'background.trees', terrain: { left: 'terrain.dirt.left', middle: 'terrain.dirt.middle', right: 'terrain.dirt.right' }, relay: 'terrain.relay', gate: 'terrain.gate', palette: { sky: '#269a83', haze: '#b8efd2', panel: '#174d43dd', accent: '#8ee58b' } });

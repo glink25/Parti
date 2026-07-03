@@ -2,8 +2,17 @@ import { PLAYER_RADIUS, WORLD_WIDTH, type Platform } from './types';
 
 export const GRAVITY = -1750;
 export const JUMP_SPEED = 930;
-export const MOVE_SPEED = 390;
+export const MOVE_SPEED = 420;
 export const MAX_ROUTE_RISE = 210;
+export const TILT_DEAD_ZONE = 3;
+export const TILT_FULL_SPEED_ANGLE = 18;
+
+export function tiltDirectionForAngle(angle: number) {
+  if (!Number.isFinite(angle)) return 0;
+  const magnitude = Math.abs(angle);
+  if (magnitude <= TILT_DEAD_ZONE) return 0;
+  return Math.sign(angle) * Math.min(1, (magnitude - TILT_DEAD_ZONE) / (TILT_FULL_SPEED_ANGLE - TILT_DEAD_ZONE));
+}
 
 export function wrappedDistance(a: number, b: number) {
   const direct = Math.abs(a - b);

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { animationFrame, characterSkinForIndex, projectileVariant, projectileVisuals, themeForBiome } from './catalog';
 import { AssetRegistry, Registry, SoundPlayer } from './registry';
 
@@ -26,6 +26,18 @@ describe('skyward asset registry', () => {
     expect(player.isEnabled()).toBe(true);
     player.setEnabled(false);
     expect(player.isEnabled()).toBe(false);
+  });
+
+  it('preloads and delegates playback to the engine sound system', () => {
+    const assets = new AssetRegistry(); assets.registerAudio({ id: 'sound', src: '/sound.mp3' });
+    const play = vi.fn();
+    const player = new SoundPlayer(assets, () => ({ play }));
+
+    player.play('sound', 0, .4);
+    expect(play).toHaveBeenCalledWith(undefined, .4, 1, 0);
+    player.setEnabled(false);
+    player.play('sound', 0, .4);
+    expect(play).toHaveBeenCalledOnce();
   });
 
   it('selects registered projectile visuals with power precedence', () => {

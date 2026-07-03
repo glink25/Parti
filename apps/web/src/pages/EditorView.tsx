@@ -69,9 +69,7 @@ export function EditorView() {
     void (async () => {
       const list = await getTemplateList();
       setTemplates(list);
-      await applyTemplate(list[0] ?? blankTemplate);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function reloadTemplates(): Promise<TemplateListEntry[]> {
@@ -217,8 +215,8 @@ export function EditorView() {
 
   async function onDeleteTemplate(entry: TemplateListEntry): Promise<void> {
     await deleteImportedTemplate(entry.id);
-    const list = await reloadTemplates();
-    if (activeTemplate === entry.id) await applyTemplate(list[0] ?? blankTemplate);
+    await reloadTemplates();
+    if (activeTemplate === entry.id) await applyTemplate(blankTemplate);
   }
 
   async function copyAiPrompt(): Promise<void> {

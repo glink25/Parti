@@ -1,9 +1,9 @@
-import { mainCanvas, mainContext } from 'littlejsengine';
+import { mainCanvas, mainContext, Sound } from 'littlejsengine';
 import { animationFrame, assets, characterSkinForIndex, enemySkins, PICKUP_VISUALS, projectileVariant, projectileVisuals, themeForBiome, uiThemes, type BiomeTheme, type ProjectileVariant } from '../assets/catalog';
 import { SoundPlayer } from '../assets/registry';
-import { GRAVITY, JUMP_SPEED, MOVE_SPEED } from '../game/physics';
+import { GRAVITY, JUMP_SPEED, MOVE_SPEED, tiltDirectionForAngle } from '../game/physics';
 import { CHUNK_HEIGHT, PLAYER_RADIUS, VIEW_HEIGHT, WORLD_WIDTH, type BossAttack, type EnemySpawn, type GameState, type PickupSpawn, type Platform, type PublicPlayer, type TerrainChunk } from '../game/types';
-import { biomeFor, generateChunk, isBossExitActive, platformTransform } from '../game/world';
+import { biomeFor, generateChunk, isBossCeilingActive, isBossExitActive, platformTransform } from '../game/world';
 
 type Bullet = { shotId: string; projectileIndex: number; x: number; y: number; vy: number; life: number; cosmetic: boolean; color: string; variant: ProjectileVariant };
 type UiHit = { x: number; y: number; w: number; h: number; action: () => void };
@@ -41,7 +41,7 @@ export class SkywardScene {
   private appliedPositionEpoch = -1;
   private shotSequence = 0;
   private pendingDefeatedEnemies = new Set<string>();
-  private sounds = new SoundPlayer(assets);
+  private sounds = new SoundPlayer(assets, (src) => new Sound(src));
   private pressedUntil = 0;
   private bossHitUntil = 0;
   private soundEnabled = this.readSoundPreference();
@@ -159,7 +159,7 @@ export class SkywardScene {
         if (landing.hazard === 'spikes') this.reportLocalDeath('enemy');
       }
     }
-    const bossChunk = this.visibleChunks().find((chunk) => chunk.regionKind === 'boss' && chunk.bossCeilingY && this.state?.nextGate === Math.floor(chunk.index / 7) + 1);
+    const bossChunk = this.visibleChunks().find((chunk) => this.state && isBossCeilingActive(chunk, this.state.phase, this.state.nextGate));
     if (bossChunk?.bossCeilingY && this.local.y > bossChunk.bossCeilingY - PLAYER_RADIUS) {
       this.local.y = bossChunk.bossCeilingY - PLAYER_RADIUS; this.local.vy = Math.min(-120, this.local.vy);
     }
@@ -543,7 +543,7 @@ export class SkywardScene {
     if (raw == null || !this.tiltEnabled) return;
     if (this.tiltAngle !== angle || this.tiltNeutral == null) { this.tiltAngle = angle; this.tiltNeutral = raw; this.tiltFiltered = 0; }
     const delta = raw - this.tiltNeutral; this.tiltFiltered += (delta - this.tiltFiltered) * .18; this.tiltDataAt = performance.now();
-    const magnitude = Math.abs(this.tiltFiltered); this.tiltDirection = magnitude <= 3 ? 0 : Math.sign(this.tiltFiltered) * Math.min(1, (magnitude - 3) / 15);
+    this.tiltDirection = tiltDirectionForAngle(this.tiltFiltered);
   }
 
   private readSoundPreference() {

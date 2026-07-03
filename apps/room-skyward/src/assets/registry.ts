@@ -21,6 +21,7 @@ export class AssetRegistry {
   hasAudio(id: string) { return this.audio.has(id); }
   image(id: string) { return this.imageCache.get(id) ?? null; }
   audioSrc(id: string) { return this.audio.get(id)?.src ?? null; }
+  audioAssets() { return [...this.audio.values()]; }
   didFail(id: string) { return this.failed.has(id); }
 
   async preloadImages(ids: Iterable<string> = this.images.keys()) {
@@ -66,17 +67,27 @@ export class Registry<T extends { id: string }> {
 
 export class SoundPlayer {
   private lastPlayed = new Map<string, number>();
+  private sounds = new Map<string, EngineSound>();
   private enabled = true;
-  constructor(private readonly assets: AssetRegistry) {}
+  constructor(
+    private readonly assets: AssetRegistry,
+    createSound?: (src: string) => EngineSound,
+  ) {
+    if (createSound) for (const asset of assets.audioAssets()) this.sounds.set(asset.id, createSound(asset.src));
+  }
   setEnabled(enabled: boolean) { this.enabled = enabled; }
   isEnabled() { return this.enabled; }
   play(id: string, minimumGap = 90, volume = .35) {
     if (!this.enabled) return;
-    const src = this.assets.audioSrc(id);
-    if (!src || typeof Audio === 'undefined') return;
+    const sound = this.sounds.get(id);
+    if (!sound || !this.assets.audioSrc(id)) return;
     const now = performance.now();
     if (now - (this.lastPlayed.get(id) ?? -Infinity) < minimumGap) return;
     this.lastPlayed.set(id, now);
-    const audio = new Audio(src); audio.volume = volume; void audio.play().catch(() => undefined);
+    sound.play(undefined, volume, 1, 0);
   }
+}
+
+export interface EngineSound {
+  play(position?: unknown, volume?: number, pitch?: number, randomnessScale?: number): unknown;
 }

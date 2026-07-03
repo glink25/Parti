@@ -1,4 +1,4 @@
-import { CHUNK_HEIGHT, CHUNKS_PER_REGION, WORLD_WIDTH, type Connector, type EnemySpawn, type HazardZone, type PickupSpawn, type Platform, type RegionKind, type TerrainChunk } from './types';
+import { CHUNK_HEIGHT, CHUNKS_PER_REGION, WORLD_WIDTH, type Connector, type EnemySpawn, type HazardZone, type Phase, type PickupSpawn, type Platform, type RegionKind, type TerrainChunk } from './types';
 import { createRandom, scopedSeed, type Random } from './random';
 import { wrappedInterpolate } from './physics';
 
@@ -28,6 +28,9 @@ export function regionKindFor(index: number): RegionKind {
 export function biomeFor(index: number) { return BIOMES[Math.floor(index / CHUNKS_PER_REGION) % BIOMES.length]; }
 export function gateY(gate: number) { return (gate * CHUNKS_PER_REGION - 1) * CHUNK_HEIGHT + 1120; }
 export function gateForChunk(index: number) { return Math.floor(index / CHUNKS_PER_REGION) + 1; }
+export function isBossCeilingActive(chunk: TerrainChunk, phase: Phase, nextGate: number) {
+  return phase === 'boss' && chunk.regionKind === 'boss' && chunk.bossCeilingY != null && gateForChunk(chunk.index) === nextGate;
+}
 export function isBossExitActive(item: Platform, nextGate: number) {
   return item.kind !== 'boss-reveal' || nextGate > gateForChunk(Number(item.id.split(':')[0]));
 }

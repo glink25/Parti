@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canReachPlatform, MAX_ROUTE_RISE } from './physics';
-import { generateChunk, isBossExitActive, platformTransform } from './world';
+import { canReachPlatform, MAX_ROUTE_RISE, MOVE_SPEED, tiltDirectionForAngle } from './physics';
+import { generateChunk, isBossCeilingActive, isBossExitActive, platformTransform } from './world';
 
 describe('skyward world entity placement', () => {
   it('anchors every enemy and pickup to a platform', () => {
@@ -52,6 +52,24 @@ describe('skyward world entity placement', () => {
     expect(exits).toHaveLength(3);
     expect(exits.every((platform) => !isBossExitActive(platform, 1))).toBe(true);
     expect(exits.every((platform) => isBossExitActive(platform, 2))).toBe(true);
+  });
+
+  it('allows players to cross the boss gate before constraining the active arena', () => {
+    const bossChunk = generateChunk(42, 6, 4);
+    expect(isBossCeilingActive(bossChunk, 'running', 1)).toBe(false);
+    expect(isBossCeilingActive(bossChunk, 'boss', 1)).toBe(true);
+    expect(isBossCeilingActive(bossChunk, 'boss', 2)).toBe(false);
+  });
+
+  it('maps device tilt continuously from a dead zone to full movement speed', () => {
+    expect(MOVE_SPEED).toBe(420);
+    expect(tiltDirectionForAngle(3)).toBe(0);
+    expect(tiltDirectionForAngle(-3)).toBe(0);
+    expect(tiltDirectionForAngle(10.5)).toBeCloseTo(.5);
+    expect(tiltDirectionForAngle(-10.5)).toBeCloseTo(-.5);
+    expect(tiltDirectionForAngle(18)).toBe(1);
+    expect(tiltDirectionForAngle(-30)).toBe(-1);
+    expect(tiltDirectionForAngle(Number.NaN)).toBe(0);
   });
 
   it('is deterministic and avoids repeating a route skeleton in the same region kind', () => {
