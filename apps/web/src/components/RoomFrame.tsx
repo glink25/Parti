@@ -4,6 +4,7 @@ import { Maximize2Icon } from 'lucide-react';
 import {
   UISandboxBridge,
   type RoomClientPort,
+  type OrientationStatus,
 } from '@parti/client-sdk';
 import type { RoomPackage } from '@parti/room-packager';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,12 @@ export const ROOM_FRAME_GRID_AREAS = {
 } as const satisfies Record<string, CSSProperties>;
 
 export type RoomFrameGridKey = keyof typeof ROOM_FRAME_GRID_AREAS;
+const NO_SENSORS: readonly string[] = [];
+
+export interface SensorPermissionControl {
+  status: OrientationStatus;
+  requestPermission(): void;
+}
 
 export function RoomFrame({
   pkg,
@@ -40,6 +47,7 @@ export function RoomFrame({
   viewport,
   exitAriaLabelId,
   exitTitleId,
+  onSensorPermissionChange,
 }: {
   pkg: RoomPackage;
   port: RoomClientPort;
@@ -55,13 +63,15 @@ export function RoomFrame({
   viewport?: RoomFrameViewport;
   exitAriaLabelId?: string;
   exitTitleId?: string;
+  onSensorPermissionChange?: (control: SensorPermissionControl | null) => void;
 }) {
   const intl = useIntl();
   const ref = useRef<HTMLIFrameElement>(null);
   const bridgeRef = useRef<UISandboxBridge | null>(null);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showMotionPermission, setShowMotionPermission] = useState(false);
+  const sensors = pkg.manifest.permissions?.sensors ?? NO_SENSORS;
+  const sensorAllow = sensors.length ? sensors.join('; ') : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -83,14 +93,21 @@ export function RoomFrame({
     if (!iframe || !frameUrl) return;
     const bridge = new UISandboxBridge(iframe, port, {
       ...(onLog ? { onLog } : {}),
-      onOrientationHostGestureRequired: () => setShowMotionPermission(true),
+      orientationSensors: sensors,
+      onOrientationStatusChange: (status) => {
+        onSensorPermissionChange?.({
+          status,
+          requestPermission: () => bridgeRef.current?.requestOrientationPermission(),
+        });
+      },
     });
     bridgeRef.current = bridge;
     return () => {
       bridgeRef.current = null;
+      onSensorPermissionChange?.(null);
       bridge.dispose();
     };
-  }, [frameUrl, port, onLog]);
+  }, [frameUrl, port, onLog, onSensorPermissionChange, sensors]);
 
   useEffect(() => {
     if (!fullscreen || !onExitFullscreen) return;
@@ -143,20 +160,6 @@ export function RoomFrame({
           exitTitleId={exitTitleId}
         />
       )}
-      {showMotionPermission && (
-        <Button
-          type="button"
-          size="sm"
-          className="absolute top-3 right-3 z-50 rounded-full shadow-lg"
-          onClick={() => {
-            // Keep this call synchronous: iOS consumes transient activation immediately.
-            bridgeRef.current?.requestOrientationPermission();
-            setShowMotionPermission(false);
-          }}
-        >
-          {intl.formatMessage({ id: 'room.motion.enable', defaultMessage: 'Enable motion controls' })}
-        </Button>
-      )}
       {viewport ? (
         <div
           className={cn(
@@ -170,7 +173,7 @@ export function RoomFrame({
             <iframe
               ref={ref}
               src={frameUrl}
-              allow="accelerometer; gyroscope; magnetometer"
+              allow={sensorAllow}
               title={label}
               className="absolute inset-0 h-full w-full border-0 bg-white"
             />
@@ -179,7 +182,7 @@ export function RoomFrame({
       ) : (
         <>
           {loadError ? <div className="flex flex-1 items-center justify-center p-6 text-sm text-destructive">{loadError}</div> : null}
-          {frameUrl ? <iframe ref={ref} src={frameUrl} title={label} className="w-full flex-1 border-0 bg-white" allow="accelerometer; gyroscope; magnetometer" /> : null}
+          {frameUrl ? <iframe ref={ref} src={frameUrl} title={label} className="w-full flex-1 border-0 bg-white" allow={sensorAllow} /> : null}
         </>
       )}
     </div>

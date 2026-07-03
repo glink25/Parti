@@ -263,6 +263,22 @@
       "sheetTitle": "Share room",
       "sheetDescription": "Copy the link or QR code to invite friends."
     },
+    "sensors": {
+      "eyebrow": "Device permission",
+      "title": "Motion sensors",
+      "enable": "Enable sensors",
+      "enabled": "Enabled",
+      "requesting": "Requesting…",
+      "status": {
+        "unsupported": "This browser or device does not support the motion sensors required by the room.",
+        "needs-permission": "This room uses device tilt controls. Select the button to grant sensor access.",
+        "requesting": "Waiting for the browser permission decision.",
+        "active": "Sensors are enabled and the room can read device orientation.",
+        "denied": "Permission was denied. Allow motion and orientation access in the browser site settings.",
+        "blocked-by-policy": "Sensors are blocked by an insecure connection or the site's permissions policy.",
+        "no-data": "Permission is enabled. Waiting for sensor data from the device."
+      }
+    },
     "fullscreen": {
       "enter": "Fullscreen",
       "enterAria": "View room in fullscreen",

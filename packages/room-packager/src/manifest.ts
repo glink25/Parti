@@ -3,6 +3,7 @@
 export type SyncMode = 'snapshot' | 'patch';
 export type StoragePermission = 'none' | 'session' | 'local';
 export type PackageMode = 'blob' | 'filesystem';
+export type SensorPermission = 'accelerometer' | 'gyroscope' | 'magnetometer';
 
 export interface RoomManifest {
   partiVersion: string;
@@ -36,6 +37,7 @@ export interface RoomManifest {
     camera?: boolean;
     microphone?: boolean;
     clipboard?: boolean;
+    sensors?: SensorPermission[];
   };
   actions?: Record<string, { payload?: string }>;
 }
@@ -66,6 +68,23 @@ export function validateManifest(input: unknown): RoomManifest {
   const entry = m.entry as Record<string, unknown> | undefined;
   if (!entry || typeof entry.ui !== 'string' || typeof entry.worker !== 'string') {
     throw new ManifestError('manifest.entry 必须包含 ui 与 worker');
+  }
+  const permissions = m.permissions as Record<string, unknown> | undefined;
+  if (permissions?.sensors !== undefined) {
+    if (!Array.isArray(permissions.sensors)) {
+      throw new ManifestError('manifest.permissions.sensors 必须是数组');
+    }
+    const allowed = new Set<SensorPermission>(['accelerometer', 'gyroscope', 'magnetometer']);
+    const seen = new Set<string>();
+    for (const sensor of permissions.sensors) {
+      if (typeof sensor !== 'string' || !allowed.has(sensor as SensorPermission)) {
+        throw new ManifestError(`manifest.permissions.sensors 包含未知传感器: ${String(sensor)}`);
+      }
+      if (seen.has(sensor)) {
+        throw new ManifestError(`manifest.permissions.sensors 包含重复项: ${sensor}`);
+      }
+      seen.add(sensor);
+    }
   }
   return m as unknown as RoomManifest;
 }

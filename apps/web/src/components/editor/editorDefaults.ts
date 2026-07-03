@@ -49,6 +49,6 @@ export function blankManifest(locale: AppLocale): string {
     entry: { ui: 'index.html', worker: 'room.worker.js' },
     room: { minPlayers: 1, maxPlayers: 8 },
     sync: { mode: 'snapshot' },
-    permissions: { network: false, storage: 'session' },
+    permissions: { network: false, storage: 'session', sensors: [] },
   }, null, 2);
 }

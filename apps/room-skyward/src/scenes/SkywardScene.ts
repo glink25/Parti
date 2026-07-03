@@ -437,9 +437,10 @@ export class SkywardScene {
       this.drawIcon(ui.icons.fire, fireX - 22, fireY - 28, 44);
       this.centerText('开火', fireX, fireY + 29, 11, ui.colors.text, 800);
       this.uiHits.push({ x: fireX - 58, y: fireY - 58, w: 116, h: 116, action: () => this.shoot() });
-      const controlY = view.y + 18;
-      this.iconButton(view.x + view.w - 52, controlY, 'sound', this.soundEnabled, () => this.toggleSound());
-      if (parti.orientation) this.iconButton(view.x + view.w - 100, controlY, 'tilt', this.tiltEnabled, () => void this.toggleTilt());
+      const controlX = view.x + view.w - 52;
+      const controlY = view.y + 72;
+      this.iconButton(controlX, controlY, 'sound', this.soundEnabled, () => this.toggleSound());
+      if (parti.orientation) this.iconButton(controlX, controlY + 48, 'tilt', this.tiltEnabled, () => void this.toggleTilt());
       const me = this.me()!;
       if (!me.alive && me.respawnAt) this.overlay('正在返回云端', `${Math.max(0, Math.ceil((me.respawnAt - Date.now()) / 1000))} 秒`);
       else if (this.pendingDeath) this.overlay('正在坠入云海', '同步远征状态…');
@@ -557,11 +558,11 @@ export class SkywardScene {
     if (this.soundEnabled) this.sounds.play('sound.select', 0);
   }
 
-  private async toggleTilt() {
+  private toggleTilt() {
     if (!parti.orientation) { this.notify('当前环境不支持重力感应'); return; }
     if (!this.tiltEnabled) {
-      const status = await parti.orientation.requestPermission();
-      if (status !== 'active' && status !== 'no-data') { this.notify('未获得重力感应权限'); return; }
+      const status = parti.orientation.getStatus();
+      if (status !== 'active' && status !== 'no-data') { this.notify('请在更多/分享房间中启用传感器'); return; }
       if (status === 'no-data') this.notify('正在等待传感器数据，触控仍可使用');
     }
     this.tiltEnabled = !this.tiltEnabled; this.tiltDirection = 0; this.tiltNeutral = null;

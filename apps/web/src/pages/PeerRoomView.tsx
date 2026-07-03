@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { Settings2Icon } from 'lucide-react';
 import type { HostRuntime, RoomAdmissionStatus } from '@parti/core';
@@ -6,7 +6,7 @@ import type { RoomClientPort } from '@parti/client-sdk';
 import { createHostLocalPort } from '@parti/client-sdk';
 import { type RoomPackage } from '@parti/room-packager';
 import { InviteQrDialog } from '../components/InviteQrDialog';
-import { RoomFrame } from '../components/RoomFrame';
+import { RoomFrame, type SensorPermissionControl } from '../components/RoomFrame';
 import { DevTools } from '../components/DevTools';
 import {
   createPeerHost,
@@ -133,6 +133,10 @@ function PeerHostSession({
   const [error, setError] = useState<string | null>(null);
   const [replayBusy, setReplayBusy] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
+  const [sensorPermission, setSensorPermission] = useState<SensorPermissionControl | null>(null);
+  const onSensorPermissionChange = useCallback((control: SensorPermissionControl | null) => {
+    setSensorPermission(control);
+  }, []);
   const recordingRef = useRef<ReplayRecordingController | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
   const started = useRef(false);
@@ -391,6 +395,7 @@ function PeerHostSession({
     replayBusy,
     replayError,
     onToggleReplay: toggleReplay,
+    sensorPermission,
   };
 
   return (
@@ -437,6 +442,7 @@ function PeerHostSession({
               onExitFullscreen={() => { setControlsOpen(false); setFullscreen(false); }}
               onFullscreenMore={() => setControlsOpen(true)}
               className={fullscreen ? undefined : 'min-h-[min(68vh,720px)] max-lg:min-h-[58vh] max-md:min-h-[62dvh]'}
+              onSensorPermissionChange={pkg.manifest.permissions?.sensors?.length ? onSensorPermissionChange : undefined}
             />
           </div>
         </div>
@@ -479,6 +485,10 @@ function PeerJoinView({
   const [qrOpen, setQrOpen] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [sensorPermission, setSensorPermission] = useState<SensorPermissionControl | null>(null);
+  const onSensorPermissionChange = useCallback((control: SensorPermissionControl | null) => {
+    setSensorPermission(control);
+  }, []);
   const activeAttempt = useRef('');
   const localUser = loadLocalUser(undefined, locale);
 
@@ -629,6 +639,7 @@ function PeerJoinView({
     replayBusy: false,
     replayError: null,
     onToggleReplay: () => {},
+    sensorPermission,
   };
 
   return (
@@ -643,6 +654,7 @@ function PeerJoinView({
         onFullscreenMore={() => setControlsOpen(true)}
         exitAriaLabelId="peer.join.exitAria"
         exitTitleId="peer.join.exitTitle"
+        onSensorPermissionChange={state.pkg.manifest.permissions?.sensors?.length ? onSensorPermissionChange : undefined}
       />
       <RoomControlsSheet
         open={controlsOpen}

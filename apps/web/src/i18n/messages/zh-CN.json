@@ -263,6 +263,22 @@
       "sheetTitle": "分享房间",
       "sheetDescription": "复制链接或二维码，邀请朋友加入。"
     },
+    "sensors": {
+      "eyebrow": "设备权限",
+      "title": "动作传感器",
+      "enable": "启用传感器",
+      "enabled": "已启用",
+      "requesting": "申请中…",
+      "status": {
+        "unsupported": "当前浏览器或设备不支持房间所需的动作传感器。",
+        "needs-permission": "此房间使用设备倾斜操作。点击按钮授予传感器权限。",
+        "requesting": "正在等待浏览器权限确认。",
+        "active": "传感器已启用，房间可以读取设备方向。",
+        "denied": "权限已被拒绝，请在浏览器的网站设置中允许动作与方向访问。",
+        "blocked-by-policy": "传感器被非 HTTPS 环境或网站权限策略阻止。",
+        "no-data": "权限已启用，正在等待设备传感器数据。"
+      }
+    },
     "fullscreen": {
       "enter": "全屏展示",
       "enterAria": "全屏展示房间",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CircleIcon, CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
+import { ActivityIcon, CircleIcon, CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
 import type { HostRoomSettings } from '@/lib/roomSettings';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ENABLE_REPLAYS } from '@/lib/featureFlags';
 import type { TransportConfig } from '@/lib/transportConfig';
+import type { SensorPermissionControl } from '@/components/RoomFrame';
 
 export type RoomControlsProps = {
   settings: HostRoomSettings;
@@ -36,7 +37,37 @@ export type RoomControlsProps = {
   replayBusy: boolean;
   replayError: string | null;
   onToggleReplay: () => void;
+  sensorPermission?: SensorPermissionControl | null;
 };
+
+function SensorPermissionCard({ control }: { control: SensorPermissionControl }) {
+  const canRequest = control.status === 'needs-permission';
+  const enabled = control.status === 'active' || control.status === 'no-data';
+  return (
+    <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
+      <CardHeader>
+        <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">
+          <FormattedMessage id="peer.sensors.eyebrow" />
+        </span>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <ActivityIcon className="size-4" />
+          <FormattedMessage id="peer.sensors.title" />
+        </CardTitle>
+        <CardDescription><FormattedMessage id={`peer.sensors.status.${control.status}`} /></CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button
+          type="button"
+          variant={enabled ? 'outline' : 'default'}
+          disabled={!canRequest}
+          onClick={control.requestPermission}
+        >
+          <FormattedMessage id={enabled ? 'peer.sensors.enabled' : control.status === 'requesting' ? 'peer.sensors.requesting' : 'peer.sensors.enable'} />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControlsProps; showAdmissionStatus?: boolean }) {
   const { settings, admission, inviteUrl, copied, transportConfig, onCopyInvite, onOpenQr } = props;
@@ -160,6 +191,7 @@ function ControlsContent({ props, showSettings = true, showAdmissionStatus = tru
   return (
     <>
       <InviteCard props={props} showAdmissionStatus={showAdmissionStatus} />
+      {props.sensorPermission && <SensorPermissionCard control={props.sensorPermission} />}
       {showSettings && <SettingsCard props={props} />}
     </>
   );

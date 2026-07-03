@@ -22,23 +22,30 @@ class HostOrientationController {
   constructor(
     private readonly emit: (msg: HostToUi) => void,
     private readonly needsHostGesture: () => void,
+    private readonly sensors: readonly string[],
+    private readonly onStatusChange?: (status: OrientationStatus) => void,
   ) {
     this.status = this.detectInitialStatus();
-    if (this.status === 'no-data') this.startListening();
+    this.onStatusChange?.(this.status);
   }
 
   announce(): void { this.emit({ __parti: true, type: 'orientation-status', status: this.status }); }
 
-  request(requestId: number, hostGesture = false): void {
+  request(requestId?: number, hostGesture = false): void {
     if (this.status === 'unsupported' || this.status === 'blocked-by-policy') {
       this.emitStatus(this.status, requestId);
       return;
     }
     const Orientation = window.DeviceOrientationEvent as OrientationEventConstructor | undefined;
     const requestPermission = Orientation?.requestPermission;
-    if (!requestPermission) {
+    if (this.status === 'active' || this.status === 'no-data') {
       this.startListening();
       this.emitStatus(this.status, requestId);
+      return;
+    }
+    if (!requestPermission) {
+      this.startListening();
+      this.emitStatus('no-data', requestId);
       return;
     }
     if (!hostGesture && !navigator.userActivation?.isActive) {
@@ -59,10 +66,11 @@ class HostOrientationController {
   }
 
   requestFromHostGesture(): void {
-    if (this.pendingRequestId !== undefined) this.request(this.pendingRequestId, true);
+    this.request(this.pendingRequestId, true);
   }
 
   private detectInitialStatus(): OrientationStatus {
+    if (this.sensors.length === 0) return 'unsupported';
     if (!window.isSecureContext) return 'blocked-by-policy';
     if (!('DeviceOrientationEvent' in window)) return 'unsupported';
     const policy = document as Document & {
@@ -70,9 +78,8 @@ class HostOrientationController {
       featurePolicy?: { allowsFeature(feature: string): boolean };
     };
     const permissions = policy.permissionsPolicy ?? policy.featurePolicy;
-    if (permissions && !permissions.allowsFeature('gyroscope')) return 'blocked-by-policy';
-    const Orientation = window.DeviceOrientationEvent as OrientationEventConstructor;
-    return Orientation.requestPermission ? 'needs-permission' : 'no-data';
+    if (permissions && this.sensors.some((sensor) => !permissions.allowsFeature(sensor))) return 'blocked-by-policy';
+    return 'needs-permission';
   }
 
   private startListening(): void {
@@ -116,6 +123,7 @@ class HostOrientationController {
   private emitStatus(status: OrientationStatus, requestId?: number): void {
     const changed = status !== this.status;
     this.status = status;
+    if (changed) this.onStatusChange?.(status);
     if (changed || requestId !== undefined) {
       this.emit({ __parti: true, type: 'orientation-status', status, ...(requestId === undefined ? {} : { requestId }) });
     }
@@ -145,6 +153,8 @@ export interface RoomClientPort {
 
 export interface UISandboxBridgeOptions {
   onLog?: (args: unknown[]) => void;
+  orientationSensors?: readonly string[];
+  onOrientationStatusChange?: (status: OrientationStatus) => void;
   /** iframe 的点击无法把 transient activation 传给 Safari 时，请宿主显示真实按钮。 */
   onOrientationHostGestureRequired?: () => void;
 }
@@ -170,6 +180,8 @@ export class UISandboxBridge {
     this.orientation = new HostOrientationController(
       (msg) => this.post(msg),
       () => this.opts.onOrientationHostGestureRequired?.(),
+      this.opts.orientationSensors ?? [],
+      this.opts.onOrientationStatusChange,
     );
 
     this.messageListener = (e: MessageEvent) => this.onMessage(e);

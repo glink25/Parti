@@ -17,7 +17,8 @@
     "storage": "session",
     "camera": false,
     "microphone": false,
-    "clipboard": false
+    "clipboard": false,
+    "sensors": ["accelerometer", "gyroscope"]
   },
   "actions": {
     "setReady": { "payload": "{ ready: boolean }" },
