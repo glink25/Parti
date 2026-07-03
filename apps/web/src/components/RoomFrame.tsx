@@ -149,7 +149,6 @@ export function RoomFrame({
             <iframe
               ref={ref}
               src={frameUrl}
-              sandbox="allow-scripts allow-same-origin"
               title={label}
               className="absolute inset-0 h-full w-full border-0 bg-white"
             />
