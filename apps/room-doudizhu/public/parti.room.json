@@ -6,7 +6,9 @@
   "version": "0.1.0",
   "packageMode": "filesystem",
   "description": "三人联机斗地主：准备、叫地主、完整出牌校验和实时累计计分。",
+  "cover": "cover.png",
   "author": { "name": "Parti" },
+  "_template_order": 90,
   "entry": {
     "ui": "index.html",
     "worker": "worker.js"

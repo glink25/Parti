@@ -7,9 +7,9 @@ export const PLAYER_RADIUS = 34;
 export type Phase = 'lobby' | 'running' | 'boss' | 'gameover';
 export type RegionKind = 'normal' | 'cooperative' | 'boss';
 
-export type Platform = { id: string; x: number; y: number; width: number; kind: 'normal' | 'relay-trigger' | 'relay-bridge' | 'gate' };
-export type EnemySpawn = { id: string; x: number; y: number; kind: 'drifter' | 'spike' };
-export type PickupSpawn = { id: string; x: number; y: number; kind: 'rapid' | 'spread' | 'power' | 'team-shield' };
+export type Platform = { id: string; x: number; y: number; width: number; kind: 'normal' | 'relay-trigger' | 'relay-bridge' | 'gate' | 'boss-exit' };
+export type EnemySpawn = { id: string; platformId: string; x: number; y: number; kind: 'drifter' | 'spike' };
+export type PickupSpawn = { id: string; platformId: string; x: number; y: number; kind: 'rapid' | 'spread' | 'power' | 'team-shield' };
 export type Connector = { minX: number; maxX: number; minY: number; maxY: number; wrap: true };
 
 export type TerrainChunk = {
@@ -22,6 +22,7 @@ export type TerrainChunk = {
   entry: Connector;
   exit: Connector;
   platforms: Platform[];
+  route: string[];
   enemies: EnemySpawn[];
   pickups: PickupSpawn[];
 };

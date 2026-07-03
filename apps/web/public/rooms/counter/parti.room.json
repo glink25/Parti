@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "packageMode": "blob",
   "description": "一个简单的多人计数器，验证 action / snapshot / broadcast。",
+  "cover": "cover.png",
   "author": { "name": "Parti" },
   "entry": {
     "ui": "index.html",

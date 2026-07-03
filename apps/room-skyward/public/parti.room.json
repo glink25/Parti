@@ -6,6 +6,8 @@
   "version": "0.1.0",
   "packageMode": "filesystem",
   "description": "跳跃，合作，疯狂！",
+  "cover": "assets/skyward/cover.png",
+  "_template_order": 100,
   "author": { "name": "Parti" },
   "entry": { "ui": "index.html", "worker": "worker.js" },
   "room": { "minPlayers": 1, "maxPlayers": 4 },

@@ -12,3 +12,5 @@ apps/web/public/rooms/room-*
 .agents
 skills-lock.json
 supabase
+dev-only
+.tinify_api_key

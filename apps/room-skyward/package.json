@@ -6,6 +6,7 @@
   "scripts": {
     "dev:room": "vite build --watch --mode room-dev",
     "build:room": "vite build --mode room-build",
+    "test": "vitest run src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

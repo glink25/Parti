@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "packageMode": "blob",
   "description": "实时多人文字聊天，支持加入/离开系统提示与消息历史同步。",
+  "cover": "cover.png",
   "author": { "name": "Parti" },
   "entry": {
     "ui": "index.html",

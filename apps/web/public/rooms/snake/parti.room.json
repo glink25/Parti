@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "packageMode": "blob",
   "description": "极简多人贪吃蛇：实时移动、吃食物变长、撞墙撞身后重生，累计得分排行。",
+  "cover": "cover.png",
   "author": { "name": "Parti" },
   "entry": { "ui": "index.html", "worker": "room.worker.js" },
   "room": { "minPlayers": 1, "maxPlayers": 8 },

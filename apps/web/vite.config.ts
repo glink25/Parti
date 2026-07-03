@@ -17,9 +17,11 @@ function roomRegistryPlugin(): Plugin {
 
   function readRegistry(): string {
     const dirs = fs.existsSync(roomsDir)
-      ? fs.readdirSync(roomsDir, { withFileTypes: true }).filter((e) => e.isDirectory())
+      ? fs.readdirSync(roomsDir, { withFileTypes: true })
+          .filter((e) => e.isDirectory())
+          .sort((a, b) => a.name.localeCompare(b.name))
       : [];
-    const entries = dirs.flatMap((entry) => {
+    const entries = dirs.flatMap((entry, defaultOrderIndex) => {
       const manifestPath = path.join(roomsDir, entry.name, 'parti.room.json');
       if (!fs.existsSync(manifestPath)) return [];
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -32,7 +34,7 @@ function roomRegistryPlugin(): Plugin {
         }
       };
       collect(path.dirname(manifestPath));
-      return [{ dir: entry.name, manifest, files: files.sort() }];
+      return [{ dir: entry.name, manifest, files: files.sort(), defaultOrderIndex }];
     });
     return `export const rooms = ${JSON.stringify(entries)};`;
   }

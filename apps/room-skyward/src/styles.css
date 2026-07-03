@@ -5,7 +5,7 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #07131f;
+  background: radial-gradient(circle at 50% 25%, #244b68 0%, #0c2033 48%, #07131f 100%);
 }
 
 body {
@@ -17,4 +17,8 @@ body {
   user-select: none;
 }
 
-#game canvas { display: block; touch-action: none; }
+#game canvas {
+  display: block;
+  touch-action: none;
+  filter: saturate(1.06) contrast(1.02);
+}
