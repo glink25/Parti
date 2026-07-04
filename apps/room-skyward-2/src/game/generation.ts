@@ -1,72 +1,23 @@
-import { BOSS_INTERVAL, CHUNK_HEIGHT, WORLD_WIDTH, type Chunk, type GenerationContext, type Platform } from './contracts';
+import { BOSS_INTERVAL, CHUNK_HEIGHT, WORLD_WIDTH, type Chunk, type ChunkRecipe, type DifficultyAxes, type DynamicEntityState, type GenerationContext, type Platform, type RuntimeContext } from './contracts';
 import { createRandom, scopedSeed } from './random';
-import { biomeForChunk, encounterStrategies, makeBridge, stormWarden, weightedPlatform } from '../content';
+import { biomeForChunk, bossForContext, encounterStrategies, platformStrategies, weightedFromPool } from '../content';
 import { canReachPlatform, MAX_ROUTE_RISE, wrapX } from '../runtime/physics';
 
 export function difficultyFor(index: number) { return Math.min(10, Math.floor(index / 3)); }
+export function difficultyAxesFor(index: number): DifficultyAxes { return { sparsity: Math.min(1, index / 45), hazardRate: Math.min(.75, .12 + index * .012), enemyDensity: Math.min(1, .18 + index * .022), enemyStrength: Math.min(1, index / 55), bossLevel: Math.min(5, 1 + Math.floor(index / 20)) }; }
 export function boundaryX(seed: number, boundary: number) { return boundary === 0 ? WORLD_WIDTH / 2 : createRandom(scopedSeed(seed, boundary, 'boundary')).int(130, WORLD_WIDTH - 130); }
 export function isBossChunk(index: number) { return index > 0 && (index + 1) % BOSS_INTERVAL === 0; }
-export function contextFor(seed: number, chunkIndex: number, players: number): GenerationContext {
-  return { seed, chunkIndex, players, difficulty: difficultyFor(chunkIndex), biome: biomeForChunk(chunkIndex), rng(channel) { return createRandom(scopedSeed(seed, chunkIndex, channel)); } };
-}
+export function bossOrdinalForChunk(index: number) { return Math.floor((index + 1) / BOSS_INTERVAL); }
+export function contextFor(seed: number, chunkIndex: number, players: number): GenerationContext { return { seed, chunkIndex, players, difficulty: difficultyFor(chunkIndex), difficultyAxes: difficultyAxesFor(chunkIndex), biome: biomeForChunk(chunkIndex), rng(channel) { return createRandom(scopedSeed(seed, chunkIndex, channel)); } }; }
+export function runtimeContext(context: GenerationContext, startedAt: number, now: number): RuntimeContext { return { ...context, startedAt, now }; }
 
+function recipeFor(context: GenerationContext): ChunkRecipe { if (isBossChunk(context.chunkIndex)) return 'boss'; if ((context.chunkIndex + 2) % BOSS_INTERVAL === 0) return 'boss-buffer'; const r = context.rng('recipe').float(); return r < .14 ? 'reward' : r < .31 ? 'danger' : r < .45 ? 'mechanism' : 'normal'; }
 function platform(id: string, x: number, y: number, width: number, optional = false): Platform { return { id, kind: 'normal', x: wrapX(x), y, width, optional }; }
+function generateRoute(context: GenerationContext, entryX: number, exitX: number) { const base = context.chunkIndex * CHUNK_HEIGHT, rng = context.rng('route'); const result = [platform(`${context.chunkIndex}:route:0`, entryX, base + 70, 250)]; let step = 1; while (result.at(-1)!.y < base + CHUNK_HEIGHT - MAX_ROUTE_RISE - 30) { const previous = result.at(-1)!; let next: Platform | null = null; for (let attempt = 0; attempt < 12 && !next; attempt += 1) { const min = 60 + Math.round(context.difficultyAxes.sparsity * 35), max = 125 + Math.round(context.difficultyAxes.sparsity * 95), remaining = base + CHUNK_HEIGHT - 70 - previous.y, rise = Math.min(rng.int(min, max), remaining), pull = (exitX - previous.x) * Math.min(.35, rise / Math.max(1, remaining)); const candidate = platform(`${context.chunkIndex}:route:${step}`, previous.x + pull + rng.int(-270, 270), previous.y + rise, rng.int(145, 235)); if (canReachPlatform(previous, candidate)) next = candidate; } if (!next) next = platform(`${context.chunkIndex}:route:${step}`, previous.x + Math.sign(exitX - previous.x) * 70, previous.y + Math.min(base + CHUNK_HEIGHT - 70 - previous.y, MAX_ROUTE_RISE, 95 + context.difficulty * 12), 220); result.push(next); step += 1; } const last = result.at(-1)!, exit = platform(`${context.chunkIndex}:route:${step}`, exitX, base + CHUNK_HEIGHT - 70, 250); if (!canReachPlatform(last, exit)) exit.x = last.x; result.push(exit); return result; }
+function generateOptional(context: GenerationContext, route: Platform[], recipe: ChunkRecipe) { const rng = context.rng('optional'), result: Platform[] = [], count = Math.min(8, 4 + Math.floor(context.difficulty / 2)); for (let i = 0; i < count; i += 1) { const anchor = route[rng.int(1, Math.max(1, route.length - 2))]!, base = platform(`${context.chunkIndex}:optional:${i}`, anchor.x + (rng.float() < .5 ? -1 : 1) * rng.int(170, 280), anchor.y + rng.int(-20, 100), rng.int(115, 180), true); const pool = context.biome.content.platforms.filter((x) => recipe !== 'mechanism' || x.id === 'trigger' || x.id === 'spring'); const id = weightedFromPool(pool.length ? pool : context.biome.content.platforms, context.rng(`platform-kind:${i}`).float()); const item = platformStrategies.require(id).generate({ ...base, rewardMultiplier: recipe === 'danger' ? 1.75 : 1 }, context, i); result.push(item); const trigger = item.config?.trigger; if (trigger) trigger.outputs.forEach((outputId, n) => result.push({ id: outputId, kind: 'bridge', x: wrapX(item.x + 190 + n * 145), y: item.y + 100 + n * 55, width: 170, optional: true, rewardMultiplier: item.rewardMultiplier })); } return result; }
 
-function generateRoute(context: GenerationContext, entryX: number, exitX: number) {
-  const base = context.chunkIndex * CHUNK_HEIGHT; const rng = context.rng('route');
-  const result = [platform(`${context.chunkIndex}:route:0`, entryX, base + 70, 250)];
-  let step = 1;
-  while (result.at(-1)!.y < base + CHUNK_HEIGHT - MAX_ROUTE_RISE - 30) {
-    const previous = result.at(-1)!; let next: Platform | null = null;
-    for (let attempt = 0; attempt < 12 && !next; attempt += 1) {
-      const minimumRise = 60 + Math.round(context.difficulty * 6);
-      const maximumRise = 125 + Math.round(context.difficulty * 9);
-      const remaining = base + CHUNK_HEIGHT - 70 - previous.y; const rise = Math.min(rng.int(minimumRise, maximumRise), remaining);
-      const pull = (exitX - previous.x) * Math.min(.35, rise / Math.max(1, remaining));
-      const candidate = platform(`${context.chunkIndex}:route:${step}`, previous.x + pull + rng.int(-270, 270), previous.y + rise, rng.int(145, 235));
-      if (canReachPlatform(previous, candidate)) next = candidate;
-    }
-    if (!next) next = platform(`${context.chunkIndex}:route:${step}`, previous.x + Math.sign(exitX - previous.x) * 70, previous.y + Math.min(base + CHUNK_HEIGHT - 70 - previous.y, MAX_ROUTE_RISE, 95 + context.difficulty * 12), 220);
-    result.push(next); step += 1;
-  }
-  const last = result.at(-1)!; const exit = platform(`${context.chunkIndex}:route:${step}`, exitX, base + CHUNK_HEIGHT - 70, 250);
-  if (!canReachPlatform(last, exit)) {
-    const bridge = platform(`${context.chunkIndex}:route:${step}`, wrapX(last.x + (exitX - last.x) * .5), Math.min(exit.y - 140, last.y + 180), 220);
-    if (canReachPlatform(last, bridge) && canReachPlatform(bridge, exit)) { result.push(bridge); step += 1; exit.id = `${context.chunkIndex}:route:${step}`; }
-    else exit.x = last.x;
-  }
-  result.push(exit); return result;
-}
-
-function generateOptional(context: GenerationContext, route: Platform[]) {
-  const rng = context.rng('optional'); const result: Platform[] = []; const count = Math.min(8, 4 + Math.floor(context.difficulty / 2));
-  for (let i = 0; i < count; i += 1) {
-    const anchor = route[rng.int(1, Math.max(1, route.length - 2))]!;
-    const base = platform(`${context.chunkIndex}:optional:${i}`, anchor.x + (rng.float() < .5 ? -1 : 1) * rng.int(170, 280), anchor.y + rng.int(-20, 100), rng.int(115, 180), true);
-    const item = weightedPlatform(context, i).apply(base, context, i); result.push(item);
-    if (item.kind === 'trigger') result.push(makeBridge(item));
-  }
-  return result;
-}
-
-export function generateChunk(seed: number, index: number, players: number): Chunk {
-  const context = contextFor(seed, index, players); const entryX = boundaryX(seed, index); const exitX = boundaryX(seed, index + 1);
-  if (isBossChunk(index)) {
-    const platforms = stormWarden.arenaPlatforms(context); const boss = stormWarden.create(context, 0, null);
-    return { index, biomeId: context.biome.id, baseY: index * CHUNK_HEIGHT, difficulty: context.difficulty, boss: true, entryX, exitX, route: platforms.map((p) => p.id), platforms, enemies: [boss], pickups: [] };
-  }
-  const route = generateRoute(context, entryX, exitX); const optional = generateOptional(context, route); const encounter = encounterStrategies.require('mixed').populate(context, route, optional);
-  return { index, biomeId: context.biome.id, baseY: index * CHUNK_HEIGHT, difficulty: context.difficulty, boss: false, entryX, exitX, route: route.map((p) => p.id), platforms: [...route, ...optional], ...encounter };
-}
-
-export function findEntity(seed: number, players: number, id: string) {
-  const index = Number(id.split(':')[0]); if (!Number.isInteger(index) || index < 0) return null;
-  const chunk = generateChunk(seed, index, players);
-  return chunk.platforms.find((x) => x.id === id) ?? chunk.enemies.find((x) => x.id === id) ?? chunk.pickups.find((x) => x.id === id) ?? null;
-}
-
-export function platformActive(platform: Platform, state: Record<string, { disabledUntil?: number; activatedUntil?: number }>, now: number, bossDefeated: boolean) {
-  if (platform.kind === 'boss-exit') return bossDefeated;
-  if (platform.kind === 'bridge') return (state[platform.id]?.activatedUntil ?? 0) > now;
-  return (state[platform.id]?.disabledUntil ?? 0) <= now;
-}
+export function generateChunk(seed: number, index: number, players: number): Chunk { const context = contextFor(seed, index, players), recipe = recipeFor(context), entryX = boundaryX(seed, index), exitX = boundaryX(seed, index + 1); if (recipe === 'boss') { const strategy = bossForContext(context), platforms = strategy.arenaPlatforms(context), boss = strategy.create(context, 0, null); return { index, biomeId: context.biome.id, baseY: index * CHUNK_HEIGHT, difficulty: context.difficulty, difficultyAxes: context.difficultyAxes, recipe, boss: true, entryX, exitX, route: platforms.map((p) => p.id), platforms, enemies: [boss], pickups: [] }; } const route = generateRoute(context, entryX, exitX), optional = generateOptional(context, route, recipe), encounter = recipe === 'boss-buffer' ? { enemies: [], pickups: [] } : encounterStrategies.require('mixed').populate(context, route, optional); return { index, biomeId: context.biome.id, baseY: index * CHUNK_HEIGHT, difficulty: context.difficulty, difficultyAxes: context.difficultyAxes, recipe, boss: false, entryX, exitX, route: route.map((p) => p.id), platforms: [...route, ...optional], ...encounter }; }
+export function findEntity(seed: number, players: number, id: string) { const index = Number(id.split(':')[0]); if (!Number.isInteger(index) || index < 0) return null; const chunk = generateChunk(seed, index, players); return chunk.platforms.find((x) => x.id === id) ?? chunk.enemies.find((x) => x.id === id) ?? chunk.pickups.find((x) => x.id === id) ?? null; }
+export function transitionedState(platform: Platform, state: DynamicEntityState | undefined, context: RuntimeContext) { return platformStrategies.require(platform.kind).transition(platform, context, state); }
+export function platformActive(platform: Platform, state: Record<string, DynamicEntityState>, context: RuntimeContext, bossDefeated: boolean) { if (platform.kind === 'boss-exit') return bossDefeated; const current = transitionedState(platform, state[platform.id], context); if (platform.kind === 'bridge') return current?.kind === 'platform' && current.phase === 'active' && (current.until == null || current.until > context.now); return current?.kind !== 'platform' || current.phase === 'active' || current.phase === 'warning'; }
+export function platformPosition(platform: Platform, context: RuntimeContext) { const m = platform.config?.movement; if (!m) return { x: platform.x, y: platform.y }; const elapsed = Math.max(0, context.now - context.startedAt - (m.delayMs ?? 0)); if (!elapsed) return { x: platform.x, y: platform.y }; const travel = Math.max(1, m.periodMs - (m.pauseMs ?? 0) * 2), within = elapsed % m.periodMs; const normalized = within < (m.pauseMs ?? 0) ? 0 : within > travel + (m.pauseMs ?? 0) ? 1 : (within - (m.pauseMs ?? 0)) / travel; const offset = Math.sin(normalized * Math.PI * 2 + m.phase * Math.PI * 2) * m.range; if (m.axis === 'y') return { x: platform.x, y: platform.y + offset }; if (m.axis === 'path' && m.path?.length === 2) return { x: platform.x + (m.path[1]!.x - m.path[0]!.x) * ((Math.sin(normalized * Math.PI * 2 + m.phase * Math.PI * 2) + 1) / 2), y: platform.y + (m.path[1]!.y - m.path[0]!.y) * ((Math.sin(normalized * Math.PI * 2 + m.phase * Math.PI * 2) + 1) / 2) }; return { x: Math.max(0, Math.min(WORLD_WIDTH, platform.x + offset)), y: platform.y }; }
