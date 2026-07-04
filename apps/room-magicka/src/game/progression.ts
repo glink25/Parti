@@ -1,7 +1,7 @@
 import type { MapManifest,StageProgress } from './contracts';
 
 export function createStageProgress(map:MapManifest,index:number):StageProgress{
- const distances=roomDistances(map,'room-0'),ranked=map.rooms.slice(1).sort((a,b)=>(distances.get(b.id)??0)-(distances.get(a.id)??0)||a.id.localeCompare(b.id)),bossRoom=ranked[0]!,objectiveRooms=ranked.slice(1,4),kinds=['elite','altar','puzzle'] as const;
+ const distances=roomDistances(map,'room-0'),ranked=map.rooms.slice(1).sort((a,b)=>(distances.get(b.id)??0)-(distances.get(a.id)??0)||a.id.localeCompare(b.id)),large=ranked.filter(room=>room.gridWidth*room.gridHeight>1),bossRoom=large[0]??ranked[0]!,used=new Set([bossRoom.id]),take=(preferLarge:boolean)=>{const room=(preferLarge?large:ranked).find(candidate=>!used.has(candidate.id))??ranked.find(candidate=>!used.has(candidate.id))!;used.add(room.id);return room;},objectiveRooms=[take(true),take(true),take(false)],kinds=['elite','altar','puzzle'] as const;
  return{index,requiredSigils:2,objectives:objectiveRooms.map((room,i)=>({id:`objective-${index}-${kinds[i]}`,roomId:room.id,kind:kinds[i]!,status:'dormant',progress:0,target:kinds[i]==='altar'?2:kinds[i]==='puzzle'?3:1,startedAt:null})),boss:{roomId:bossRoom.id,status:'locked',enemyId:null,phase:0,nextMechanicAt:0},portal:null};
 }
 

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=6, WORLD_WIDTH=4800, WORLD_HEIGHT=3360, HUD_HEIGHT=118, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=7, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, HUD_HEIGHT=118, ELEMENT_SLOTS=4;
 export type Point={x:number;y:number};
 export type Element='rock'|'fire'|'ice'|'life'|'lightning'|'water'|'shield';
 export const ELEMENTS:readonly Element[]=['rock','fire','ice','life','lightning','water','shield'];
@@ -35,7 +35,8 @@ export type EnemyAttackState={kind:EnemyAttackKind;targetId:string;startedAt:num
 export type EnemyState={id:string;roomId:string;kind:EnemyKind;x:number;y:number;hp:number;maxHp:number;radius:number;targetId:string|null;nextAttackAt:number;attack:EnemyAttackState|null;statuses:StatusInstance[];controls:ControlState;flashUntil:number;revision:number};
 export type HostProjectile={id:string;roomId:string;kind:'bolt'|'water-bolt';sourceId:string;x:number;y:number;vx:number;vy:number;radius:number;damage:number;expiresAt:number;control?:ControlEffect};
 export type EnvironmentState={id:string;kind:'rain'|'steam';x:number;y:number;radius:number;startedAt:number;endsAt:number};
-export type MapRoom={id:string;gridX:number;gridY:number;x:number;y:number;width:number;height:number;connections:string[]};
+export type RoomTemplateKind='standard'|'wide'|'tall';
+export type MapRoom={id:string;gridX:number;gridY:number;gridWidth:number;gridHeight:number;templateKind:RoomTemplateKind;x:number;y:number;width:number;height:number;connections:string[]};
 export type MapCorridor={id:string;fromRoomId:string;toRoomId:string;x:number;y:number;width:number;height:number};
 export type MapManifest={generationVersion:number;seed:number;width:number;height:number;spawn:Point;rooms:MapRoom[];corridors:MapCorridor[]};
 export type EncounterKind='roaming'|'sealed';
