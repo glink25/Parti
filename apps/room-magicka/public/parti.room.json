@@ -1,0 +1,24 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "room-magicka",
+  "name": "元素训练场",
+  "version": "0.1.0",
+  "packageMode": "filesystem",
+  "description": "组合七种元素，在无尽训练场中测试法术反应",
+  "_template_order": 102,
+  "author": { "name": "Parti" },
+  "entry": { "ui": "index.html", "worker": "worker.js" },
+  "room": { "minPlayers": 1, "maxPlayers": 4 },
+  "sync": { "mode": "snapshot" },
+  "permissions": { "network": false, "storage": "session", "camera": false, "microphone": false, "clipboard": false, "sensors": [] },
+  "actions": {
+    "setReady": { "payload": "{ ready: boolean }" },
+    "restart": {},
+    "publishPlayer": { "payload": "PlayerReport" },
+    "syncWorld": { "payload": "HostWorldReport" },
+    "reportEnemyDamage": { "payload": "EnemyDamageReport" },
+    "reportPlayerEffect": { "payload": "PlayerEffectReport" },
+    "reportEnvironment": { "payload": "EnvironmentState" }
+  }
+}
