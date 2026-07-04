@@ -15,6 +15,7 @@
   "actions": {
     "setReady": { "payload": "{ ready: boolean }" },
     "restart": {},
+    "advanceStage": {},
     "exploreRoom": { "payload": "{ roomId: string }" },
     "publishPlayer": { "payload": "PlayerReport" },
     "syncWorld": { "payload": "HostWorldReport" },
