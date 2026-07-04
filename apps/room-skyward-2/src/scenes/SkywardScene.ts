@@ -22,7 +22,7 @@ export class SkywardScene {
 
   init() {
     this.disposers.push(
-      parti.onState((state) => this.receiveState(state as GameState)),
+      parti.onState((state) => { if (state) this.receiveState(state as GameState); }),
       parti.onEvent('skyward2:shot', (raw) => { const shot = raw as { shotId: string; playerId: string; x: number; y: number }; if (shot.playerId !== parti.playerId) this.bullets.push({ id: shot.shotId, x: shot.x, y: shot.y + 30, vy: 1050, life: 1.6, cosmetic: true }); }),
       parti.onEvent('skyward2:pose', (raw) => this.receivePose(raw as PosePacket)),
       parti.onEvent('skyward2:pickup', (raw) => this.notify(`${this.playerName((raw as { playerId: string }).playerId)} 获得 ${(raw as { kind: string }).kind}`)),
@@ -91,16 +91,16 @@ export class SkywardScene {
 
   render() {
     const c = mainContext, width = mainCanvas.width / this.pixelRatio, height = mainCanvas.height / this.pixelRatio; c.save(); c.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0); c.clearRect(0, 0, width, height); c.fillStyle = '#070b14'; c.fillRect(0, 0, width, height); this.hits = [];
-    c.save(); c.beginPath(); c.rect(this.viewport.x, this.viewport.y, this.viewport.w, this.viewport.h); c.clip(); this.drawWorld(); c.restore(); this.drawHud(width, height);
+    c.save(); c.beginPath(); c.rect(this.viewport.x, this.viewport.y, this.viewport.w, this.viewport.h); c.clip(); if (this.state) this.drawWorld(); c.restore(); this.drawHud(width, height);
     if (!this.state) this.overlay(width, height, '连接房间中', ''); else if (this.state.phase === 'lobby') this.drawLobby(width, height); else if (this.state.phase === 'gameover') this.drawGameOver(width, height);
     if (performance.now() < this.flashUntil) { c.fillStyle = 'rgba(0,0,0,.75)'; c.fillRect(width / 2 - 180, 76, 360, 42); this.text(this.flash, width / 2, 97, 16, '#fff', 'center'); } c.restore();
   }
   private drawWorld() {
-    const c = mainContext, biome = biomeForChunk(Math.max(0, Math.floor(this.local.viewBottom / CHUNK_HEIGHT))); c.fillStyle = biome.background; c.fillRect(this.viewport.x, this.viewport.y, this.viewport.w, this.viewport.h);
+    const state = this.state; if (!state) return; const c = mainContext, biome = biomeForChunk(Math.max(0, Math.floor(this.local.viewBottom / CHUNK_HEIGHT))); c.fillStyle = biome.background; c.fillRect(this.viewport.x, this.viewport.y, this.viewport.w, this.viewport.h);
     for (const p of this.platforms()) this.drawPlatform(p, biome.platform); for (const p of this.pickups()) this.drawPickup(p); for (const e of this.enemies()) this.drawEnemy(e); for (const a of this.activeBoss()?.attacks ?? []) this.drawAttack(a);
     for (const p of Object.values(this.state?.players ?? {})) if (p.id !== parti.playerId && p.connected) { const v = this.remote[p.id] ?? p; this.drawPlayer(v.x, v.y, '#76a9ff', p.name); }
     if (this.me()?.alive && this.local.alive) this.drawPlayer(this.local.x, this.local.y, '#fff176', 'YOU'); for (const b of this.bullets) { const s = this.toScreen(b.x, b.y); c.fillStyle = b.cosmetic ? '#7db6ff' : '#fff'; c.fillRect(s.x - 4, s.y - 12, 8, 24); }
-    if ((this.state?.teamVoidY ?? 0) > this.local.viewBottom - 60) { const y = this.toScreen(0, this.state!.teamVoidY).y; c.fillStyle = 'rgba(220,40,80,.25)'; c.fillRect(this.viewport.x, y, this.viewport.w, this.viewport.y + this.viewport.h - y); }
+    if (state.teamVoidY > this.local.viewBottom - 60) { const y = this.toScreen(0, state.teamVoidY).y; c.fillStyle = 'rgba(220,40,80,.25)'; c.fillRect(this.viewport.x, y, this.viewport.w, this.viewport.y + this.viewport.h - y); }
   }
   private drawPlatform(p: Platform, fallback: string) { const c = mainContext, s = this.toScreen(p.x, p.y), w = p.width * this.viewport.scale, h = 20 * this.viewport.scale, description = platformStrategies.require(p.kind).render(p, this.runtime(Number(p.id.split(':')[0])), this.state?.entities[p.id]); if (description.hidden) return; c.fillStyle = description.warning ? '#fff36b' : description.color || fallback; c.fillRect(s.x - w / 2, s.y - h / 2, w, h); if (description.spikeRange) { c.fillStyle = '#fff'; const left = s.x - w / 2 + w * description.spikeRange[0], right = s.x - w / 2 + w * description.spikeRange[1]; for (let x = left; x < right; x += 18 * this.viewport.scale) { c.beginPath(); c.moveTo(x, s.y - h / 2); c.lineTo(x + 9 * this.viewport.scale, s.y - h / 2 - 18 * this.viewport.scale); c.lineTo(x + 18 * this.viewport.scale, s.y - h / 2); c.fill(); } } this.label(description.label, s.x, s.y + 13 * this.viewport.scale); }
   private drawEnemy(e: Enemy) { const c = mainContext, s = this.toScreen(e.x, e.y), r = e.radius * this.viewport.scale; c.strokeStyle = e.boss ? '#ff5d73' : e.kind === 'floater' ? '#66e2ff' : '#ff9c5a'; c.lineWidth = 4; c.strokeRect(s.x - r, s.y - r, r * 2, r * 2); this.label(`${e.kind} ${e.hp}`, s.x, s.y); }
