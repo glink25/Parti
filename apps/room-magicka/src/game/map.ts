@@ -30,7 +30,7 @@ export function generateMap(seed:number):MapManifest{
  return{generationVersion:MAP_GENERATION_VERSION,seed:seed>>>0,width:WORLD_WIDTH,height:WORLD_HEIGHT,spawn:{x:spawnRoom.x+spawnRoom.width/2,y:spawnRoom.y+spawnRoom.height/2},rooms,corridors};
 }
 
-export function roomAt(map:MapManifest,p:Point){return map.rooms.find(room=>contains(room,p,0));}
+export function roomAt(map:MapManifest,p:Point,inset=0){return map.rooms.find(room=>contains(room,p,inset));}
 export function isWalkable(map:MapManifest,p:Point,radius=PLAYER_RADIUS){return map.rooms.some(room=>contains(room,p,radius))||map.corridors.some(c=>contains(c,p,radius));}
 export function moveWithinMap(map:MapManifest,from:Point,to:Point,radius=PLAYER_RADIUS):Point{
  if(isWalkable(map,to,radius))return to;

@@ -9,3 +9,8 @@ export function createRegionEncounters(map:MapManifest,partySize:number):RegionE
 export function activeSimulationRooms(encounters:Iterable<RegionEncounter>,occupied:ReadonlySet<string>){
  const result=new Set(occupied);for(const encounter of encounters)if(encounter.kind==='sealed'&&encounter.status==='active')result.add(encounter.roomId);return result;
 }
+
+export function shouldActivateEncounter(encounter:RegionEncounter,playerRoomIds:readonly (string|null)[]){
+ if(encounter.status!=='dormant'||!playerRoomIds.length)return false;
+ return encounter.kind==='sealed'?playerRoomIds.every(roomId=>roomId===encounter.roomId):playerRoomIds.some(roomId=>roomId===encounter.roomId);
+}
