@@ -25,6 +25,8 @@
     "awardGold": { "payload": "{ eventId: string, playerIds: string[], amount: number }" },
     "exploreRoom": { "payload": "{ roomId: string }" },
     "publishPlayer": { "payload": "PlayerReport" },
+    "publishRealtimeFrame": { "payload": "PlayerRealtimeFrame" },
+    "reportSpellCast": { "payload": "SpellCastReport" },
     "syncWorld": { "payload": "HostWorldReport" },
     "reportEnemyDamage": { "payload": "EnemyDamageReport" },
     "reportPlayerEffect": { "payload": "PlayerEffectReport" },

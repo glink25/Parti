@@ -1,0 +1,4 @@
+import type { PlayerRealtimeFrame } from './contracts';
+export const REALTIME_INTERVAL_MS=24,BACKGROUND_INTERVAL_MS=100,REALTIME_HEARTBEAT_MS=250,INTERPOLATION_BUFFER_MS=50,MAX_EXTRAPOLATION_MS=100;
+export function shouldPublishRealtime(now:number,nextAt:number,heartbeatAt:number,changed:boolean){return now>=nextAt&&(changed||now>=heartbeatAt);}
+export function interpolateRealtime(previous:PlayerRealtimeFrame,current:PlayerRealtimeFrame,receivedAt:number,now:number){const blend=Math.max(0,Math.min(1,(now-receivedAt)/INTERPOLATION_BUFFER_MS));let x=previous.x+(current.x-previous.x)*blend,y=previous.y+(current.y-previous.y)*blend,z=previous.z+(current.z-previous.z)*blend;if(blend>=1){const age=Math.max(0,Math.min(MAX_EXTRAPOLATION_MS,now-receivedAt-INTERPOLATION_BUFFER_MS)),dt=Math.max(REALTIME_INTERVAL_MS,current.sentAt-previous.sentAt);x+=(current.x-previous.x)/dt*age;y+=(current.y-previous.y)/dt*age;z+=(current.z-previous.z)/dt*age;}return{x,y,z};}

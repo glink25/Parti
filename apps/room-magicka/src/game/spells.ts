@@ -1,4 +1,4 @@
-import type { Element, SpellEffect, SpellPlan, SpellRecipe, StaffModifier, StatusInstance, StatusKind } from './contracts';
+import type { Element, SpellEffect, SpellPlan, SpellPresentation, SpellRecipe, StaffModifier, StatusInstance, StatusKind } from './contracts';
 
 const damage=(element:Element,amount:number):SpellEffect=>({type:'damage',element,amount});
 const status=(kind:StatusKind,intensity=1,durationMs=4000):SpellEffect=>({type:'status',status:kind,intensity,durationMs});
@@ -37,8 +37,9 @@ export function resolveSpell(elements:readonly Element[],staff?:StaffModifier):S
  if(!elements.length)return null; const recipe=RECIPES.find(r=>same(r.pattern,elements));
  let plan:SpellPlan=recipe?{...recipe,elements:[...elements],channel:Boolean(recipe.channel),pierce:recipe.pierce??0,tickMs:recipe.tickMs??150,recoveryMs:recipe.recoveryMs??180,projectileSpeed:recipe.projectileSpeed??600,coneAngle:recipe.coneAngle??.9}:{id:`mixed:${elements.join('-')}`,elements:[...elements],...bases[elements[0]! ]};
  if(!recipe&&elements.length>1){const repeats=elements.slice(1).filter(e=>e===elements[0]).length;const extras=elements.length-1;plan={...plan,name:`混合${plan.name}`,radius:plan.radius+extras*12,range:plan.range+extras*45,effects:plan.effects.map(e=>e.type==='damage'?{...e,amount:Math.round(e.amount*(1+extras*.22+repeats*.18))}:e)};}
- return staff?.matches(plan)?staff.transform(plan):plan;
+ plan={...plan,presentation:presentationFor(plan)};return staff?.matches(plan)?staff.transform(plan):plan;
 }
+export function presentationFor(plan:Pick<SpellPlan,'id'|'delivery'>):SpellPresentation{return{telegraph:plan.id==='meteor'?'target-circle':plan.delivery==='area'||plan.delivery==='targeted'?'target-circle':plan.delivery==='cone'?'cone':'none',syncExecution:true,...(plan.delivery==='beam'?{channelUpdateMs:48}: {})};}
 
 export function applyStatus(current:readonly StatusInstance[],next:StatusInstance,now:number){
  const result=current.filter(s=>s.expiresAt==null||s.expiresAt>now).map(s=>({...s})); const found=result.find(s=>s.kind===next.kind);
