@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=10, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, HUD_HEIGHT=118, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=10, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
 export const BIOMES=['ruins','swamp','volcano'] as const;
 export type BiomeId=(typeof BIOMES)[number];
 export type Point={x:number;y:number};
