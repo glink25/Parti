@@ -1,9 +1,10 @@
 import { describe,expect,it } from 'vitest';
 import { beamTargets,coneContains,createPending,enemyCap,rayToBoundary,turnToward,ZERO_CONTROL,applyControl } from './combat';
 import type { AimState,EnemyState } from './contracts';
+import { WORLD_WIDTH } from './contracts';
 const enemy=(id:string,x:number,y:number):EnemyState=>({id,kind:'chaser',x,y,hp:50,maxHp:50,radius:20,targetId:null,nextAttackAt:0,attack:null,statuses:[],controls:{...ZERO_CONTROL},flashUntil:0,revision:0});
 describe('combat geometry',()=>{
- it('extends a beam to the arena boundary',()=>expect(rayToBoundary({x:800,y:450},0)).toEqual({x:1600,y:450}));
+ it('extends a beam to the world boundary',()=>expect(rayToBoundary({x:800,y:450},0)).toEqual({x:WORLD_WIDTH,y:450}));
  it('orders beam targets and respects pierce',()=>{const targets=beamTargets({x:0,y:100},0,10,[enemy('b',300,100),enemy('a',100,100)],0);expect(targets.map(v=>v.enemy.id)).toEqual(['a']);expect(beamTargets({x:0,y:100},0,10,[enemy('b',300,100),enemy('a',100,100)],1)).toHaveLength(2)});
  it('checks cone range and angle',()=>{expect(coneContains({x:0,y:0},0,200,Math.PI/6,{x:150,y:20},10)).toBe(true);expect(coneContains({x:0,y:0},0,200,Math.PI/6,{x:0,y:150},10)).toBe(false)});
  it('limits turn speed',()=>expect(turnToward(0,Math.PI,Math.PI/4)).toBeCloseTo(Math.PI/4));

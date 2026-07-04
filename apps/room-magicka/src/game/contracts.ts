@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=2, WORLD_WIDTH=1600, WORLD_HEIGHT=900, HUD_HEIGHT=118, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=3, WORLD_WIDTH=4800, WORLD_HEIGHT=3360, HUD_HEIGHT=118, ELEMENT_SLOTS=4;
 export type Point={x:number;y:number};
 export type Element='rock'|'fire'|'ice'|'life'|'lightning'|'water'|'shield';
 export const ELEMENTS:readonly Element[]=['rock','fire','ice','life','lightning','water','shield'];
@@ -30,8 +30,11 @@ export type EnemyAttackState={kind:EnemyAttackKind;targetId:string;startedAt:num
 export type EnemyState={id:string;kind:EnemyKind;x:number;y:number;hp:number;maxHp:number;radius:number;targetId:string|null;nextAttackAt:number;attack:EnemyAttackState|null;statuses:StatusInstance[];controls:ControlState;flashUntil:number;revision:number};
 export type HostProjectile={id:string;kind:'bolt'|'water-bolt';sourceId:string;x:number;y:number;vx:number;vy:number;radius:number;damage:number;expiresAt:number;control?:ControlEffect};
 export type EnvironmentState={id:string;kind:'rain'|'steam';x:number;y:number;radius:number;startedAt:number;endsAt:number};
+export type MapRoom={id:string;gridX:number;gridY:number;x:number;y:number;width:number;height:number;connections:string[]};
+export type MapCorridor={id:string;fromRoomId:string;toRoomId:string;x:number;y:number;width:number;height:number};
+export type MapManifest={generationVersion:number;seed:number;width:number;height:number;spawn:Point;rooms:MapRoom[];corridors:MapCorridor[]};
 export type Phase='lobby'|'running'|'gameover';
-export type GameState={schemaVersion:number;phase:Phase;hostId:string|null;startedAt:number|null;players:Record<string,PublicPlayer>;enemies:Record<string,EnemyState>;projectiles:Record<string,HostProjectile>;environments:Record<string,EnvironmentState>;worldSequence:number;totalKills:number;message:string};
+export type GameState={schemaVersion:number;phase:Phase;hostId:string|null;startedAt:number|null;runSeed:number;exploredRoomIds:string[];players:Record<string,PublicPlayer>;enemies:Record<string,EnemyState>;projectiles:Record<string,HostProjectile>;environments:Record<string,EnvironmentState>;worldSequence:number;totalKills:number;message:string};
 export type PlayerReport={sequence:number;x:number;y:number;z:number;hp:number;downed:boolean;elements:Element[];statuses:StatusInstance[];controls:ControlState;kills:number};
 export type HostWorldReport={sequence:number;enemies:EnemyState[];projectiles:HostProjectile[];environments:EnvironmentState[]};
 export type EnemyDamageReport={eventId:string;worldSequence:number;enemyId:string;sourcePlayerId:string;spellId:string;amount:number;statuses:StatusInstance[];controls:ControlEffect[];direction:Point};
