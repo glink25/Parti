@@ -19,14 +19,14 @@ function generateRoute(context: GenerationContext, entryX: number, exitX: number
   while (result.at(-1)!.y < base + CHUNK_HEIGHT - MAX_ROUTE_RISE - 30) {
     const previous = result.at(-1)!; let next: Platform | null = null;
     for (let attempt = 0; attempt < 12 && !next; attempt += 1) {
-      const minimumRise = 75 + Math.round(context.difficulty * 10);
-      const maximumRise = 150 + Math.round(context.difficulty * 12.5);
+      const minimumRise = 60 + Math.round(context.difficulty * 6);
+      const maximumRise = 125 + Math.round(context.difficulty * 9);
       const remaining = base + CHUNK_HEIGHT - 70 - previous.y; const rise = Math.min(rng.int(minimumRise, maximumRise), remaining);
       const pull = (exitX - previous.x) * Math.min(.35, rise / Math.max(1, remaining));
       const candidate = platform(`${context.chunkIndex}:route:${step}`, previous.x + pull + rng.int(-270, 270), previous.y + rise, rng.int(145, 235));
       if (canReachPlatform(previous, candidate)) next = candidate;
     }
-    if (!next) next = platform(`${context.chunkIndex}:route:${step}`, previous.x + Math.sign(exitX - previous.x) * 70, previous.y + Math.min(base + CHUNK_HEIGHT - 70 - previous.y, MAX_ROUTE_RISE, 110 + context.difficulty * 14), 220);
+    if (!next) next = platform(`${context.chunkIndex}:route:${step}`, previous.x + Math.sign(exitX - previous.x) * 70, previous.y + Math.min(base + CHUNK_HEIGHT - 70 - previous.y, MAX_ROUTE_RISE, 95 + context.difficulty * 12), 220);
     result.push(next); step += 1;
   }
   const last = result.at(-1)!; const exit = platform(`${context.chunkIndex}:route:${step}`, exitX, base + CHUNK_HEIGHT - 70, 250);
@@ -39,7 +39,7 @@ function generateRoute(context: GenerationContext, entryX: number, exitX: number
 }
 
 function generateOptional(context: GenerationContext, route: Platform[]) {
-  const rng = context.rng('optional'); const result: Platform[] = []; const count = Math.min(5, 2 + Math.floor(context.difficulty / 2));
+  const rng = context.rng('optional'); const result: Platform[] = []; const count = Math.min(8, 4 + Math.floor(context.difficulty / 2));
   for (let i = 0; i < count; i += 1) {
     const anchor = route[rng.int(1, Math.max(1, route.length - 2))]!;
     const base = platform(`${context.chunkIndex}:optional:${i}`, anchor.x + (rng.float() < .5 ? -1 : 1) * rng.int(170, 280), anchor.y + rng.int(-20, 100), rng.int(115, 180), true);

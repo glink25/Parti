@@ -42,7 +42,7 @@ export const stormWarden: BossStrategy = {
       { id: `${c.chunkIndex}:boss:exit1`, kind: 'boss-exit', x: 680, y: base + 1070, width: 190, optional: false },
       { id: `${c.chunkIndex}:boss:exit2`, kind: 'boss-exit', x: 360, y: base + 1260, width: 190, optional: false },
       { id: `${c.chunkIndex}:boss:exit3`, kind: 'boss-exit', x: 590, y: base + 1450, width: 200, optional: false },
-      { id: `${c.chunkIndex}:boss:top`, kind: 'normal', x: 450, y: base + 1530, width: 240, optional: false },
+      { id: `${c.chunkIndex}:boss:top`, kind: 'boss-exit', x: 450, y: base + 1530, width: 240, optional: false },
     ];
   },
 };
@@ -60,7 +60,7 @@ encounterStrategies.register({
     const enemies = []; const pickups = []; const enemyPool = enemyStrategies.values().filter((item) => !item.boss && item.weight > 0);
     const enemyRng = context.rng('enemy-density');
     const safeAnchors = optional.filter((anchor) => route.every((platform) => Math.abs(anchor.y - platform.y) > 250 || Math.abs(anchor.x - platform.x) > platform.width / 2 + anchor.width / 2 + 90));
-    const count = enemyRng.float() < Math.min(.72, .28 + context.difficulty * .035) ? Math.min(2, safeAnchors.length, enemyRng.int(1, context.difficulty >= 6 ? 2 : 1)) : 0;
+    const count = enemyRng.float() < Math.min(.75, .45 + context.difficulty * .03) ? Math.min(2, safeAnchors.length, enemyRng.int(1, context.difficulty >= 6 ? 2 : 1)) : 0;
     for (let i = 0; i < count; i += 1) {
       const rng = context.rng(`encounter:${i}`); const chosen = weighted(enemyPool, rng.float());
       const anchor = safeAnchors[i % safeAnchors.length] ?? null;

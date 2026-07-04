@@ -47,11 +47,21 @@ describe('skyward 2 procedural generation', () => {
       generatedEnemies += chunk.enemies.length;
       for (const enemy of chunk.enemies.filter((item) => !item.boss)) expect(route.every((platform) => Math.abs(enemy.y - platform.y) > 140 || Math.abs(enemy.x - platform.x) > platform.width / 2 + enemy.radius + 55)).toBe(true);
     }
-    expect(generatedEnemies).toBeGreaterThan(0); expect(generatedEnemies).toBeLessThan(35);
+    expect(generatedEnemies).toBeGreaterThan(4); expect(generatedEnemies).toBeLessThan(45);
   });
 
   it('places the boss near the top of its chunk', () => {
     const chunk = generateChunk(42, BOSS_INTERVAL - 1, 4); expect(chunk.enemies.find((enemy) => enemy.boss)!.y - chunk.baseY).toBeGreaterThan(1300);
+  });
+
+  it('uses a ten-chunk boss cadence and locks every upward boss platform', () => {
+    expect(BOSS_INTERVAL).toBe(10);
+    for (let index = 0; index < 30; index += 1) expect(generateChunk(42, index, 2).boss).toBe([9, 19, 29].includes(index));
+    const bossChunk = generateChunk(42, 9, 2); expect(bossChunk.platforms.at(-1)?.kind).toBe('boss-exit');
+  });
+
+  it('adds four to eight optional platform opportunities per normal chunk', () => {
+    for (const index of [0, 5, 15, 35]) { const chunk = generateChunk(42, index, 2); expect(chunk.platforms.filter((platform) => platform.optional).length).toBeGreaterThanOrEqual(4); }
   });
 
   it('treats boss as a registered enemy and locks its exit until defeated', () => {

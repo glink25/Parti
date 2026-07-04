@@ -1,6 +1,7 @@
 import { defineRoom, type RoomContext } from '@parti/worker-sdk';
 import { CHUNK_HEIGHT, WORLD_WIDTH, type BossAttack, type GameState, type PickupKind, type PublicPlayer } from '../game/contracts';
-import { findEntity, generateChunk, isBossChunk } from '../game/generation';
+import { activeBossAfterRestore, bossDefeatedKey, canStartBoss } from '../game/boss';
+import { findEntity, generateChunk } from '../game/generation';
 
 const RESPAWN_MS = 4000;
 const INVULNERABLE_MS = 2200;
@@ -12,6 +13,7 @@ export default defineRoom<GameState>({
   initialState,
   onRestore(ctx) {
     latestPoses = new Map(); ctx.state.hostId = ctx.host.id;
+    ctx.state.boss = activeBossAfterRestore(ctx.state);
     for (const player of Object.values(ctx.state.players)) { player.lastHitSequence ??= 0; player.lastOutcomeSequence ??= 0; latestPoses.set(player.id, { sequence: -1, x: player.x, y: player.y, vy: player.vy, cameraBottom: player.cameraBottom, direction: player.direction, persistedAt: ctx.now() }); }
     for (const player of Object.values(ctx.state.players)) if (!player.alive && player.respawnAt) scheduleRespawn(ctx, player.id, Math.max(100, player.respawnAt - ctx.now()));
     if (ctx.state.boss) scheduleBossTick(ctx, 200);
@@ -114,6 +116,7 @@ function damageEnemy(ctx: RoomContext<GameState>, playerId: string, id: string, 
   if (hp <= 0) { ctx.state.defeatedEnemies.push(id); p.kills += 1; ctx.broadcast('skyward2:enemy-defeated', { enemyId: id, playerId }); }
 }
 function startBoss(ctx: RoomContext<GameState>, chunkIndex: number) {
+  if (!canStartBoss(ctx.state, chunkIndex)) return;
   const chunk = generateChunk(ctx.state.seed, chunkIndex, ctx.state.startedPlayers.length); const enemy = chunk.enemies.find((e) => e.boss); if (!enemy) return;
   const now = ctx.now(); ctx.state.boss = { enemyId: enemy.id, chunkIndex, hp: enemy.hp, maxHp: enemy.hp, startedAt: now, nextAttackAt: now + 3200, sequence: 0, attacks: [], summons: [] }; ctx.state.message = '风暴守卫封锁了上行通路'; scheduleBossTick(ctx, 200);
 }
@@ -130,10 +133,16 @@ function scheduleBossTick(ctx: RoomContext<GameState>, delay = 200) {
     scheduleBossTick(ctx);
   });
 }
-function defeatBoss(ctx: RoomContext<GameState>) { const boss = ctx.state.boss; if (!boss) return; ctx.state.defeatedEnemies.push(boss.enemyId); ctx.state.entities[`boss-defeated:${boss.chunkIndex}`] = { activatedUntil: Number.MAX_SAFE_INTEGER }; ctx.state.bossCount += 1; ctx.state.boss = null; ctx.clearTimer('boss:tick'); ctx.state.message = '通路恢复，继续向上'; ctx.broadcast('skyward2:boss-defeated', { chunkIndex: boss.chunkIndex }); }
+function defeatBoss(ctx: RoomContext<GameState>) {
+  const boss = ctx.state.boss; if (!boss) return; const chunkIndex = boss.chunkIndex;
+  boss.attacks = []; boss.summons = []; ctx.clearTimer('boss:tick');
+  if (!ctx.state.defeatedEnemies.includes(boss.enemyId)) ctx.state.defeatedEnemies.push(boss.enemyId);
+  ctx.state.entities[bossDefeatedKey(chunkIndex)] = { activatedUntil: Number.MAX_SAFE_INTEGER }; ctx.state.bossCount += 1; ctx.state.boss = null; ctx.state.message = '通路恢复，继续向上';
+  ctx.broadcast('skyward2:boss-defeated', { chunkIndex });
+}
 function persistPose(ctx: RoomContext<GameState>, player: PublicPlayer, pose: LatestPose, now: number) {
   player.x = pose.x; player.y = pose.y; player.vy = pose.vy; player.direction = pose.direction; player.cameraBottom = Math.max(player.cameraBottom, Math.min(pose.cameraBottom, pose.y - 140)); pose.persistedAt = now;
   ctx.state.highestY = Math.max(ctx.state.highestY, pose.y); updateVoid(ctx.state); pruneWorld(ctx.state, now);
-  const chunk = Math.floor(pose.y / CHUNK_HEIGHT); if (!ctx.state.boss && isBossChunk(chunk) && pose.y >= chunk * CHUNK_HEIGHT + 620) startBoss(ctx, chunk);
+  const chunk = Math.floor(pose.y / CHUNK_HEIGHT); if (pose.y >= chunk * CHUNK_HEIGHT + 620) startBoss(ctx, chunk);
 }
 function pruneWorld(s: GameState, now: number) { const below = Math.floor(s.teamVoidY / CHUNK_HEIGHT) - 2; for (const [id, value] of Object.entries(s.entities)) { const chunk = Number(id.split(':')[0]); if ((Number.isInteger(chunk) && chunk < below) || ((value.disabledUntil ?? Infinity) < now && (value.activatedUntil ?? 0) < now && value.hp == null)) delete s.entities[id]; } s.claimedPickups = s.claimedPickups.filter((id) => Number(id.split(':')[0]) >= below); s.defeatedEnemies = s.defeatedEnemies.filter((id) => Number(id.split(':')[0]) >= below); }

@@ -1,5 +1,6 @@
 import { mainCanvas, mainContext } from 'littlejsengine';
 import { biomeForChunk } from '../content';
+import { isBossDefeated } from '../game/boss';
 import { CHUNK_HEIGHT, PLAYER_RADIUS, VIEW_HEIGHT, WORLD_WIDTH, type BossAttack, type Chunk, type Enemy, type GameState, type Pickup, type PickupKind, type Platform, type PublicPlayer } from '../game/contracts';
 import { generateChunk, platformActive } from '../game/generation';
 import { directDistance, GRAVITY, JUMP_SPEED, MOVE_SPEED, movingX, tiltDirection, wrapX } from '../runtime/physics';
@@ -16,6 +17,7 @@ export class SkywardScene {
   private direction = 0; private keyDirection: -1 | 0 | 1 = 0; private touches = new Map<number, -1 | 1>(); private tilt = 0; private tiltEnabled = false; private tiltNeutral: number | null = null;
   private previous = performance.now(); private telemetryAt = 0; private shotAt = 0; private hitAt = 0; private epoch = -1; private pendingDeath = false; private shotSequence = 0; private poseSequence = 0; private hitSequence = 0; private outcomeSequence = 0;
   private locallyConsumedBuffs = new Set<PickupKind>();
+  private optimisticallyDefeatedBosses = new Set<number>();
   private pixelRatio = 1; private viewport: Viewport = { x: 0, y: 0, w: 0, h: 0, scale: 1 }; private hits: Hit[] = []; private flash = ''; private flashUntil = 0; private disposers: Array<() => void> = [];
 
   init() {
@@ -25,7 +27,7 @@ export class SkywardScene {
       parti.onEvent('skyward2:pose', (raw) => this.receivePose(raw as PosePacket)),
       parti.onEvent('skyward2:pickup', (raw) => this.notify(`${this.playerName((raw as { playerId: string }).playerId)} 获得 ${(raw as { kind: string }).kind}`)),
       parti.onEvent('skyward2:death', (raw) => this.notify(`${this.playerName((raw as { playerId: string }).playerId)} 倒下了`)),
-      parti.onEvent('skyward2:boss-defeated', () => this.notify('Boss 已击败，上行通路恢复')),
+      parti.onEvent('skyward2:boss-defeated', (raw) => { const chunkIndex = Number((raw as { chunkIndex: number }).chunkIndex); if (Number.isInteger(chunkIndex)) this.optimisticallyDefeatedBosses.add(chunkIndex); this.notify('Boss 已击败，上行通路恢复'); }),
       parti.onEvent('skyward2:outcome', (raw) => { const event = raw as { playerId: string; outcome: string }; if (event.outcome === 'shield' && event.playerId !== parti.playerId) this.notify(`${this.playerName(event.playerId)} 的护盾抵消了伤害`); }),
     );
     if (parti.orientation) this.disposers.push(parti.orientation.onData((data) => this.orientation(data)));
@@ -54,10 +56,6 @@ export class SkywardScene {
         else { this.local.y = landing.y + PLAYER_RADIUS; this.local.vy = this.buff(me, 'super-jump') ? 1170 : JUMP_SPEED; }
       }
     }
-    if (this.state?.boss) {
-      const top = this.state.boss.chunkIndex * CHUNK_HEIGHT + 970;
-      if (this.local.y > top && !this.bossDefeated(this.state.boss.chunkIndex)) { this.local.y = top; this.local.vy = -180; }
-    }
     this.local.cameraBottom = Math.max(this.local.cameraBottom, this.local.y - VIEW_HEIGHT * .56); const upper = this.local.viewBottom + VIEW_HEIGHT * .56, lower = this.local.viewBottom + VIEW_HEIGHT * .27;
     if (this.local.y > upper) this.local.viewBottom = this.local.y - VIEW_HEIGHT * .56; else if (this.local.y < lower) this.local.viewBottom = this.local.y - VIEW_HEIGHT * .27;
     this.local.viewBottom = Math.max(this.state?.teamVoidY ?? 0, this.local.viewBottom); if (this.local.y < (this.state?.teamVoidY ?? 0) - 60) this.die('虚空');
@@ -69,16 +67,17 @@ export class SkywardScene {
       else if (now >= this.hitAt) { this.hitAt = now + 1200; this.die(e.boss ? 'Boss 接触' : '怪物'); }
     }
     for (const p of this.pickups()) if (directDistance(this.local.x, p.x) < 55 && Math.abs(this.local.y - p.y) < 70) void parti.action('claimPickup', { pickupId: p.id });
-    for (const attack of this.state?.boss?.attacks ?? []) if (Date.now() >= attack.activeAt && Date.now() <= attack.endsAt && this.attackHits(attack)) { this.die(`Boss ${attack.kind}`); break; }
+    for (const attack of this.activeBoss()?.attacks ?? []) if (Date.now() >= attack.activeAt && Date.now() <= attack.endsAt && this.attackHits(attack)) { this.die(`Boss ${attack.kind}`); break; }
   }
   private attackHits(a: BossAttack) { if (a.kind === 'summon') return false; const radius = a.kind === 'lightning' ? 90 : a.kind === 'lock-zone' ? 125 : 105; return directDistance(this.local.x, a.x) < radius && Math.abs(this.local.y - a.y) < radius; }
-  private receiveState(state: GameState) { const prior = this.state?.phase; this.state = state; const me = this.me(); if (!me) return; this.hitSequence = Math.max(this.hitSequence, me.lastHitSequence ?? 0); this.outcomeSequence = Math.max(this.outcomeSequence, me.lastOutcomeSequence ?? 0); for (const kind of this.locallyConsumedBuffs) if (!(me.buffs[kind] ?? 0)) this.locallyConsumedBuffs.delete(kind); if (prior === 'lobby' && state.phase === 'running') { this.chunks.clear(); this.bullets = []; this.remote = {}; } if (state.phase === 'running' && me.positionEpoch !== this.epoch) { this.epoch = me.positionEpoch; this.pendingDeath = false; this.local = { x: me.x, y: me.y, vy: me.vy || JUMP_SPEED, cameraBottom: me.cameraBottom, viewBottom: Math.max(state.teamVoidY, me.y - VIEW_HEIGHT * .35), alive: true }; } if (!me.alive) { this.pendingDeath = false; this.local.alive = false; } else if (!this.pendingDeath) this.local.alive = true; }
+  private receiveState(state: GameState) { const prior = this.state?.phase; this.state = state; const me = this.me(); if (!me) return; for (const chunk of this.optimisticallyDefeatedBosses) if (isBossDefeated(state.entities, chunk)) this.optimisticallyDefeatedBosses.delete(chunk); this.hitSequence = Math.max(this.hitSequence, me.lastHitSequence ?? 0); this.outcomeSequence = Math.max(this.outcomeSequence, me.lastOutcomeSequence ?? 0); for (const kind of this.locallyConsumedBuffs) if (!(me.buffs[kind] ?? 0)) this.locallyConsumedBuffs.delete(kind); if (prior === 'lobby' && state.phase === 'running') { this.chunks.clear(); this.bullets = []; this.remote = {}; this.optimisticallyDefeatedBosses.clear(); } if (state.phase === 'running' && me.positionEpoch !== this.epoch) { this.epoch = me.positionEpoch; this.pendingDeath = false; this.local = { x: me.x, y: me.y, vy: me.vy || JUMP_SPEED, cameraBottom: me.cameraBottom, viewBottom: Math.max(state.teamVoidY, me.y - VIEW_HEIGHT * .35), alive: true }; } if (!me.alive) { this.pendingDeath = false; this.local.alive = false; } else if (!this.pendingDeath) this.local.alive = true; }
   private receivePose(packet: PosePacket) { if (packet.playerId === parti.playerId) return; const player = this.state?.players[packet.playerId]; const pose = this.remote[packet.playerId] ??= createRemotePose(player?.x ?? packet.x, player?.y ?? packet.y); acceptPose(pose, packet, performance.now()); }
   private visibleChunks() { if (!this.state || this.state.phase !== 'running') return []; const start = Math.max(0, Math.floor(this.local.viewBottom / CHUNK_HEIGHT) - 1), end = Math.floor((this.local.viewBottom + VIEW_HEIGHT) / CHUNK_HEIGHT) + 1; const result = []; for (let i = start; i <= end; i += 1) { let c = this.chunks.get(i); if (!c) { c = generateChunk(this.state.seed, i, Math.max(1, this.state.startedPlayers.length)); this.chunks.set(i, c); } result.push(c); } return result; }
   private platforms(now = Date.now()) { const elapsed = now - (this.state?.startedAt ?? now); return this.visibleChunks().flatMap((c) => c.platforms).filter((p) => platformActive(p, this.state?.entities ?? {}, Date.now(), this.bossDefeated(Number(p.id.split(':')[0])))).map((p) => ({ ...p, x: movingX(p.x, p.movement, elapsed) })); }
-  private enemies() { const defeated = new Set(this.state?.defeatedEnemies ?? []), elapsed = Date.now() - (this.state?.startedAt ?? Date.now()); const generated = this.visibleChunks().flatMap((c) => c.enemies); const summons = this.state?.boss?.summons ?? []; return [...generated, ...summons].filter((e) => !defeated.has(e.id)).map((e) => ({ ...e, x: movingX(e.x, e.movement, elapsed), hp: this.state?.boss?.enemyId === e.id ? this.state.boss.hp : summons.find((s) => s.id === e.id)?.hp ?? this.state?.entities[e.id]?.hp ?? e.hp })); }
+  private enemies() { const defeated = new Set(this.state?.defeatedEnemies ?? []), elapsed = Date.now() - (this.state?.startedAt ?? Date.now()); const boss = this.activeBoss(); const generated = this.visibleChunks().flatMap((c) => c.enemies); const summons = boss?.summons ?? []; return [...generated, ...summons].filter((e) => !defeated.has(e.id) && !(e.boss && this.bossDefeated(Number(e.id.split(':')[0])))).map((e) => ({ ...e, x: movingX(e.x, e.movement, elapsed), hp: boss?.enemyId === e.id ? boss.hp : summons.find((s) => s.id === e.id)?.hp ?? this.state?.entities[e.id]?.hp ?? e.hp })); }
   private pickups() { const claimed = new Set(this.state?.claimedPickups ?? []); return this.visibleChunks().flatMap((c) => c.pickups).filter((p) => !claimed.has(p.id)); }
-  private bossDefeated(chunk: number) { return (this.state?.entities[`boss-defeated:${chunk}`]?.activatedUntil ?? 0) > Date.now(); }
+  private bossDefeated(chunk: number) { return this.optimisticallyDefeatedBosses.has(chunk) || (this.state ? isBossDefeated(this.state.entities, chunk) : false); }
+  private activeBoss() { const boss = this.state?.boss ?? null; return boss && !this.bossDefeated(boss.chunkIndex) ? boss : null; }
   private buff(me: PublicPlayer, id: keyof PublicPlayer['buffs']) { return !this.locallyConsumedBuffs.has(id) && (me.buffs[id] ?? 0) > Date.now(); }
   private shoot() { const me = this.me(); if (!me?.alive || !this.local.alive || performance.now() < this.shotAt) return; this.shotAt = performance.now() + (this.buff(me, 'rapid') ? 110 : 240); const id = `${parti.playerId}:${Date.now().toString(36)}:${++this.shotSequence}`; this.bullets.push({ id, x: this.local.x, y: this.local.y + 35, vy: 1050, life: 1.6, cosmetic: false }); void parti.action('shoot', { shotId: id, x: this.local.x, y: this.local.y, power: this.buff(me, 'power') }); }
   private die(reason: string) {
@@ -96,7 +95,7 @@ export class SkywardScene {
   }
   private drawWorld() {
     const c = mainContext, biome = biomeForChunk(Math.max(0, Math.floor(this.local.viewBottom / CHUNK_HEIGHT))); c.fillStyle = biome.background; c.fillRect(this.viewport.x, this.viewport.y, this.viewport.w, this.viewport.h);
-    for (const p of this.platforms()) this.drawPlatform(p, biome.platform); for (const p of this.pickups()) this.drawPickup(p); for (const e of this.enemies()) this.drawEnemy(e); for (const a of this.state?.boss?.attacks ?? []) this.drawAttack(a);
+    for (const p of this.platforms()) this.drawPlatform(p, biome.platform); for (const p of this.pickups()) this.drawPickup(p); for (const e of this.enemies()) this.drawEnemy(e); for (const a of this.activeBoss()?.attacks ?? []) this.drawAttack(a);
     for (const p of Object.values(this.state?.players ?? {})) if (p.id !== parti.playerId && p.connected) { const v = this.remote[p.id] ?? p; this.drawPlayer(v.x, v.y, '#76a9ff', p.name); }
     if (this.me()?.alive && this.local.alive) this.drawPlayer(this.local.x, this.local.y, '#fff176', 'YOU'); for (const b of this.bullets) { const s = this.toScreen(b.x, b.y); c.fillStyle = b.cosmetic ? '#7db6ff' : '#fff'; c.fillRect(s.x - 4, s.y - 12, 8, 24); }
     if ((this.state?.teamVoidY ?? 0) > this.local.viewBottom - 60) { const y = this.toScreen(0, this.state!.teamVoidY).y; c.fillStyle = 'rgba(220,40,80,.25)'; c.fillRect(this.viewport.x, y, this.viewport.w, this.viewport.y + this.viewport.h - y); }
@@ -106,7 +105,7 @@ export class SkywardScene {
   private drawPickup(p: Pickup) { const c = mainContext, s = this.toScreen(p.x, p.y), r = 24 * this.viewport.scale; c.fillStyle = '#ffe16a'; c.beginPath(); c.arc(s.x, s.y, r, 0, Math.PI * 2); c.fill(); this.label(p.kind, s.x, s.y); }
   private drawPlayer(x: number, y: number, color: string, name: string) { const c = mainContext, s = this.toScreen(x, y), r = PLAYER_RADIUS * this.viewport.scale; c.fillStyle = color; c.fillRect(s.x - r, s.y - r, r * 2, r * 2); this.label(name, s.x, s.y - r - 10); }
   private drawAttack(a: BossAttack) { const c = mainContext, s = this.toScreen(a.x, a.y), warning = Date.now() < a.activeAt, r = (a.kind === 'lightning' ? 90 : 120) * this.viewport.scale; c.strokeStyle = warning ? '#fff36b' : '#ff3d66'; c.lineWidth = warning ? 3 : 8; c.beginPath(); c.arc(s.x, s.y, r, 0, Math.PI * 2); c.stroke(); this.label(a.kind, s.x, s.y); }
-  private drawHud(width: number, height: number) { if (!this.state) return; const me = this.me(); this.text(`高度 ${Math.max(0, Math.floor(this.local.y))}  Boss ${this.state.bossCount}`, 18, 22, 16, '#fff'); if (me) { const buffs = Object.entries(me.buffs).filter(([, end]) => (end ?? 0) > Date.now()).map(([id]) => id).join(' · '); this.text(buffs || '无增益', 18, 46, 13, '#b9d7ff'); } if (this.state.boss) { const ratio = this.state.boss.hp / this.state.boss.maxHp; mainContext.fillStyle = '#2a2335'; mainContext.fillRect(width / 2 - 150, 24, 300, 18); mainContext.fillStyle = '#ff5577'; mainContext.fillRect(width / 2 - 150, 24, 300 * ratio, 18); }
+  private drawHud(width: number, height: number) { if (!this.state) return; const me = this.me(), boss = this.activeBoss(); this.text(`高度 ${Math.max(0, Math.floor(this.local.y))}  Boss ${this.state.bossCount}`, 18, 22, 16, '#fff'); if (me) { const buffs = Object.entries(me.buffs).filter(([, end]) => (end ?? 0) > Date.now()).map(([id]) => id).join(' · '); this.text(buffs || '无增益', 18, 46, 13, '#b9d7ff'); } if (boss) { const ratio = boss.hp / boss.maxHp; mainContext.fillStyle = '#2a2335'; mainContext.fillRect(width / 2 - 150, 24, 300, 18); mainContext.fillStyle = '#ff5577'; mainContext.fillRect(width / 2 - 150, 24, 300 * ratio, 18); }
     const size = 64, x = width - size - 18, y = height - size - 18; mainContext.fillStyle = 'rgba(255,255,255,.18)'; mainContext.fillRect(x, y, size, size); this.text('FIRE', x + size / 2, y + size / 2, 13, '#fff', 'center'); this.hits.push({ x, y, w: size, h: size, action: () => this.shoot() }); }
   private drawLobby(w: number, h: number) { const me = this.me(); this.overlay(w, h, 'SKYWARD 2', '完全随机碰撞盒原型'); const x = w / 2 - 100, y = h / 2 + 70; mainContext.fillStyle = me?.ready ? '#486878' : '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text(me?.ready ? '等待其他玩家' : '准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => void parti.action('setReady', { ready: !me?.ready }) }); }
   private drawGameOver(w: number, h: number) { this.overlay(w, h, '远征结束', `最高 ${Math.floor(this.state?.highestY ?? 0)}`); if (this.state?.hostId === parti.playerId) { const x = w / 2 - 100, y = h / 2 + 65; mainContext.fillStyle = '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text('返回准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => void parti.action('restart') }); } }

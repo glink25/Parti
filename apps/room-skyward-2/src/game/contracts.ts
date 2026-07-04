@@ -2,7 +2,7 @@ export const WORLD_WIDTH = 900;
 export const VIEW_HEIGHT = 1600;
 export const CHUNK_HEIGHT = 1600;
 export const PLAYER_RADIUS = 32;
-export const BOSS_INTERVAL = 6;
+export const BOSS_INTERVAL = 10;
 
 export type Random = { float(): number; int(min: number, max: number): number; pick<T>(items: readonly T[]): T };
 export type EntityKind = 'platform' | 'enemy' | 'pickup';
