@@ -28,6 +28,7 @@
     "syncWorld": { "payload": "HostWorldReport" },
     "reportEnemyDamage": { "payload": "EnemyDamageReport" },
     "reportPlayerEffect": { "payload": "PlayerEffectReport" },
+    "reportSpellVisual": { "payload": "SharedSpellVisual" },
     "reportEnvironment": { "payload": "EnvironmentState" },
     "reportProjectileHit": { "payload": "{ projectileId: string }" }
   }
