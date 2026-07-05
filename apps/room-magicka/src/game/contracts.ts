@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=12, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=13, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
 export const BIOMES=['ruins','swamp','volcano'] as const;
 export type BiomeId=(typeof BIOMES)[number];
 export type Point={x:number;y:number};
@@ -67,7 +67,8 @@ export type ObjectiveStatus='dormant'|'active'|'completed';
 export type StageObjective={id:string;roomId:string;kind:ObjectiveKind;status:ObjectiveStatus;progress:number;target:number;startedAt:number|null};
 export type BossStatus='locked'|'available'|'active'|'defeated';
 export type BossMechanic={id:string;kind:'rune-pillar'|'purifier'|'cooling-rune';x:number;y:number;progress:number;target:number;active:boolean};
-export type StageBoss={roomId:string;status:BossStatus;enemyId:string|null;phase:number;nextMechanicAt:number;mechanics:BossMechanic[]};
+export type BossArenaState={phase:'idle'|'warning'|'active';warningStartsAt:number;activeStartsAt:number;endsAt:number};
+export type StageBoss={roomId:string;status:BossStatus;enemyId:string|null;phase:number;nextMechanicAt:number;arena:BossArenaState;mechanics:BossMechanic[]};
 export type StagePortal={roomId:string;x:number;y:number;active:boolean};
 export type StageProgress={index:number;biome:BiomeId;status:'exploring'|'boss'|'complete';startedAt:number;completedAt:number|null;requiredSigils:number;objectives:StageObjective[];boss:StageBoss;portal:StagePortal|null};
 export type LootEntity={id:string;x:number;y:number;roomId:string;item:InventoryItem;wants:string[];droppedByPlayerId:string|null;ownerPriorityUntil:number};
