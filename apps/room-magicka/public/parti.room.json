@@ -22,6 +22,8 @@
     "pickupLoot": { "payload": "{ lootId: string }" },
     "toggleLootWant": { "payload": "{ lootId: string }" },
     "buyItem": { "payload": "{ merchantId: string, itemId: string }" },
+    "sellItem": { "payload": "{ merchantId: string, itemId: string }" },
+    "fuseEquipment": { "payload": "{ itemIds: string[], useCatalyst: boolean }" },
     "awardGold": { "payload": "{ eventId: string, playerIds: string[], amount: number }" },
     "exploreRoom": { "payload": "{ roomId: string }" },
     "publishPlayer": { "payload": "PlayerReport" },
