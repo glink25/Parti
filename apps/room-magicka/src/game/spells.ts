@@ -36,6 +36,7 @@ export const RECIPES:readonly SpellRecipe[]=[
  {id:'tidal-wave',name:'潮汐冲击',pattern:['water','rock','water'],delivery:'cone',castMs:360,range:520,radius:110,coneAngle:1.25,effects:[damage('water',30),status('wet'),control('knockback',520,500)],traits:['tidal-wave','water-pool']},
  {id:'life-barrier',name:'生命屏障',pattern:['life','shield','life','shield'],delivery:'area',castMs:520,range:600,radius:145,effects:[{type:'environment',kind:'life-barrier',durationMs:6500,radius:145}],traits:['life-barrier']}
 ];
+export const DEFAULT_KNOWN_RECIPE_IDS=['revive'] as const;
 
 const bases:Record<Element,Omit<SpellPlan,'id'|'elements'>>={
  rock:{name:'岩弹',delivery:'projectile',castMs:220,channel:false,range:680,radius:34,effects:[damage('rock',38),control('knockback',360,400)],pierce:0,tickMs:150,recoveryMs:180,projectileSpeed:650,coneAngle:.9,traits:[]},

@@ -23,7 +23,7 @@
     "toggleLootWant": { "payload": "{ lootId: string }" },
     "buyItem": { "payload": "{ merchantId: string, itemId: string }" },
     "sellItem": { "payload": "{ merchantId: string, itemId: string }" },
-    "fuseEquipment": { "payload": "{ itemIds: string[], useCatalyst: boolean }" },
+    "fuseEquipment": { "payload": "{ forgeId: string, itemIds: string[] }" },
     "awardGold": { "payload": "{ eventId: string, playerIds: string[], amount: number }" },
     "exploreRoom": { "payload": "{ roomId: string }" },
     "publishPlayer": { "payload": "PlayerReport" },
