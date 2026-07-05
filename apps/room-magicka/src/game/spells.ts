@@ -1,10 +1,17 @@
-import type { Element, SpellEffect, SpellPlan, SpellPresentation, SpellRecipe, StaffModifier, StatusInstance, StatusKind } from './contracts';
+import type { Element, InventoryItem, SpellEffect, SpellPlan, SpellPresentation, SpellRecipe, StaffModifier, StatusInstance, StatusKind } from './contracts';
+import {SCROLLS,isScroll} from './scrolls';
 
 const damage=(element:Element,amount:number):SpellEffect=>({type:'damage',element,amount});
 const status=(kind:StatusKind,intensity=1,durationMs=4000):SpellEffect=>({type:'status',status:kind,intensity,durationMs});
 const control=(kind:'knockback'|'knockup'|'slow'|'stun',strength:number,durationMs:number):SpellEffect=>({type:'control',control:{kind,strength,durationMs}});
 
 export const RECIPES:readonly SpellRecipe[]=[
+ {id:'revive',name:'复活术',pattern:['lightning','life','lightning'],delivery:'targeted',castMs:520,range:480,radius:110,effects:[{type:'revive',healthRatio:.25}]},
+ {id:'lightning-barrage',name:'雷击术',pattern:['lightning','fire','fire','lightning'],delivery:'targeted',castMs:700,range:900,radius:145,effects:[{type:'environment',kind:'lightning-barrage',durationMs:3000,radius:145}],traits:['lightning-barrage']},
+ {id:'teleport',name:'瞬间移动',pattern:['lightning','shield','lightning'],delivery:'targeted',castMs:180,range:600,radius:20,effects:[{type:'teleport',maxRange:600}]},
+ {id:'cleanse',name:'消除术',pattern:['life','ice','shield'],delivery:'area',castMs:300,range:520,radius:115,effects:[{type:'cleanse'}]},
+ {id:'haste',name:'加速',pattern:['lightning','shield','fire'],delivery:'self',castMs:180,range:0,radius:0,effects:[status('haste',.7,6000)]},
+ {id:'blizzard',name:'暴风雪',pattern:['water','ice','ice','water'],delivery:'global',castMs:700,range:0,radius:0,effects:[{type:'environment',kind:'blizzard',durationMs:10000}]},
  {id:'flame-beam',name:'生命烈焰',pattern:['fire','life'],delivery:'beam',castMs:240,channel:true,tickMs:140,recoveryMs:220,range:1600,radius:18,effects:[damage('fire',9),status('burning',1,3500)]},
  {id:'meteor',name:'天降陨石',pattern:['fire','rock','rock','fire'],delivery:'targeted',castMs:850,range:900,radius:145,effects:[damage('fire',75),damage('rock',45),status('burning',2,5000),control('knockup',520,700)]},
  {id:'rain',name:'全场降雨',pattern:['fire','water','water','fire'],delivery:'global',castMs:900,range:0,radius:0,effects:[{type:'environment',kind:'rain',durationMs:12000}]},
@@ -61,6 +68,11 @@ export function resolveSpell(elements:readonly Element[],staff?:StaffModifier):S
  let plan:SpellPlan=recipe?{...recipe,elements:[...elements],channel:Boolean(recipe.channel),pierce:recipe.pierce??0,tickMs:recipe.tickMs??150,recoveryMs:recipe.recoveryMs??180,projectileSpeed:recipe.projectileSpeed??600,coneAngle:recipe.coneAngle??.9,traits:[...(recipe.traits??[])]}:{id:`mixed:${elements.join('-')}`,elements:[...elements],...bases[elements[0]! ],traits:[]};
  if(!recipe&&elements.length>1){plan={...plan,name:`混合${plan.name}`};for(let i=1;i<elements.length;i++)plan=POSITION_MODIFIERS[(i+1) as 2|3|4][elements[i]!](plan);}
  plan={...plan,presentation:presentationFor(plan)};return staff?.matches(plan)?staff.transform(plan):plan;
+}
+export function resolvePlayerSpell(elements:readonly Element[],inventory:readonly InventoryItem[],cooldowns:Readonly<Record<string,number>>,now=Date.now(),staff?:StaffModifier):SpellPlan|null{
+ const scroll=SCROLLS.find(definition=>same(definition.pattern,elements)&&inventory.some(item=>isScroll(item)&&item.spellId===definition.spellId));
+ if(scroll&&(cooldowns[scroll.spellId]??0)<=now){const effect:SpellEffect=scroll.spellId==='scroll-supernova'?{type:'current-health-damage',ratio:.5}:scroll.spellId==='scroll-equilibrium'?{type:'set-health',ratio:.5}:{type:'current-health-damage',ratio:.99,bossRatio:.5};const plan:SpellPlan={id:scroll.spellId,name:scroll.name,elements:[...elements],delivery:scroll.spellId==='scroll-annihilation'?'targeted':'global',castMs:650,channel:false,range:scroll.spellId==='scroll-annihilation'?700:0,radius:scroll.spellId==='scroll-annihilation'?75:0,effects:[effect],pierce:0,tickMs:150,recoveryMs:240,projectileSpeed:0,coneAngle:.9,traits:[]};plan.presentation=presentationFor(plan);return staff?.matches(plan)?staff.transform(plan):plan;}
+ return resolveSpell(elements,staff);
 }
 export function presentationFor(plan:Pick<SpellPlan,'id'|'delivery'>):SpellPresentation{return{telegraph:plan.id==='meteor'?'target-circle':plan.delivery==='area'||plan.delivery==='targeted'?'target-circle':plan.delivery==='cone'?'cone':'none',syncExecution:true,...(plan.delivery==='beam'?{channelUpdateMs:48}: {})};}
 
