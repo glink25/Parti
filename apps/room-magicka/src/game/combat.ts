@@ -1,4 +1,4 @@
-import { WORLD_HEIGHT,WORLD_WIDTH,type AimState,type ControlEffect,type ControlState,type EnemyState,type PendingCast,type Point,type SpellPlan } from './contracts';
+import { WORLD_HEIGHT,WORLD_WIDTH,type AimState,type ControlEffect,type ControlState,type EnemyState,type EnvironmentState,type PendingCast,type Point,type SpellPlan } from './contracts';
 
 export const ZERO_CONTROL:ControlState={vx:0,vy:0,z:0,vz:0,slowedUntil:0,slowScale:1,stunnedUntil:0};
 export function distance(a:Point,b:Point){return Math.hypot(a.x-b.x,a.y-b.y);}
@@ -13,6 +13,11 @@ export function projectionOnRay(origin:Point,angle:number,p:Point){const dx=Math
 export function beamTargets(origin:Point,angle:number,width:number,enemies:readonly EnemyState[],pierce:number,maxDistance=Infinity){return enemies.map(e=>({enemy:e,...projectionOnRay(origin,angle,e)})).filter(v=>v.along>=0&&v.along<=maxDistance&&v.perp<=width+v.enemy.radius).sort((a,b)=>a.along-b.along).slice(0,Math.max(1,pierce+1));}
 export function coneContains(origin:Point,angle:number,range:number,halfAngle:number,p:Point,radius=0){const d=distance(origin,p);if(d>range+radius)return false;return Math.abs(shortestAngle(angle,angleTo(origin,p)))<=halfAngle+Math.asin(Math.min(1,radius/Math.max(d,1)));}
 export function circleContains(center:Point,radius:number,p:Point,targetRadius=0){return distance(center,p)<=radius+targetRadius;}
+export function blackHoleZone(position:Point,hole:Pick<EnvironmentState,'x'|'y'|'radius'|'innerRadius'>){const d=distance(position,hole);return d<=(hole.innerRadius??0)?'inner':d<=hole.radius?'outer':'outside';}
+export function applyBlackHolePull(velocity:Pick<ControlState,'vx'|'vy'>,position:Point,hole:Pick<EnvironmentState,'x'|'y'|'radius'|'innerRadius'|'pullStrength'>,dt:number){
+ const d=distance(position,hole);if(d>hole.radius||d<1)return{vx:velocity.vx,vy:velocity.vy};const inner=hole.innerRadius??0,base=hole.pullStrength??700,acceleration=d<=inner?base*3.5:base*(.35+.65*(1-(d-inner)/Math.max(1,hole.radius-inner))),direction=normalize(position,hole);
+ return{vx:velocity.vx+direction.x*acceleration*dt,vy:velocity.vy+direction.y*acceleration*dt};
+}
 export function createPending(id:string,aim:AimState,releasedAt:number):PendingCast{return{id,plan:aim.plan,origin:{x:0,y:0},target:{...aim.target},releasedAt,triggersAt:releasedAt+aim.plan.castMs};}
 export function canAct(control:ControlState,now:number){return control.z<=0&&control.stunnedUntil<=now;}
 export function applyControl(state:ControlState,effect:ControlEffect,direction:Point,now:number){const next={...state};if(effect.kind==='knockback'){next.vx+=direction.x*effect.strength;next.vy+=direction.y*effect.strength;}else if(effect.kind==='knockup'){next.vz=Math.max(next.vz,effect.strength);next.z=Math.max(1,next.z);}else if(effect.kind==='slow'){next.slowedUntil=Math.max(next.slowedUntil,now+effect.durationMs);next.slowScale=Math.min(next.slowScale,effect.strength);}else next.stunnedUntil=Math.max(next.stunnedUntil,now+effect.durationMs);return next;}

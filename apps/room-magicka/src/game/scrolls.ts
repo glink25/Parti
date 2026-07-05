@@ -5,7 +5,8 @@ export type ScrollDefinition={spellId:string;name:string;pattern:Element[];coold
 export const SCROLLS:readonly ScrollDefinition[]=[
  {spellId:'scroll-supernova',name:'超新星爆发',pattern:['lightning','life','shield','fire'],cooldownMs:20000,price:110,weight:.8,description:'当前房间所有存活实体损失50%当前生命'},
  {spellId:'scroll-equilibrium',name:'均衡术',pattern:['rock','shield','ice','life'],cooldownMs:20000,price:100,weight:1,description:'当前房间所有存活实体变为50%最大生命'},
- {spellId:'scroll-annihilation',name:'湮灭术',pattern:['rock','ice','life'],cooldownMs:20000,price:120,weight:.9,description:'唯一目标损失99%当前生命，Boss为50%'}
+ {spellId:'scroll-annihilation',name:'湮灭术',pattern:['rock','ice','life'],cooldownMs:20000,price:120,weight:.9,description:'唯一目标损失99%当前生命，Boss为50%'},
+ {spellId:'scroll-black-hole',name:'黑洞',pattern:['shield','rock','rock','shield'],cooldownMs:20000,price:125,weight:.75,description:'制造持续8秒的双层黑洞，无差别牵引并伤害内圈实体'}
 ];
 export type ScrollSource='merchant'|'elite'|'boss'|'chest'|'cursed-chest';
 export const SCROLL_SOURCE_CHANCE:Record<ScrollSource,number>={merchant:.3,elite:.35,boss:1,chest:.02,'cursed-chest':.06};

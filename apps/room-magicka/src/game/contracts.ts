@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=16, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=17, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
 export const BIOMES=['ruins','swamp','volcano'] as const;
 export type BiomeId=(typeof BIOMES)[number];
 export type Point={x:number;y:number};
@@ -31,7 +31,7 @@ export type PendingCast={id:string;plan:SpellPlan;origin:Point;target:Point;rele
 export type ActiveBeam={id:string;plan:SpellPlan;angle:number;targetAngle:number;startedAt:number;nextDamageAt:number;pointerId:number};
 export type ActiveProjectile={id:string;ownerId:string;spellId:string;element:Element;x:number;y:number;vx:number;vy:number;radius:number;remainingPierce:number;expiresAt:number;effects:SpellEffect[];traits:SpellTrait[];hitIds:string[]};
 export type SpellVisual={id:string;kind:'cone'|'impact'|'beam'|'projectile'|'heal';origin:Point;target:Point;radius:number;angle:number;coneAngle?:number;color:Element;startedAt:number;endsAt:number};
-export type SharedSpellVisual={eventId:string;sourcePlayerId:string;kind:SpellVisual['kind'];origin:Point;target:Point;radius:number;angle:number;coneAngle:number;color:Element;durationMs:number};
+export type SharedSpellVisual={eventId:string;sourcePlayerId:string;kind:SpellVisual['kind'];origin:Point;target:Point;radius:number;angle:number;coneAngle:number;color:Element;durationMs:number;castId?:string;reflected?:boolean};
 export type FloatingText={id:string;x:number;y:number;text:string;color:string;startedAt:number;endsAt:number};
 export type EquipmentSlot='staff'|'robe'|'ring';
 export type EquipmentAffixId='element-power'|'recipe-power'|'stealth'|'tenacity'|'element-immunity'|'beam-reflect'|'beam-pierce'|'combat-vision'|'cast-speed'|'area-power'|'damage-reduction'|'move-speed';
@@ -52,8 +52,8 @@ export type EnemyAttackState={kind:EnemyAttackKind;targetId:string;startedAt:num
 export type EnemyTag='undead';
 export type EnemyState={id:string;roomId:string;kind:EnemyKind;x:number;y:number;hp:number;maxHp:number;radius:number;targetId:string|null;nextAttackAt:number;attack:EnemyAttackState|null;statuses:StatusInstance[];controls:ControlState;flashUntil:number;revision:number;tags?:EnemyTag[];freezeImmuneUntil?:number;lastStatusTickAt?:number;elite?:boolean;behaviorPhase?:number;mechanicState?:string};
 export type HostProjectile={id:string;roomId:string;kind:'bolt'|'water-bolt';sourceId:string;x:number;y:number;vx:number;vy:number;radius:number;damage:number;element?:Element;expiresAt:number;control?:ControlEffect};
-export type EnvironmentKind='rain'|'steam'|'water-pool'|'ice-wall'|'storm-field'|'gravity-well'|'fire-ring'|'life-barrier'|'overflow-heal'|'blizzard'|'lightning-barrage';
-export type EnvironmentState={id:string;kind:EnvironmentKind;x:number;y:number;radius:number;startedAt:number;endsAt:number;sourcePlayerId?:string;lastTickAt?:number;power?:number};
+export type EnvironmentKind='rain'|'steam'|'water-pool'|'ice-wall'|'storm-field'|'gravity-well'|'black-hole'|'fire-ring'|'life-barrier'|'overflow-heal'|'blizzard'|'lightning-barrage';
+export type EnvironmentState={id:string;kind:EnvironmentKind;x:number;y:number;radius:number;innerRadius?:number;damagePerTick?:number;pullStrength?:number;startedAt:number;endsAt:number;sourcePlayerId?:string;lastTickAt?:number;power?:number};
 export type RoomTemplateKind='standard'|'wide'|'tall';
 export type MapRoom={id:string;gridX:number;gridY:number;gridWidth:number;gridHeight:number;templateKind:RoomTemplateKind;templateTags:string[];x:number;y:number;width:number;height:number;connections:string[]};
 export type MapCorridor={id:string;fromRoomId:string;toRoomId:string;x:number;y:number;width:number;height:number};
