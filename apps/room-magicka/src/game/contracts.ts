@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=14, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=15, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
 export const BIOMES=['ruins','swamp','volcano'] as const;
 export type BiomeId=(typeof BIOMES)[number];
 export type Point={x:number;y:number};
@@ -82,7 +82,7 @@ export type CastPhase='committed'|'resolved'|'channeling'|'cancelled'|'ended';
 export type ActiveCast={castId:string;sourcePlayerId:string;spellId:string;phase:CastPhase;origin:Point;target:Point;committedAt:number;resolveAt:number;revision:number};
 export type SpellCastReport={castId:string;spellId:string;elements:Element[];phase:CastPhase;origin:Point;target:Point;revision:number};
 export type Phase='lobby'|'running'|'gameover'|'victory';
-export type GameState={schemaVersion:number;phase:Phase;hostId:string|null;startedAt:number|null;runSeed:number;stageIndex:number;biome:BiomeId;stageSeed:number;stage:StageProgress|null;activeCasts:Record<string,ActiveCast>;discoveredRecipeIds:string[];exploredRoomIds:string[];players:Record<string,PublicPlayer>;enemies:Record<string,EnemyState>;projectiles:Record<string,HostProjectile>;environments:Record<string,EnvironmentState>;hazards:Record<string,HazardState>;events:Record<string,WorldEventState>;encounters:Record<string,RegionEncounter>;loot:Record<string,LootEntity>;merchants:Record<string,MerchantState>;rewardEventIds:string[];authorityEventIds:string[];worldSequence:number;totalKills:number;victorySummary:VictorySummary|null;message:string};
+export type GameState={schemaVersion:number;phase:Phase;hostId:string|null;startedAt:number|null;runSeed:number;stageIndex:number;biome:BiomeId;stageSeed:number;stage:StageProgress|null;activeCasts:Record<string,ActiveCast>;discoveredRecipeIds:string[];exploredRoomIds:string[];playerOrder:string[];players:Record<string,PublicPlayer>;enemies:Record<string,EnemyState>;projectiles:Record<string,HostProjectile>;environments:Record<string,EnvironmentState>;hazards:Record<string,HazardState>;events:Record<string,WorldEventState>;encounters:Record<string,RegionEncounter>;loot:Record<string,LootEntity>;merchants:Record<string,MerchantState>;rewardEventIds:string[];authorityEventIds:string[];worldSequence:number;totalKills:number;victorySummary:VictorySummary|null;message:string};
 export type PlayerReport={sequence:number;x:number;y:number;z:number;hp:number;downed:boolean;elements:Element[];statuses:StatusInstance[];controls:ControlState;kills:number};
 export type HostWorldReport={sequence:number;enemies:EnemyState[];projectiles:HostProjectile[];environments:EnvironmentState[];hazards:HazardState[];events:WorldEventState[];encounters:RegionEncounter[];stage:StageProgress;loot:LootEntity[];merchants:MerchantState[]};
 export type EnemyDamageReport={eventId:string;worldSequence:number;enemyId:string;sourcePlayerId:string;spellId:string;amount:number;statuses:StatusInstance[];controls:ControlEffect[];direction:Point};

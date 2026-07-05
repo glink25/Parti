@@ -1,8 +1,22 @@
+import type {StatusInstance} from '../game/contracts';
+
 export type Rect={x:number;y:number;w:number;h:number};
 export type HudLayout={compact:boolean;status:Rect;message:Rect;minimap:Rect;inventoryButton:Rect;spellbookButton:Rect;elementPanel:Rect;elementCenters:Array<{x:number;y:number;r:number}>};
 export type UiMessageCategory='tip'|'combat'|'objective'|'warning'|'system';
 export type UiMessage={id:number;text:string;category:UiMessageCategory;priority:number;createdAt:number;expiresAt:number;dedupeKey?:string;count:number};
 export type UiMessageInput={text:string;category?:UiMessageCategory;priority?:number;durationMs?:number;dedupeKey?:string};
+export type MinimapMarkerStyle={fill:string;radius:number;alert:'none'|'low'|'downed'};
+export type PlayerRenderMode='normal'|'local-stealth'|'remote-stealth';
+
+const STATUS_NAMES:Record<StatusInstance['kind'],string>={wet:'潮湿',burning:'燃烧',chilled:'减速',frozen:'冻结',shocked:'感电',shielded:'护盾','fire-ward':'防火','frost-ward':'防冻','water-ward':'防潮',haste:'加速'};
+export function activeStatusText(statuses:readonly StatusInstance[]){return statuses.slice(0,4).map(status=>STATUS_NAMES[status.kind]).join(' · ');}
+export function minimapMarkerStyle(isLocal:boolean,hp:number,downed:boolean):MinimapMarkerStyle{
+ if(isLocal)return{fill:'#ffe06a',radius:2.5,alert:'none'};
+ if(downed)return{fill:'#ff4f5e',radius:4,alert:'downed'};
+ if(hp<30)return{fill:'#ff9f43',radius:3.5,alert:'low'};
+ return{fill:'#78b7ff',radius:2.5,alert:'none'};
+}
+export function playerRenderMode(isLocal:boolean,stealthActive:boolean):PlayerRenderMode{return!stealthActive?'normal':isLocal?'local-stealth':'remote-stealth';}
 
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 export const contains=(rect:Rect,p:{x:number;y:number})=>p.x>=rect.x&&p.x<=rect.x+rect.w&&p.y>=rect.y&&p.y<=rect.y+rect.h;
