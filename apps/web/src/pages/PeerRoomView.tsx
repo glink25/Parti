@@ -449,13 +449,13 @@ function PeerHostSession({
         {!fullscreen && <ResponsiveRoomControls open={controlsOpen} onOpenChange={setControlsOpen} props={controlsProps} />}
       </div>
       {!fullscreen && import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />}
-      {!fullscreen && <InviteQrDialog
+      <InviteQrDialog
         open={qrOpen}
         onOpenChange={setQrOpen}
         inviteUrl={inviteUrl}
         inviterName={localUser.name}
         roomTitle={roomTitle}
-      />}
+      />
       {fullscreen && <RoomControlsSheet open={controlsOpen} onOpenChange={setControlsOpen} props={controlsProps} />}
     </div>
   );
