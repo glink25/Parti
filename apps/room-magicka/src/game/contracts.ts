@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION=11, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
+export const SCHEMA_VERSION=12, WORLD_WIDTH=7800, WORLD_HEIGHT=5100, ELEMENT_SLOTS=4;
 export const BIOMES=['ruins','swamp','volcano'] as const;
 export type BiomeId=(typeof BIOMES)[number];
 export type Point={x:number;y:number};
@@ -34,7 +34,7 @@ export type SpellVisual={id:string;kind:'cone'|'impact'|'beam'|'projectile'|'hea
 export type SharedSpellVisual={eventId:string;sourcePlayerId:string;kind:SpellVisual['kind'];origin:Point;target:Point;radius:number;angle:number;coneAngle:number;color:Element;durationMs:number};
 export type FloatingText={id:string;x:number;y:number;text:string;color:string;startedAt:number;endsAt:number};
 export type EquipmentSlot='staff'|'robe'|'ring';
-export type EquipmentStats={spellPower:number;castSpeed:number;damageReduction:number;moveSpeed:number};
+export type EquipmentStats={elementPower:Partial<Record<Element,number>>;castSpeed:number;areaPower:number;damageReduction:number;moveSpeed:number};
 export type EquipmentItem={id:string;prototypeId:string;name:string;slot:EquipmentSlot;rarity:'common'|'uncommon'|'rare';stats:EquipmentStats;affixes:string[];biome:BiomeId;mechanicId:string;description:string};
 export type ScrollItem={id:string;kind:'scroll';name:string;spellId:string;cooldownMs:number;description:string};
 export type InventoryItem=EquipmentItem|ScrollItem;
