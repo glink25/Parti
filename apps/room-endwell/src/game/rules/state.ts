@@ -1,0 +1,8 @@
+import type { CastState, Combatant, EntityState, FactionTeam, GameState, PlayerState, Vec2 } from '../contracts';
+
+export const idleCast = (aim: Vec2 = { x: 1, y: 0 }): CastState => ({ phase: 'idle', castId: null, spell: null, startedAt: 0, phaseEndsAt: null, aim, target: { x: 0, y: 0 } });
+export function combatant(team: FactionTeam, factionId: string, hp: number): Combatant { return { health: { current: hp, max: hp }, damageable: { canReceiveDamage: true, canReceiveHeal: true }, faction: { id: factionId, team }, statuses: {}, buildup: {}, buffs: [], shields: [], resistances: {}, cast: idleCast() }; }
+export function player(id: string, name: string, index: number): PlayerState { return { id, name, connected: true, alive: true, position: { x: 180 + index * 80, y: 360 }, aim: { x: 1, y: 0 }, positionEpoch: 0, lastPoseSequence: 0, lastCastSequence: 0, equipment: {}, ...combatant('player', 'players', 100) }; }
+export function trainingMonster(now: number): EntityState { return { id: 'monster:training', kind: 'monster', position: { x: 680, y: 360 }, radius: 34, createdAt: now, expiresAt: null, detached: true, obstacle: { blocksMovement: true, blocksProjectile: true, blocksBeam: true, blocksSpray: true, material: 'flesh' }, ...combatant('monster', 'monsters', 500) }; }
+export function initialState(): GameState { return { schemaVersion: 1, phase: 'lobby', hostId: null, seed: 1, worldTime: 0, startedAt: null, players: {}, entities: {}, environment: { global: null, fields: [] }, seen: { hits: {}, spawns: {} }, message: '等待开始' }; }
+export function normalize(value: Vec2): Vec2 { const length = Math.hypot(value.x, value.y); return length > .0001 ? { x: value.x / length, y: value.y / length } : { x: 1, y: 0 }; }

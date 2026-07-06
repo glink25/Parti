@@ -1,0 +1,24 @@
+import { createGameRuntime, createPartiSyncPlugin, type GameRuntime, type StateAdapter } from '@parti/flow';
+import type { CastAimPayload, Element, GameEvent, GameState, HitRequestPayload, PartiApi, PosePayload, Vec2 } from '../game/contracts';
+import { endwellGame } from '../game/definition';
+import { positionAt } from '../game/rules/entities';
+import { acceptRemoteFrame, needsHardCorrection, remotePosition, type RemoteMotion, type RemotePoseFrame } from './remoteMotion';
+
+export type EndwellFlow = { game: GameRuntime; pose(payload: PosePayload): void; cast(sequence: number, elements: Element[], aim: Vec2, target: Vec2): string; aim(payload: CastAimPayload): void; release(castId: string): void; hit(payload: HitRequestPayload): void; start(): void; finish(): void };
+export type EndwellHandlers = { state(state: GameState): void; event(event: GameEvent): void };
+
+export function createEndwellFlow(api: PartiApi, handlers: EndwellHandlers): EndwellFlow {
+  let runtime: GameRuntime | null = null; const synced = new Set<string>(), motions = new Map<string, RemoteMotion>();
+  const adapter: StateAdapter = { get: () => undefined, set(path, value) { if (path !== '' || !runtime) return; const state = value as GameState; const active = new Set<string>();
+    for (const p of Object.values(state.players)) { active.add(p.id); if (!runtime.world.has(p.id)) runtime.world.spawn({ id: p.id, type: 'player', components: { Transform: p.position, Radius: 24, PlayerState: p, PositionEpoch: p.positionEpoch } }); else { const epoch = runtime.world.getComponent<number>(p.id, 'PositionEpoch') ?? -1, current = runtime.world.getComponent<Vec2>(p.id, 'Transform') ?? p.position; runtime.world.setComponent(p.id, 'PlayerState', p); if (epoch !== p.positionEpoch || p.id !== runtime.playerId && needsHardCorrection(current, p.position)) { runtime.world.setComponent(p.id, 'Transform', p.position); runtime.world.setComponent(p.id, 'PositionEpoch', p.positionEpoch); if (p.id !== runtime.playerId) { const frame: RemotePoseFrame = { playerId: p.id, sequence: p.lastPoseSequence, sentAt: Date.now(), position: p.position, aim: p.aim }; motions.set(p.id, acceptRemoteFrame(undefined, frame, performance.now())); } } } }
+    for (const entity of Object.values(state.entities)) { active.add(entity.id); const position = positionAt(entity, Date.now()); if (!runtime.world.has(entity.id)) runtime.world.spawn({ id: entity.id, type: entity.kind, components: { Transform: position, RemoteTarget: position, Radius: entity.radius, EntityState: entity, Velocity: entity.velocity, Lifetime: entity.expiresAt } }); else { runtime.world.setComponent(entity.id, 'EntityState', entity); runtime.world.setComponent(entity.id, 'RemoteTarget', position); runtime.world.setComponent(entity.id, 'Velocity', entity.velocity); runtime.world.setComponent(entity.id, 'Lifetime', entity.expiresAt); } }
+    for (const id of synced) if (!active.has(id) && runtime.world.has(id)) runtime.world.destroy(id); synced.clear(); for (const id of active) synced.add(id); handlers.state(state);
+  } };
+  const game = runtime = createGameRuntime(endwellGame, { role: 'client', playerId: api.playerId ?? 'pending', stateAdapter: adapter });
+  const eventTypes = ['damage_applied', 'heal_applied', 'status_applied', 'reaction_triggered', 'cast_started', 'cast_interrupted', 'entity_spawned', 'entity_destroyed'] as const;
+  for (const type of eventTypes) game.events.on<GameEvent>(`endwell.${type}`, handlers.event);
+  game.events.on<RemotePoseFrame>('endwell.player_pose', (frame) => { if (frame.playerId === game.playerId) return; motions.set(frame.playerId, acceptRemoteFrame(motions.get(frame.playerId), frame, performance.now())); });
+  game.use(createPartiSyncPlugin(api));
+  game.addSystem({ update(ctx) { const now = performance.now(); for (const [id, motion] of motions) if (ctx.world.has(id)) ctx.world.setComponent(id, 'Transform', remotePosition(motion, now)); } });
+  return { game, pose: (payload) => { game.action('player.pose', payload); }, cast: (sequence, elements, aim, target) => { const castId = `${game.playerId}:cast:${sequence}`; game.action('cast.request', { castId, sequence, elements, aim, target }); return castId; }, aim: (payload) => { game.action('cast.aim', payload); }, release: (castId) => { game.action('cast.release', { castId }); }, hit: (payload) => { game.action('combat.hit', payload); }, start: () => { game.action('game.start', null); }, finish: () => { game.action('game.finish', null); } };
+}

@@ -1,0 +1,23 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "room-endwell",
+  "name": "Endwell 无底之尽",
+  "version": "0.1.0",
+  "packageMode": "filesystem",
+  "description": "多人元素组合 Roguelike 的核心战斗垂直切片",
+  "author": { "name": "Parti" },
+  "entry": { "ui": "index.html", "worker": "worker.js" },
+  "room": { "minPlayers": 1, "maxPlayers": 4 },
+  "sync": { "mode": "snapshot" },
+  "permissions": { "network": false, "storage": "session", "camera": false, "microphone": false, "clipboard": false, "sensors": [] },
+  "actions": {
+    "game.start": {},
+    "game.finish": {},
+    "player.pose": { "payload": "{ sequence, sentAt, position, aim }" },
+    "cast.request": { "payload": "{ castId, sequence, elements, aim, target }" },
+    "cast.aim": { "payload": "{ sequence, aim }" },
+    "cast.release": { "payload": "{ castId }" },
+    "combat.hit": { "payload": "{ hitId, sourceId, targetId, tick, reason }" }
+  }
+}
