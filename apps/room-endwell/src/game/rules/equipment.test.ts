@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EquipmentAffix, EquipmentItem, EquipmentSlot, InventoryItem } from '../contracts';
-import { applyEquipmentToSpell, canFuse, createCatalyst, fuseEquipment, generateEquipment, isEquipment, sellPrice } from './equipment';
+import { applyEquipmentToSpell, canFuse, createCatalyst, createInitialLoot, createMerchant, fuseEquipment, generateEquipment, isCatalyst, isEquipment, isScroll, sellPrice } from './equipment';
+import { createScroll, SCROLLS } from './scrolls';
 import { resolveSpell } from './spells';
 
 const item = (slot: EquipmentSlot, affixes: EquipmentAffix[] = []): EquipmentItem => ({ id: `test:${slot}:${affixes.length}`, slot, rarity: affixes.length ? 'excellent' : 'normal', name: '测试装备', visualKey: `test.${slot}`, affixes, tags: [slot], description: 'test', value: 40, fusionGeneration: 0, sourceItemValues: [40] });
@@ -48,5 +49,20 @@ describe('equipment economy', () => {
     expect(isEquipment(equipment)).toBe(true);
     expect(sellPrice(equipment)).toBe(20);
     expect(sellPrice(createCatalyst(1, 'test'))).toBe(0);
+  });
+
+  it('adds scrolls to economy without making them fusion materials', () => {
+    const scroll = createScroll('black-hole', 'test');
+    expect(isScroll(scroll)).toBe(true);
+    expect(sellPrice(scroll)).toBe(Math.floor(scroll.value * .5));
+    expect(canFuse([item('staff'), item('staff'), scroll])).toBe(false);
+    const merchantStock = createMerchant(7).stock.map((entry) => entry.item), loot = Object.values(createInitialLoot(7)).map((entry) => entry.item);
+    for (const scroll of SCROLLS) {
+      expect(merchantStock.some((item) => isScroll(item) && item.scrollId === scroll.id)).toBe(true);
+      expect(loot.some((item) => isScroll(item) && item.scrollId === scroll.id)).toBe(true);
+    }
+    expect(merchantStock.filter(isCatalyst)).toHaveLength(3);
+    expect(loot.filter(isCatalyst)).toHaveLength(2);
+    expect(loot.filter(isEquipment).filter((entry) => entry.rarity === 'rare')).toHaveLength(6);
   });
 });

@@ -2,18 +2,170 @@ import { describe, expect, it } from 'vitest';
 import type { FlowReducerContext, GameAction } from '@parti/flow';
 import type { GameState, SpellSpec } from './contracts';
 import { endwellGame } from './definition';
+import { spawnSpellEntity } from './rules/entities';
 import { createCatalyst, generateEquipment } from './rules/equipment';
-import { initialState, player } from './rules/state';
+import { createScroll, resolveScrollSpell } from './rules/scrolls';
+import { initialState, player, trainingMonster } from './rules/state';
 import { resolveSpell } from './rules/spells';
 
 function setup(spell: SpellSpec) { const state = initialState(), p = state.players.p1 = player('p1', 'one', 0), timers: Array<{ action: string; payload: unknown }> = []; state.phase = 'running'; p.cast = { phase: 'chanting', castId: 'p1:cast:1', spell, startedAt: 0, phaseEndsAt: 100, aim: { x: 1, y: 0 }, target: { x: 600, y: 300 } }; const actor = { id: p.id, name: p.name, role: 'host' as const }, ctx: FlowReducerContext<GameState> = { state, role: 'authority', actor, players: [actor], host: actor, now: () => 1000, random: () => .5, timers: { dispatch(_name, _delay, action, payload) { timers.push({ action, payload }); }, clear() {} }, emit() {}, dispatch() {}, kick() {} }; const action = { id: 'a', type: '', payload: null, from: p.id, seq: 1, origin: 'host', createdAt: 0 } as GameAction; return { state, p, ctx, action, timers }; }
 describe('delivery activation', () => {
   it('applies shields without spawning a fake hit source', () => { const test = setup(resolveSpell(['fire', 'shield'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); expect(test.p.shields).toHaveLength(1); expect(test.state.entities).toEqual({}); expect(test.p.cast.phase).toBe('recovery'); });
+  it('applies special shield ward statuses', () => { const test = setup(resolveSpell(['shield', 'fire'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); expect(test.p.shields[0]?.tags).toContain('fireWard'); expect(test.p.statuses.fireWard).toBeDefined(); });
+  it('activates instant teleport and resurrection effects', () => {
+    const teleport = setup(resolveSpell(['lightning', 'shield', 'lightning']));
+    endwellGame.actions['internal.castActivate']!.reduce(teleport.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, teleport.action);
+    expect(teleport.p.position).toEqual({ x: 600, y: 300 });
+    const resurrect = setup(resolveSpell(['lightning', 'life', 'lightning'])), ally = resurrect.state.players.p2 = player('p2', 'two', 1);
+    ally.position = { x: 610, y: 310 };
+    ally.alive = false;
+    ally.health.current = 0;
+    endwellGame.actions['internal.castActivate']!.reduce(resurrect.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, resurrect.action);
+    expect(ally.alive).toBe(true);
+    expect(ally.health.current).toBe(25);
+  });
   it('creates meteor warning then impact', () => { const test = setup(resolveSpell(['fire', 'rock', 'rock', 'fire'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); expect(test.state.entities['p1:cast:1:warning:0']?.source).toBeUndefined(); endwellGame.actions['internal.areaImpact']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); expect(test.state.entities['p1:cast:1:warning:0']).toBeUndefined(); expect(test.state.entities['p1:cast:1:area:0']?.source?.spell.id).toBe('meteor'); });
   it('starts rain and advances authoritative wet ticks', () => { const test = setup(resolveSpell(['fire', 'water', 'water', 'fire'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); const environment = test.state.environment.global!; expect(environment.kind).toBe('rain'); for (let i = 0; i < 6; i++) endwellGame.actions['internal.environmentTick']!.reduce(test.ctx, { environmentId: environment.id }, test.action); expect(test.p.statuses.wet).toBeDefined(); expect(test.p.statuses.burning).toBeUndefined(); endwellGame.actions['internal.environmentExpire']!.reduce(test.ctx, { environmentId: environment.id }, test.action); expect(test.state.environment.global).toBeNull(); });
+  it('starts blizzard and advances chilled ticks', () => { const test = setup(resolveSpell(['water', 'ice', 'ice', 'water'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); const environment = test.state.environment.global!; expect(environment.kind).toBe('blizzard'); for (let i = 0; i < 5; i++) endwellGame.actions['internal.environmentTick']!.reduce(test.ctx, { environmentId: environment.id }, test.action); expect(test.p.statuses.chilled).toBeDefined(); });
+  it('activates scroll instant effects and black hole fields', () => {
+    const supernova = setup(resolveScrollSpell(createScroll('supernova', 'test').elements, Object.assign(player('tmp', 'tmp', 0), { inventory: [createScroll('supernova', 'test')] }), 0)!);
+    supernova.state.entities['monster:training'] = { ...player('m', 'monster', 0), id: 'monster:training', kind: 'monster', position: { x: 500, y: 300 }, radius: 30, createdAt: 0, expiresAt: null, detached: true };
+    supernova.state.entities['monster:training'].health.current = 400;
+    endwellGame.actions['internal.castActivate']!.reduce(supernova.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, supernova.action);
+    expect(supernova.p.health.current).toBe(50);
+    expect(supernova.state.entities['monster:training']?.health.current).toBe(200);
+
+    const equilibrium = setup(resolveScrollSpell(createScroll('equilibrium', 'test').elements, Object.assign(player('tmp', 'tmp', 0), { inventory: [createScroll('equilibrium', 'test')] }), 0)!);
+    equilibrium.p.health.current = 10;
+    endwellGame.actions['internal.castActivate']!.reduce(equilibrium.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, equilibrium.action);
+    expect(equilibrium.p.health.current).toBe(50);
+
+    const annihilation = setup(resolveScrollSpell(createScroll('annihilation', 'test').elements, Object.assign(player('tmp', 'tmp', 0), { inventory: [createScroll('annihilation', 'test')] }), 0)!);
+    annihilation.state.entities['monster:one'] = { ...player('m', 'monster', 0), id: 'monster:one', kind: 'monster', position: { x: 610, y: 300 }, radius: 30, createdAt: 0, expiresAt: null, detached: true };
+    annihilation.state.entities['monster:one'].health.current = 500;
+    endwellGame.actions['internal.castActivate']!.reduce(annihilation.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, annihilation.action);
+    expect(annihilation.state.entities['monster:one']?.health.current).toBeCloseTo(5);
+
+    const blackHole = setup(resolveScrollSpell(createScroll('black-hole', 'test').elements, Object.assign(player('tmp', 'tmp', 0), { inventory: [createScroll('black-hole', 'test')] }), 0)!);
+    endwellGame.actions['internal.castActivate']!.reduce(blackHole.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, blackHole.action);
+    expect(blackHole.state.entities['p1:cast:1:summon:0']).toMatchObject({ archetype: 'black-hole', radius: 340, source: { tickMs: 500 } });
+  });
 });
 
-function economySetup() { const state = initialState(), p = state.players.p1 = player('p1', 'one', 0), actor = { id: p.id, name: p.name, role: 'host' as const }, ctx: FlowReducerContext<GameState> = { state, role: 'authority', actor, players: [actor], host: actor, now: () => 2000, random: () => .5, timers: { dispatch() {}, clear() {} }, emit() {}, dispatch() {}, kick() {} }, action = { id: 'a', type: '', payload: null, from: p.id, seq: 1, origin: 'host', createdAt: 0 } as GameAction; state.phase = 'running'; return { state, p, ctx, action }; }
+describe('scroll spell priority', () => {
+  it('uses owned ready scrolls before normal element resolution and writes cooldown', () => {
+    const test = economySetup(), scroll = createScroll('supernova', 'test');
+    test.p.inventory.push(scroll);
+    endwellGame.actions['cast.request']!.reduce(test.ctx, { castId: 'p1:cast:1', sequence: 1, elements: scroll.elements, aim: { x: 1, y: 0 }, target: { x: 700, y: 300 } }, test.action);
+    expect(test.p.cast.spell?.id).toBe('supernova');
+    expect(test.p.scrollCooldowns.supernova).toBe(22_000);
+
+    test.p.cast = { phase: 'idle', castId: null, spell: null, startedAt: 0, phaseEndsAt: null, aim: { x: 1, y: 0 }, target: { x: 0, y: 0 } };
+    endwellGame.actions['cast.request']!.reduce(test.ctx, { castId: 'p1:cast:2', sequence: 2, elements: scroll.elements, aim: { x: 1, y: 0 }, target: { x: 700, y: 300 } }, test.action);
+    expect(test.p.cast.spell?.id).not.toBe('supernova');
+  });
+});
+
+function economySetup() { const state = initialState(), p = state.players.p1 = player('p1', 'one', 0), actor = { id: p.id, name: p.name, role: 'host' as const }, timers: Array<{ name: string; delay: number; action: string; payload: unknown; actorId?: string }> = [], events: Array<{ type: string; payload: unknown }> = [], ctx: FlowReducerContext<GameState> = { state, role: 'authority', actor, players: [actor], host: actor, now: () => 2000, random: () => .5, timers: { dispatch(name, delay, action, payload, actorId) { timers.push({ name, delay, action, payload, actorId }); }, clear() {} }, emit(type, payload) { events.push({ type, payload }); }, dispatch() {}, kick() {} }, action = { id: 'a', type: '', payload: null, from: p.id, seq: 1, origin: 'host', createdAt: 0 } as GameAction; state.phase = 'running'; return { state, p, ctx, action, timers, events }; }
+
+describe('death and respawn rules', () => {
+  it('kills players, interrupts their cast, and removes owned active sources', () => {
+    const test = economySetup(), target = test.state.players.p2 = player('p2', 'two', 1);
+    target.health.current = 1;
+    target.cast = { phase: 'active', castId: 'p2:cast:1', spell: resolveSpell(['water']), startedAt: 0, phaseEndsAt: 5000, aim: { x: 1, y: 0 }, target: { x: 500, y: 360 } };
+    spawnSpellEntity(test.state, target, target.cast.spell!, 1000);
+    test.p.cast = { phase: 'active', castId: 'p1:cast:1', spell: resolveSpell(['fire', 'rock']), startedAt: 0, phaseEndsAt: 0, aim: { x: 1, y: 0 }, target: target.position };
+    const source = spawnSpellEntity(test.state, test.p, test.p.cast.spell!, 1000);
+    endwellGame.actions['combat.hit']!.reduce(test.ctx, { hitId: 'death:player', sourceId: source.id, targetId: target.id, tick: 1, reason: 'hit' }, test.action);
+    expect(target.alive).toBe(false);
+    expect(target.cast.phase).toBe('idle');
+    expect(Object.values(test.state.entities).some((entity) => entity.ownerId === target.id)).toBe(false);
+  });
+
+  it('rejects player actions while dead', () => {
+    const test = economySetup(), merchant = test.state.merchant!, loot = Object.values(test.state.loot)[0]!, item = loot.item, forge = test.state.forge!;
+    test.p.alive = false;
+    test.p.inventory.push(item, generateEquipment(4, 1), generateEquipment(4, 2));
+    const payloads = [
+      ['player.pose', { sequence: 1, sentAt: 2000, position: test.p.position, aim: { x: 1, y: 0 } }],
+      ['cast.request', { castId: 'p1:cast:1', sequence: 1, elements: ['fire'], aim: { x: 1, y: 0 }, target: { x: 500, y: 360 } }],
+      ['cast.aim', { sequence: 1, aim: { x: 1, y: 0 } }],
+      ['cast.release', { castId: 'p1:cast:1' }],
+      ['inventory.equip', { itemId: item.id }],
+      ['inventory.unequip', { itemId: item.id }],
+      ['inventory.drop', { itemId: item.id }],
+      ['inventory.pickup', { lootId: loot.id }],
+      ['merchant.buy', { merchantId: merchant.id, itemId: merchant.stock[0]!.item.id }],
+      ['merchant.sell', { merchantId: merchant.id, itemId: item.id }],
+      ['forge.fuse', { forgeId: forge.id, itemIds: test.p.inventory.slice(0, 3).map((entry) => entry.id) }],
+    ] as const;
+    for (const [type, payload] of payloads) expect(endwellGame.actions[type]!.validate!(test.ctx, payload).ok).toBe(false);
+  });
+
+  it('rejects hits from dead owners and lets resurrection restore action eligibility', () => {
+    const test = economySetup(), ally = test.state.players.p2 = player('p2', 'two', 1);
+    test.p.alive = false;
+    test.p.cast = { phase: 'active', castId: 'p1:cast:1', spell: resolveSpell(['fire', 'rock']), startedAt: 0, phaseEndsAt: 0, aim: { x: 1, y: 0 }, target: ally.position };
+    const source = spawnSpellEntity(test.state, test.p, test.p.cast.spell!, 1000);
+    expect(endwellGame.actions['combat.hit']!.validate!(test.ctx, { hitId: 'dead-owner', sourceId: source.id, targetId: ally.id, tick: 1, reason: 'hit' }).ok).toBe(false);
+
+    test.p.position = { x: 610, y: 310 };
+    test.p.health.current = 0;
+    ally.cast = { phase: 'chanting', castId: 'p2:cast:1', spell: resolveSpell(['lightning', 'life', 'lightning']), startedAt: 0, phaseEndsAt: 100, aim: { x: -1, y: 0 }, target: test.p.position };
+    const allyCtx = { ...test.ctx, actor: { id: ally.id, name: ally.name, role: 'player' as const } };
+    endwellGame.actions['internal.castActivate']!.reduce(allyCtx, { playerId: ally.id, castId: 'p2:cast:1' }, test.action);
+    expect(test.p.alive).toBe(true);
+    expect(test.p.health.current).toBe(25);
+    expect(endwellGame.actions['player.pose']!.validate!(test.ctx, { sequence: 1, sentAt: 2000, position: test.p.position, aim: { x: 1, y: 0 } }).ok).toBe(true);
+  });
+
+  it('respawns the training monster after a delayed authoritative action', () => {
+    const test = economySetup(), monster = trainingMonster(0);
+    monster.health.current = 1;
+    test.state.entities[monster.id] = monster;
+    test.p.cast = { phase: 'active', castId: 'p1:cast:1', spell: resolveSpell(['fire', 'rock']), startedAt: 0, phaseEndsAt: 0, aim: { x: 1, y: 0 }, target: monster.position };
+    const source = spawnSpellEntity(test.state, test.p, test.p.cast.spell!, 1000);
+    endwellGame.actions['combat.hit']!.reduce(test.ctx, { hitId: 'death:monster', sourceId: source.id, targetId: monster.id, tick: 1, reason: 'hit' }, test.action);
+    expect(test.state.entities[monster.id]).toBeUndefined();
+    expect(test.timers).toContainEqual(expect.objectContaining({ action: 'internal.trainingMonsterRespawn', delay: 3000 }));
+    endwellGame.actions['internal.trainingMonsterRespawn']!.reduce(test.ctx, {}, test.action);
+    expect(test.state.entities[monster.id]).toMatchObject({ id: monster.id, kind: 'monster', health: { current: 500, max: 500 } });
+  });
+});
+
+describe('force motion integration', () => {
+  it('integrates player force velocity over authority ticks and decays it', () => {
+    const test = economySetup(), epoch = test.p.positionEpoch;
+    test.p.position = { x: 180, y: 360 };
+    test.p.forceVelocity = { x: 100, y: 0 };
+    endwellGame.systems![0]!.update(test.ctx, .1);
+    expect(test.p.position.x).toBeCloseTo(190);
+    expect(test.p.positionEpoch).toBe(epoch + 1);
+    expect(test.p.forceVelocity?.x).toBeLessThan(100);
+  });
+
+  it('lets player pose input oppose gravity-like force instead of snapping to the center', () => {
+    const test = economySetup();
+    test.p.position = { x: 500, y: 360 };
+    test.p.forceVelocity = { x: -100, y: 0 };
+    endwellGame.actions['player.pose']!.reduce(test.ctx, { sequence: 1, sentAt: 2000, position: { x: 530, y: 360 }, aim: { x: 1, y: 0 } }, test.action);
+    endwellGame.systems![0]!.update(test.ctx, .1);
+    expect(test.p.position.x).toBeGreaterThan(500);
+    expect(test.p.position.x).toBeLessThan(530);
+    expect(test.p.forceVelocity?.x).toBeLessThan(0);
+  });
+
+  it('integrates monster force velocity without using projectile velocity', () => {
+    const test = economySetup(), monster = test.state.entities['monster:training'] = trainingMonster(0);
+    monster.position = { x: 500, y: 360 };
+    monster.forceVelocity = { x: -80, y: 0 };
+    monster.velocity = { x: 999, y: 0 };
+    endwellGame.systems![0]!.update(test.ctx, .1);
+    expect(monster.position.x).toBeCloseTo(492);
+    expect(monster.velocity).toEqual({ x: 999, y: 0 });
+    expect(monster.forceVelocity?.x).toBeGreaterThan(-80);
+  });
+});
 
 describe('economy reducers', () => {
   it('buys and sells near the merchant', () => {
@@ -21,10 +173,10 @@ describe('economy reducers', () => {
     test.p.position = { ...merchant.position };
     endwellGame.actions['merchant.buy']!.reduce(test.ctx, { merchantId: merchant.id, itemId: entry.item.id }, test.action);
     expect(test.p.inventory).toContainEqual(entry.item);
-    expect(test.p.gold).toBe(120 - entry.price);
+    expect(test.p.gold).toBe(9999 - entry.price);
     endwellGame.actions['merchant.sell']!.reduce(test.ctx, { merchantId: merchant.id, itemId: entry.item.id }, test.action);
     expect(test.p.inventory.some((item) => item.id === entry.item.id)).toBe(false);
-    expect(test.p.gold).toBe(120 - entry.price + Math.floor(entry.item.value * .5));
+    expect(test.p.gold).toBe(9999 - entry.price + Math.floor(entry.item.value * .5));
   });
 
   it('picks up and drops nearby loot', () => {
@@ -54,14 +206,14 @@ describe('economy reducers', () => {
     test.p.position = { ...forge.position };
     test.p.inventory = [0, 1, 2].map((index) => ({ ...generateEquipment(10, index), slot: 'staff' as const }));
     endwellGame.actions['forge.fuse']!.reduce(test.ctx, { forgeId: forge.id, itemIds: test.p.inventory.map((item) => item.id) }, test.action);
-    expect(test.p.gold).toBe(70);
+    expect(test.p.gold).toBe(9949);
     expect(test.state.forgeUses[forge.id]?.[test.p.id]).toBe(1);
     expect(test.p.inventory).toHaveLength(1);
     const next = [3, 4].map((index) => ({ ...generateEquipment(10, index), slot: 'staff' as const })), orb = createCatalyst(10, 'test');
     test.p.inventory.push(...next, orb);
     endwellGame.actions['forge.fuse']!.reduce(test.ctx, { forgeId: forge.id, itemIds: [next[0]!.id, next[1]!.id, orb.id] }, test.action);
-    expect(test.p.gold).toBe(70);
-    expect(test.state.forgeUses[forge.id]?.[test.p.id]).toBe(1);
+    expect(test.p.gold).toBe(9849);
+    expect(test.state.forgeUses[forge.id]?.[test.p.id]).toBe(2);
   });
 
   it('drops fusion result when backpack was full before fusing', () => {

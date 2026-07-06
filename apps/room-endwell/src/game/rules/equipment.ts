@@ -1,9 +1,11 @@
-import type { CatalystItem, DamageElement, Element, EquipmentAffix, EquipmentItem, EquipmentSlot, ForgeState, InventoryItem, MerchantState, PlayerEquipment, SpellSpec, Vec2 } from '../contracts';
+import type { CatalystItem, DamageElement, Element, EquipmentAffix, EquipmentItem, EquipmentSlot, ForgeState, InventoryItem, MerchantState, PlayerEquipment, ScrollId, SpellSpec, Vec2 } from '../contracts';
+import { createScroll, isScroll } from './scrolls';
 
 const ELEMENT_NAMES: Record<Element, string> = { rock: '岩', fire: '火', ice: '冰', life: '生命', lightning: '雷', water: '水', shield: '盾' };
 const SLOT_NAMES: Record<EquipmentSlot, string> = { staff: '法杖', robe: '法袍', ring: '法戒' };
 const NON_SHIELD_ELEMENTS: Array<Exclude<Element, 'shield'>> = ['rock', 'fire', 'ice', 'life', 'lightning', 'water'];
 const DAMAGE_ELEMENTS: DamageElement[] = ['physical', 'rock', 'fire', 'ice', 'life', 'lightning', 'water', 'shield', 'pure'];
+const TEST_SCROLLS: ScrollId[] = ['supernova', 'equilibrium', 'annihilation', 'black-hole'];
 
 type Prototype = { slot: EquipmentSlot; name: string; visualKey: string; tags: string[]; description: string };
 
@@ -63,6 +65,8 @@ export function isEquipment(item: InventoryItem | undefined): item is EquipmentI
   return Boolean(item && !('kind' in item));
 }
 
+export { isScroll };
+
 export function createCatalyst(seed: number, source: string): CatalystItem {
   return { id: `orb:${seed.toString(36)}:${source}`, kind: 'catalyst', name: '合成宝珠', description: '可替代第三件同类装备，使合成保留更多词缀。', value: 80 };
 }
@@ -79,12 +83,26 @@ export function generateEquipment(seed: number, index: number): EquipmentItem {
   return { id: `item:${seed.toString(36)}:${index}`, slot: prototype.slot, rarity, name: prototype.name, visualKey: prototype.visualKey, affixes, tags: [...prototype.tags, rarity], description: prototype.description, value, fusionGeneration: 0, sourceItemValues: [value] };
 }
 
+function trainingEquipment(seed: number, index: number, slot: EquipmentSlot): EquipmentItem {
+  const base = generateEquipment(seed ^ 0x74726169, index);
+  const element = NON_SHIELD_ELEMENTS[index % NON_SHIELD_ELEMENTS.length]!;
+  const backupElement: Exclude<Element, 'life' | 'shield'> = element === 'fire' ? 'lightning' : 'fire';
+  const affixes: EquipmentAffix[] = slot === 'staff'
+    ? element === 'life' ? [{ type: 'lifeHealBonus', value: .45 }, { type: 'elementDamageBonus', element: backupElement, value: .3 }] : [{ type: 'elementDamageBonus', element, value: .45 }, { type: 'elementDamageBonus', element: backupElement, value: .3 }]
+    : slot === 'robe'
+      ? [{ type: 'globalDamageReduction', value: .28 }, { type: 'moveSpeedBonus', value: .22 }]
+      : [{ type: 'chantTimeReduction', value: .3 }, { type: 'recoveryTimeReduction', value: .3 }, { type: 'rangeBonus', delivery: 'beam', value: .28 }];
+  return { ...base, id: `test:${seed.toString(36)}:${slot}:${index}`, slot, rarity: 'rare', name: `试炼${SLOT_NAMES[slot]} ${index + 1}`, affixes, tags: [slot, 'test', 'rare'], description: '测试阶段投放的高强度装备，便于快速验证战斗、合成与数值反馈。', value: 220, fusionGeneration: 0, sourceItemValues: [220] };
+}
+
 export function createMerchant(seed: number): MerchantState {
-  const stock: MerchantState['stock'] = [0, 1, 2].map((index) => {
-    const item = generateEquipment(seed ^ 0x6d657263, index + 10);
-    return { item, price: item.value };
+  const slots: EquipmentSlot[] = ['staff', 'staff', 'staff', 'robe', 'robe', 'ring', 'ring'];
+  const stock: MerchantState['stock'] = slots.map((slot, index) => {
+    const item = trainingEquipment(seed ^ 0x6d657263, index + 10, slot);
+    return { item, price: Math.floor(item.value * .6) };
   });
-  stock.push({ item: createCatalyst(seed, 'merchant'), price: 80 });
+  for (let i = 0; i < 3; i++) stock.push({ item: createCatalyst(seed + i, `merchant:${i}`), price: 40 });
+  for (const id of TEST_SCROLLS) stock.push({ item: createScroll(id, `merchant:${seed}`), price: Math.floor((createScroll(id, 'price').value) * .6) });
   return { id: 'merchant:wandering', position: { x: 760, y: 200 }, radius: 56, stock };
 }
 
@@ -93,14 +111,19 @@ export function createForge(): ForgeState {
 }
 
 export function createInitialLoot(seed: number) {
-  return Object.fromEntries([0, 1, 2].map((index) => {
-    const item = generateEquipment(seed ^ 0x6c6f6f74, index);
-    return [`loot:${index}`, { id: `loot:${index}`, position: { x: 420 + index * 62, y: 440 }, item, droppedByPlayerId: null, ownerPriorityUntil: 0 }];
-  }));
+  const slots: EquipmentSlot[] = ['staff', 'staff', 'staff', 'robe', 'ring', 'ring'];
+  const entries: Array<[string, { id: string; position: Vec2; item: InventoryItem; droppedByPlayerId: null; ownerPriorityUntil: number }]> = slots.map((slot, index) => {
+    const item = trainingEquipment(seed ^ 0x6c6f6f74, index, slot);
+    return [`loot:${index}`, { id: `loot:${index}`, position: { x: 330 + index % 3 * 72, y: 410 + Math.floor(index / 3) * 58 }, item, droppedByPlayerId: null, ownerPriorityUntil: 0 }];
+  });
+  entries.push(['loot:orb:0', { id: 'loot:orb:0', position: { x: 570, y: 410 }, item: createCatalyst(seed, 'loot:0'), droppedByPlayerId: null, ownerPriorityUntil: 0 }]);
+  entries.push(['loot:orb:1', { id: 'loot:orb:1', position: { x: 642, y: 410 }, item: createCatalyst(seed + 1, 'loot:1'), droppedByPlayerId: null, ownerPriorityUntil: 0 }]);
+  for (const [index, id] of TEST_SCROLLS.entries()) entries.push([`loot:scroll:${id}`, { id: `loot:scroll:${id}`, position: { x: 534 + index * 66, y: 482 }, item: createScroll(id, `loot:${seed}`), droppedByPlayerId: null, ownerPriorityUntil: 0 }]);
+  return Object.fromEntries(entries);
 }
 
 export function sellPrice(item: InventoryItem) {
-  return isEquipment(item) ? Math.floor(item.value * .5) : 0;
+  return isEquipment(item) || isScroll(item) ? Math.floor(item.value * .5) : 0;
 }
 
 export function fusionPrice(uses: number) {
@@ -139,10 +162,12 @@ export function affixText(affix: EquipmentAffix) {
 
 export function itemTypeText(item: InventoryItem) {
   if (isCatalyst(item)) return '合成宝珠';
+  if (isScroll(item)) return '卷轴';
   return `${SLOT_NAMES[item.slot]} · ${{ normal: '普通', excellent: '优秀', rare: '稀有' }[item.rarity]}`;
 }
 
 export function itemDetailLines(item: InventoryItem) {
+  if (isScroll(item)) return [`组合：${item.elements.map((element) => ELEMENT_NAMES[element]).join('·')}`, `冷却：${Math.round(item.cooldownMs / 1000)} 秒`, item.description];
   return isEquipment(item) ? (item.affixes.length ? item.affixes.map(affixText) : ['无属性词缀']) : [item.description];
 }
 

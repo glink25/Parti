@@ -11,4 +11,16 @@ describe('client collision candidates', () => {
   it('does not collide with its owner at spawn', () => { const state = initialState(), caster = state.players.p1 = player('p1', 'one', 0); caster.cast.castId = 'p1:cast:1'; caster.cast.spell = resolveSpell(['fire', 'rock']); const source = spawnSpellEntity(state, caster, caster.cast.spell!, 1000); expect(collisionCandidates(state, source, 1000)).toEqual([]); });
   it('sweeps the projectile path so fast shots cannot skip targets', () => { const state = initialState(), caster = state.players.p1 = player('p1', 'one', 0); caster.cast.castId = 'p1:cast:1'; caster.cast.spell = resolveSpell(['fire', 'rock']); const source = spawnSpellEntity(state, caster, caster.cast.spell!, 1000), monster = trainingMonster(0); monster.position = { x: 420, y: source.position.y }; state.entities[monster.id] = monster; expect(collisionCandidates(state, source, 2000, source.position).map((candidate) => candidate.target.id)).toEqual([monster.id]); });
   it('limits normal beams to the nearest target and lets walls stop healing beams', () => { const state = initialState(), caster = state.players.p1 = player('p1', 'one', 0), ally = state.players.p2 = player('p2', 'two', 1); caster.cast.castId = 'p1:cast:1'; caster.cast.aim = { x: 1, y: 0 }; caster.cast.spell = resolveSpell(['life']); const source = spawnSpellEntity(state, caster, caster.cast.spell, 1000); ally.position = { x: 500, y: caster.position.y }; const wall = spawnSpellEntity(state, { ...caster, cast: { ...caster.cast, castId: 'wall', spell: resolveSpell(['rock', 'rock', 'shield']), target: { x: 350, y: caster.position.y } } }, resolveSpell(['rock', 'rock', 'shield']), 1000); expect(collisionCandidates(state, source, 1000)).toMatchObject([{ target: { id: wall.id }, reason: 'blocked' }]); });
+  it('ignores dead players as targets and dead owners as sources', () => {
+    const state = initialState(), caster = state.players.p1 = player('p1', 'one', 0), target = state.players.p2 = player('p2', 'two', 1);
+    caster.cast.castId = 'p1:cast:1';
+    caster.cast.spell = resolveSpell(['fire', 'rock']);
+    target.position = { x: 420, y: caster.position.y };
+    target.alive = false;
+    const source = spawnSpellEntity(state, caster, caster.cast.spell!, 1000);
+    expect(collisionCandidates(state, source, 2000, source.position)).toEqual([]);
+    target.alive = true;
+    caster.alive = false;
+    expect(collisionCandidates(state, source, 2000, source.position)).toEqual([]);
+  });
 });

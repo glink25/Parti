@@ -7,7 +7,41 @@ import { resolveSpell } from './spells';
 function sequences(length: number, prefix: Element[] = []): Element[][] { if (!length) return [prefix]; return ELEMENTS.flatMap((element) => sequences(length - 1, [...prefix, element])); }
 describe('generated spell resolver', () => {
   it('resolves every one-to-four element sequence to a serializable valid spec', () => { const all = [1, 2, 3, 4].flatMap((length) => sequences(length)); expect(all).toHaveLength(2800); for (const elements of all) { const spell = resolveSpell(elements); expect(spell.elements).toEqual(elements); expect(spell.id).toBeTruthy(); expect(spell.name).toBeTruthy(); expect(Number.isFinite(spell.chantMs)).toBe(true); expect(Number.isFinite(spell.range)).toBe(true); expect(() => JSON.stringify(spell)).not.toThrow(); } });
-  it('prioritizes exact recipes and covers every delivery', () => { expect(resolveSpell(['fire', 'rock', 'rock', 'fire'])).toMatchObject({ id: 'meteor', delivery: 'area' }); expect(resolveSpell(['fire', 'water', 'water', 'fire'])).toMatchObject({ id: 'rain', delivery: 'environment' }); expect(resolveSpell(['fire']).delivery).toBe('spray'); expect(resolveSpell(['life']).delivery).toBe('beam'); expect(resolveSpell(['water', 'rock']).delivery).toBe('projectile'); expect(resolveSpell(['fire', 'shield']).delivery).toBe('shield'); expect(resolveSpell(['fire', 'rock', 'shield'])).toMatchObject({ delivery: 'summon', summon: { archetype: 'fire-field' } }); });
+  it('prioritizes exact recipes and covers every delivery', () => { expect(resolveSpell(['fire', 'rock', 'rock', 'fire'])).toMatchObject({ id: 'meteor', delivery: 'area' }); expect(resolveSpell(['fire', 'water', 'water', 'fire'])).toMatchObject({ id: 'rain', delivery: 'environment' }); expect(resolveSpell(['lightning', 'shield', 'lightning'])).toMatchObject({ id: 'teleport', delivery: 'instant' }); expect(resolveSpell(['fire']).delivery).toBe('spray'); expect(resolveSpell(['life']).delivery).toBe('beam'); expect(resolveSpell(['water', 'rock']).delivery).toBe('projectile'); expect(resolveSpell(['fire', 'shield']).delivery).toBe('shield'); expect(resolveSpell(['fire', 'rock', 'shield'])).toMatchObject({ delivery: 'summon', summon: { archetype: 'fire-field' } }); });
+  it('maps Magicka special recipes to named Endwell specs', () => {
+    const cases: Array<[Element[], string]> = [
+      [['lightning', 'life', 'lightning'], 'resurrect'],
+      [['lightning', 'shield', 'lightning'], 'teleport'],
+      [['life', 'ice', 'shield'], 'cleanse'],
+      [['lightning', 'shield', 'fire'], 'haste'],
+      [['water', 'life'], 'life-spring'],
+      [['life', 'lightning', 'life'], 'chain-heal'],
+      [['shield', 'rock'], 'rock-shield'],
+      [['shield', 'fire'], 'fire-shield'],
+      [['shield', 'ice'], 'frost-shield'],
+      [['shield', 'lightning'], 'grounding-shield'],
+      [['shield', 'water'], 'water-shield'],
+      [['fire', 'life'], 'life-flame'],
+      [['water', 'ice'], 'frost-stream'],
+      [['fire', 'rock', 'rock', 'fire'], 'meteor'],
+      [['rock', 'fire'], 'lava-bolt'],
+      [['rock', 'ice'], 'shatter-ice-bolt'],
+      [['water', 'lightning'], 'conductive-water-chain'],
+      [['fire', 'fire'], 'flame-jet'],
+      [['ice', 'ice', 'rock'], 'ice-lance'],
+      [['water', 'rock', 'water'], 'tidal-impact'],
+      [['lightning', 'fire', 'fire', 'lightning'], 'lightning-strike'],
+      [['water', 'ice', 'ice', 'water'], 'blizzard'],
+      [['fire', 'water', 'water', 'fire'], 'rain'],
+      [['fire', 'water'], 'steam-cloud'],
+      [['ice', 'shield', 'shield', 'ice'], 'magicka-ice-wall'],
+      [['lightning', 'water', 'lightning', 'shield'], 'thunderstorm'],
+      [['rock', 'shield', 'lightning', 'rock'], 'gravity-well'],
+      [['fire', 'shield', 'fire'], 'fire-ring'],
+      [['life', 'shield', 'life', 'shield'], 'life-barrier'],
+    ];
+    for (const [elements, id] of cases) expect(resolveSpell(elements)).toMatchObject({ id, elements });
+  });
   it('covers all seven single elements without fallback', () => { expect(ELEMENTS.map((element) => resolveSpell([element]).delivery)).toEqual(['projectile', 'spray', 'spray', 'beam', 'spray', 'spray', 'shield']); });
   it('applies modifiers without mutating generated specs', () => { const base = resolveSpell(['fire', 'rock']), changed = applySpellModifiers(base, [{ stat: 'speed', op: 'multiply', value: 1.5 }]); expect(changed.speed).toBe((base.speed ?? 0) * 1.5); expect(base.speed).toBe(460); });
 });
