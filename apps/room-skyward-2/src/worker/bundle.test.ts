@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { loadRoomDefinition } from '@parti/worker-sdk';
+import { PARTI_FLOW_PAYLOAD } from '@parti/flow';
 
 describe('packaged worker', () => {
   it('can be evaluated by the Parti source loader', async () => {
@@ -25,5 +26,10 @@ describe('packaged worker', () => {
       schemaVersion: 2,
       phase: 'lobby',
     });
+    const host = { id: 'host', name: 'Host', role: 'host' as const }, state = definition.initialState({});
+    const context = { state, players: [host], host, now: () => 1000, random: () => .25, broadcast() {}, send() {}, kick() {}, log() {}, setTimer() {}, clearTimer() {} };
+    definition.onCreate?.(context); definition.onJoin?.(context, host);
+    definition.actions?.setReady?.(context, { player: host, actionId: 'ready:1', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:1', type: 'setReady', payload: { ready: true }, from: 'host', seq: 1, origin: 'local', createdAt: 1 } } });
+    expect(state).toMatchObject({ phase: 'running', hostId: 'host', startedPlayers: ['host'] });
   });
 });

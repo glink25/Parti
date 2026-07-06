@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/flow" },
     { "path": "./packages/worker-sdk" },
     { "path": "./packages/client-sdk" },
     { "path": "./packages/transport-local" },

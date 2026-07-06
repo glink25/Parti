@@ -74,6 +74,9 @@ importers:
 
   apps/room-skyward-2:
     dependencies:
+      '@parti/flow':
+        specifier: workspace:*
+        version: link:../../packages/flow
       '@parti/worker-sdk':
         specifier: workspace:*
         version: link:../../packages/worker-sdk
@@ -226,6 +229,19 @@ importers:
         version: link:../core
 
   packages/core: {}
+
+  packages/flow:
+    dependencies:
+      '@parti/worker-sdk':
+        specifier: workspace:*
+        version: link:../worker-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.0.1)(lightningcss@1.32.0)
 
   packages/room-packager:
     dependencies:

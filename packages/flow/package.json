@@ -1,0 +1,10 @@
+{
+  "name": "@parti/flow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./worker": "./src/worker.ts" },
+  "dependencies": { "@parti/worker-sdk": "workspace:*" },
+  "scripts": { "test": "vitest run --root ../.. packages/flow/src/core.test.ts packages/flow/src/worker.test.ts", "typecheck": "tsc -b" },
+  "devDependencies": { "typescript": "^5.6.3", "vitest": "^2.1.8" }
+}

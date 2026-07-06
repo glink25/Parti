@@ -5,12 +5,14 @@ import { CHUNK_HEIGHT, PLAYER_RADIUS, VIEW_HEIGHT, WORLD_WIDTH, type BossAttack,
 import { contextFor, generateChunk, platformActive, platformPosition, runtimeContext } from '../game/generation';
 import { directDistance, GRAVITY, JUMP_SPEED, MOVE_SPEED, tiltDirection, wrapX } from '../runtime/physics';
 import { acceptPose, advanceRemotePose, createRemotePose, type PosePacket, type RemotePose } from '../runtime/network';
+import { createSkywardFlow, type SkywardFlow } from '../runtime/flow';
 
 type Bullet = { id: string; x: number; y: number; vx?: number; vy: number; life: number; cosmetic: boolean; pierce?: boolean; hits?: string[] };
 type Viewport = { x: number; y: number; w: number; h: number; scale: number };
 type Hit = { x: number; y: number; w: number; h: number; action(): void };
 
 export class SkywardScene {
+  private flow: SkywardFlow | null = null;
   private state: GameState | null = null;
   private local = { x: WORLD_WIDTH / 2, y: 120, vy: JUMP_SPEED, cameraBottom: 0, viewBottom: 0, alive: true };
   private chunks = new Map<number, Chunk>(); private bullets: Bullet[] = []; private remote: Record<string, RemotePose> = {};
@@ -21,15 +23,19 @@ export class SkywardScene {
   private pixelRatio = 1; private viewport: Viewport = { x: 0, y: 0, w: 0, h: 0, scale: 1 }; private hits: Hit[] = []; private flash = ''; private flashUntil = 0; private disposers: Array<() => void> = [];
 
   init() {
-    this.disposers.push(
-      parti.onState((state) => { if (state) this.receiveState(state as GameState); }),
-      parti.onEvent('skyward2:shot', (raw) => { const shot = raw as { shotId: string; playerId: string; x: number; y: number }; if (shot.playerId !== parti.playerId) this.bullets.push({ id: shot.shotId, x: shot.x, y: shot.y + 30, vy: 1050, life: 1.6, cosmetic: true }); }),
-      parti.onEvent('skyward2:pose', (raw) => this.receivePose(raw as PosePacket)),
-      parti.onEvent('skyward2:pickup', (raw) => this.notify(`${this.playerName((raw as { playerId: string }).playerId)} 获得 ${(raw as { kind: string }).kind}`)),
-      parti.onEvent('skyward2:death', (raw) => this.notify(`${this.playerName((raw as { playerId: string }).playerId)} 倒下了`)),
-      parti.onEvent('skyward2:boss-defeated', (raw) => { const chunkIndex = Number((raw as { chunkIndex: number }).chunkIndex); if (Number.isInteger(chunkIndex)) this.optimisticallyDefeatedBosses.add(chunkIndex); this.notify('Boss 已击败，上行通路恢复'); }),
-      parti.onEvent('skyward2:outcome', (raw) => { const event = raw as { playerId: string; outcome: string }; if (event.outcome === 'shield' && event.playerId !== parti.playerId) this.notify(`${this.playerName(event.playerId)} 的护盾抵消了伤害`); }),
-    );
+    this.flow = createSkywardFlow(parti, {
+      state: (state) => this.receiveState(state), pose: (packet) => this.receivePose(packet),
+      localShot: (shot) => { const me = this.me(); if (!me) return; const spread = this.buff(me, 'spread'), pierce = this.buff(me, 'pierce'), velocities = spread ? [-260, 0, 260] : [0]; this.bullets.push(...velocities.map((vx, index) => ({ id: `${shot.shotId}:${index}`, x: shot.x, y: shot.y + 35, vx, vy: 1050, life: 1.6, cosmetic: false, pierce, hits: [] }))); },
+      shot: (shot) => { if (shot.playerId !== parti.playerId) this.bullets.push({ id: shot.shotId, x: shot.x, y: shot.y + 30, vy: 1050, life: 1.6, cosmetic: true }); },
+      pickup: (event) => this.notify(`${this.playerName(event.playerId)} 获得 ${event.kind}`),
+      death: (event) => this.notify(`${this.playerName(event.playerId)} 倒下了`),
+      bossDefeated: (event) => { if (Number.isInteger(event.chunkIndex)) this.optimisticallyDefeatedBosses.add(event.chunkIndex); this.notify('Boss 已击败，上行通路恢复'); },
+      outcome: (event) => { if (event.outcome === 'shield' && event.playerId !== parti.playerId) this.notify(`${this.playerName(event.playerId)} 的护盾抵消了伤害`); },
+    });
+    this.flow.game.addSystem({ update: (_, dt) => { const now = performance.now(); for (const p of Object.values(this.state?.players ?? {})) if (p.id !== parti.playerId) { const visual = this.remote[p.id] ??= createRemotePose(p.x, p.y); advanceRemotePose(visual, now, dt); } } });
+    this.flow.game.addSystem({ update: (_, dt) => { const me = this.me(); if (!me?.alive || !this.local.alive || this.pendingDeath) return; this.simulate(dt, performance.now()); } });
+    this.flow.game.addSystem({ update: (_, dt) => this.simulateBullets(dt) });
+    this.flow.game.addSystem({ update: () => { if (this.me()?.alive && this.local.alive && !this.pendingDeath) this.interactions(performance.now()); } });
     if (parti.orientation) this.disposers.push(parti.orientation.onData((data) => this.orientation(data)));
     mainCanvas.addEventListener('pointerdown', this.pointerDown); mainCanvas.addEventListener('pointerup', this.pointerUp); mainCanvas.addEventListener('pointercancel', this.pointerUp);
     window.addEventListener('keydown', this.key); window.addEventListener('keyup', this.key); window.addEventListener('pagehide', this.destroy, { once: true }); parti.ready();
@@ -37,10 +43,9 @@ export class SkywardScene {
   update() {
     const now = performance.now(), dt = Math.min(.04, Math.max(.001, (now - this.previous) / 1000)); this.previous = now; this.pixelRatio = mainCanvas.width / Math.max(1, mainCanvas.clientWidth); this.viewport = this.computeViewport();
     if (this.state?.phase !== 'running') return; const me = this.me(); if (!me) return;
-    for (const p of Object.values(this.state.players)) if (p.id !== parti.playerId) { const visual = this.remote[p.id] ??= createRemotePose(p.x, p.y); advanceRemotePose(visual, now, dt); }
+    const touch = [...this.touches.values()].at(-1) ?? 0; this.direction = this.keyDirection || touch || (this.tiltEnabled ? this.tilt : 0); this.flow?.game.update(dt);
     if (!me.alive || !this.local.alive || this.pendingDeath) return;
-    const touch = [...this.touches.values()].at(-1) ?? 0; this.direction = this.keyDirection || touch || (this.tiltEnabled ? this.tilt : 0); this.simulate(dt, now); this.simulateBullets(dt); this.interactions(now);
-    if (now >= this.telemetryAt) { this.telemetryAt = now + 100; void parti.action('publishPose', { sequence: ++this.poseSequence, x: this.local.x, y: this.local.y, vy: this.local.vy, cameraBottom: this.local.cameraBottom, direction: this.direction }); }
+    if (now >= this.telemetryAt) { this.telemetryAt = now + 100; this.flow?.publishPose({ sequence: ++this.poseSequence, x: this.local.x, y: this.local.y, vy: this.local.vy, cameraBottom: this.local.cameraBottom, direction: this.direction }); }
   }
   private simulate(dt: number, now: number) {
     const me = this.me()!, previousY = this.local.y; this.local.x = wrapX(this.local.x + this.direction * MOVE_SPEED * dt);
@@ -51,7 +56,7 @@ export class SkywardScene {
       const landing = this.platforms(now).find((p) => previousY - PLAYER_RADIUS >= p.y && this.local.y - PLAYER_RADIUS <= p.y && directDistance(this.local.x, p.x) <= p.width / 2 + PLAYER_RADIUS * .42);
       if (landing) {
         const result = platformStrategies.require(landing.kind).contact(landing, this.runtime(Number(landing.id.split(':')[0])), this.state?.entities[landing.id]);
-        void parti.action('landPlatform', { platformId: landing.id, sequence: ++this.outcomeSequence });
+        this.flow?.landPlatform({ platformId: landing.id, sequence: ++this.outcomeSequence });
         if (result.damageReason) this.die(result.damageReason);
         else { this.groundingUntil = 0; this.local.y = landing.y + PLAYER_RADIUS; this.local.vy = this.buff(me, 'super-jump') ? Math.max(1170, result.bounceVelocity ?? JUMP_SPEED) : result.bounceVelocity ?? JUMP_SPEED; }
       }
@@ -60,14 +65,14 @@ export class SkywardScene {
     if (this.local.y > upper) this.local.viewBottom = this.local.y - VIEW_HEIGHT * .56; else if (this.local.y < lower) this.local.viewBottom = this.local.y - VIEW_HEIGHT * .27;
     this.local.viewBottom = Math.max(this.state?.teamVoidY ?? 0, this.local.viewBottom); if (this.local.y < (this.state?.teamVoidY ?? 0) - 60) this.die('虚空');
   }
-  private simulateBullets(dt: number) { for (const b of this.bullets) { b.x = wrapX(b.x + (b.vx ?? 0) * dt); b.y += b.vy * dt; b.life -= dt; } this.bullets = this.bullets.filter((b) => b.life > 0); for (const b of this.bullets) { if (b.cosmetic) continue; const enemy = this.enemies().find((e) => !(b.hits ?? []).includes(e.id) && directDistance(b.x, e.x) < e.radius + 12 && Math.abs(b.y - e.y) < e.radius + 18); if (enemy) { (b.hits ??= []).push(enemy.id); if (!b.pierce) b.life = 0; const sequence = ++this.hitSequence; void parti.action('hitEnemy', { eventId: `${parti.playerId}:hit:${sequence}`, sequence, shotId: b.id, enemyId: enemy.id, damage: this.buff(this.me()!, 'power') ? 2 : 1 }); } } }
+  private simulateBullets(dt: number) { for (const b of this.bullets) { b.x = wrapX(b.x + (b.vx ?? 0) * dt); b.y += b.vy * dt; b.life -= dt; } this.bullets = this.bullets.filter((b) => b.life > 0); for (const b of this.bullets) { if (b.cosmetic) continue; const enemy = this.enemies().find((e) => !(b.hits ?? []).includes(e.id) && directDistance(b.x, e.x) < e.radius + 12 && Math.abs(b.y - e.y) < e.radius + 18); if (enemy) { (b.hits ??= []).push(enemy.id); if (!b.pierce) b.life = 0; const sequence = ++this.hitSequence; this.flow?.hitEnemy({ eventId: `${parti.playerId}:hit:${sequence}`, sequence, shotId: b.id, enemyId: enemy.id, damage: this.buff(this.me()!, 'power') ? 2 : 1 }); } } }
   private interactions(now: number) {
     for (const e of this.enemies()) if (directDistance(this.local.x, e.x) < e.radius + PLAYER_RADIUS * .7 && Math.abs(this.local.y - e.y) < e.radius + PLAYER_RADIUS) {
-      if (!e.boss && this.local.vy < -80 && this.local.y > e.y + 15) { this.local.vy = JUMP_SPEED; const sequence = ++this.hitSequence; void parti.action('stompEnemy', { eventId: `${parti.playerId}:hit:${sequence}`, sequence, enemyId: e.id }); }
+      if (!e.boss && this.local.vy < -80 && this.local.y > e.y + 15) { this.local.vy = JUMP_SPEED; const sequence = ++this.hitSequence; this.flow?.stompEnemy({ eventId: `${parti.playerId}:hit:${sequence}`, sequence, enemyId: e.id }); }
       else if (now >= this.hitAt) { this.hitAt = now + 1200; this.die(e.boss ? 'Boss 接触' : '怪物'); }
     }
     for (const e of this.enemies().filter((enemy) => !enemy.boss)) for (const attack of e.attacks) { const elapsed = Date.now() - (this.state?.startedAt ?? Date.now()), cycle = elapsed % attack.cooldownMs, active = cycle >= attack.warningMs && cycle <= attack.warningMs + attack.activeMs; if (active && Math.abs(this.local.y - e.y) < (attack.radius ?? 36) && directDistance(this.local.x, e.x) < (attack.kind === 'shot' ? 260 : attack.radius ?? 70)) { this.die(`怪物 ${attack.kind}`); break; } }
-    for (const p of this.pickups()) if (directDistance(this.local.x, p.x) < 55 && Math.abs(this.local.y - p.y) < 70) void parti.action('claimPickup', { pickupId: p.id, sequence: ++this.outcomeSequence });
+    for (const p of this.pickups()) if (directDistance(this.local.x, p.x) < 55 && Math.abs(this.local.y - p.y) < 70) this.flow?.claimPickup({ pickupId: p.id, sequence: ++this.outcomeSequence });
     for (const attack of this.activeBoss()?.attacks ?? []) if (Date.now() >= attack.activeAt && Date.now() <= attack.endsAt && this.attackHits(attack)) { this.die(`Boss ${attack.kind}`); break; }
   }
   private attackHits(a: BossAttack) { if (a.kind === 'summon' || a.kind === 'platform-toggle') return false; if (a.kind === 'laser') return a.direction === 'left' || a.direction === 'right' ? Math.abs(this.local.y - a.y) < 45 : directDistance(this.local.x, a.x) < 45; return directDistance(this.local.x, a.x) < a.radius && Math.abs(this.local.y - a.y) < a.radius; }
@@ -81,12 +86,12 @@ export class SkywardScene {
   private activeBoss() { const boss = this.state?.boss ?? null; return boss && !this.bossDefeated(boss.chunkIndex) ? boss : null; }
   private platformDisabledByBoss(id: string, now: number) { return Boolean(this.activeBoss()?.attacks.some((a) => a.platformId === id && a.kind === 'platform-toggle' && now >= a.activeAt && now <= a.endsAt)); }
   private buff(me: PublicPlayer, id: PickupKind) { const effect = me.effects[id]; return !this.locallyConsumedBuffs.has(id) && Boolean(effect && (effect.endsAt == null || effect.endsAt > Date.now())); }
-  private shoot() { const me = this.me(); if (!me?.alive || !this.local.alive || performance.now() < this.shotAt) return; this.shotAt = performance.now() + (this.buff(me, 'rapid') ? 110 : 240); const id = `${parti.playerId}:${Date.now().toString(36)}:${++this.shotSequence}`, spread = this.buff(me, 'spread'), pierce = this.buff(me, 'pierce'), velocities = spread ? [-260, 0, 260] : [0]; this.bullets.push(...velocities.map((vx, index) => ({ id: `${id}:${index}`, x: this.local.x, y: this.local.y + 35, vx, vy: 1050, life: 1.6, cosmetic: false, pierce, hits: [] }))); void parti.action('shoot', { shotId: id, x: this.local.x, y: this.local.y }); }
+  private shoot() { const me = this.me(); if (!me?.alive || !this.local.alive || performance.now() < this.shotAt) return; this.shotAt = performance.now() + (this.buff(me, 'rapid') ? 110 : 240); const id = `${parti.playerId}:${Date.now().toString(36)}:${++this.shotSequence}`; this.flow?.shoot({ shotId: id, x: this.local.x, y: this.local.y }); }
   private die(reason: string) {
     const me = this.me(); if (this.pendingDeath || !this.local.alive || (me?.invulnerableUntil ?? 0) > Date.now()) return;
     const sequence = ++this.outcomeSequence;
-    if (me && this.buff(me, 'shield')) { this.locallyConsumedBuffs.add('shield'); this.hitAt = performance.now() + 1200; this.notify('护盾抵消了伤害'); void parti.action('playerOutcome', { eventId: `${parti.playerId}:outcome:${sequence}`, sequence, outcome: 'shield', reason }); return; }
-    this.pendingDeath = true; this.local.alive = false; void parti.action('playerOutcome', { eventId: `${parti.playerId}:outcome:${sequence}`, sequence, outcome: 'death', reason });
+    if (me && this.buff(me, 'shield')) { this.locallyConsumedBuffs.add('shield'); this.hitAt = performance.now() + 1200; this.notify('护盾抵消了伤害'); this.flow?.playerOutcome({ eventId: `${parti.playerId}:outcome:${sequence}`, sequence, outcome: 'shield', reason }); return; }
+    this.pendingDeath = true; this.local.alive = false; this.flow?.playerOutcome({ eventId: `${parti.playerId}:outcome:${sequence}`, sequence, outcome: 'death', reason });
   }
 
   render() {
@@ -109,8 +114,8 @@ export class SkywardScene {
   private drawAttack(a: BossAttack) { const c = mainContext, s = this.toScreen(a.x, a.y), warning = Date.now() < a.activeAt, r = (a.kind === 'lightning' ? 90 : 120) * this.viewport.scale; c.strokeStyle = warning ? '#fff36b' : '#ff3d66'; c.lineWidth = warning ? 3 : 8; c.beginPath(); c.arc(s.x, s.y, r, 0, Math.PI * 2); c.stroke(); this.label(a.kind, s.x, s.y); }
   private drawHud(width: number, height: number) { if (!this.state) return; const me = this.me(), boss = this.activeBoss(); this.text(`高度 ${Math.max(0, Math.floor(this.local.y))}  Boss ${this.state.completedBossCount}`, 18, 22, 16, '#fff'); if (me) { const buffs = Object.values(me.effects).filter((effect) => effect && (effect.endsAt == null || effect.endsAt > Date.now())).map((effect) => pickupStrategies.require(effect!.id).hud(effect!, Date.now())).join(' · '); this.text(buffs || '无增益', 18, 46, 13, '#b9d7ff'); } if (boss) { const ratio = boss.hp / boss.maxHp; mainContext.fillStyle = '#2a2335'; mainContext.fillRect(width / 2 - 150, 24, 300, 18); mainContext.fillStyle = '#ff5577'; mainContext.fillRect(width / 2 - 150, 24, 300 * ratio, 18); }
     const size = 64, x = width - size - 18, y = height - size - 18; mainContext.fillStyle = 'rgba(255,255,255,.18)'; mainContext.fillRect(x, y, size, size); this.text('FIRE', x + size / 2, y + size / 2, 13, '#fff', 'center'); this.hits.push({ x, y, w: size, h: size, action: () => this.shoot() }); }
-  private drawLobby(w: number, h: number) { const me = this.me(); this.overlay(w, h, 'SKYWARD 2', '完全随机碰撞盒原型'); const x = w / 2 - 100, y = h / 2 + 70; mainContext.fillStyle = me?.ready ? '#486878' : '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text(me?.ready ? '等待其他玩家' : '准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => void parti.action('setReady', { ready: !me?.ready }) }); }
-  private drawGameOver(w: number, h: number) { this.overlay(w, h, '远征结束', `最高 ${Math.floor(this.state?.highestY ?? 0)}`); if (this.state?.hostId === parti.playerId) { const x = w / 2 - 100, y = h / 2 + 65; mainContext.fillStyle = '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text('返回准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => void parti.action('restart') }); } }
+  private drawLobby(w: number, h: number) { const me = this.me(); this.overlay(w, h, 'SKYWARD 2', '完全随机碰撞盒原型'); const x = w / 2 - 100, y = h / 2 + 70; mainContext.fillStyle = me?.ready ? '#486878' : '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text(me?.ready ? '等待其他玩家' : '准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => this.flow?.setReady(!me?.ready) }); }
+  private drawGameOver(w: number, h: number) { this.overlay(w, h, '远征结束', `最高 ${Math.floor(this.state?.highestY ?? 0)}`); if (this.state?.hostId === parti.playerId) { const x = w / 2 - 100, y = h / 2 + 65; mainContext.fillStyle = '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text('返回准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => this.flow?.restart() }); } }
   private overlay(w: number, h: number, title: string, sub: string) { mainContext.fillStyle = 'rgba(4,8,16,.82)'; mainContext.fillRect(0, 0, w, h); this.text(title, w / 2, h / 2 - 42, 30, '#fff', 'center'); this.text(sub, w / 2, h / 2 + 4, 15, '#a9c7e8', 'center'); }
   private label(value: string, x: number, y: number) { this.text(value, x, y, Math.max(9, 11 * this.viewport.scale), '#fff', 'center'); }
   private text(value: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign = 'left') { const c = mainContext; c.font = `${size}px ui-monospace, monospace`; c.fillStyle = color; c.textAlign = align; c.textBaseline = 'middle'; c.fillText(value, x, y); }
@@ -120,7 +125,7 @@ export class SkywardScene {
   private me() { return this.state && parti.playerId ? this.state.players[parti.playerId] ?? null : null; } private playerName(id: string) { return this.state?.players[id]?.name ?? '队友'; } private notify(value: string) { this.flash = value; this.flashUntil = performance.now() + 1600; }
   private pointerDown = (e: PointerEvent) => { const rect = mainCanvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top; const hit = this.hits.find((h) => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h); if (hit) { hit.action(); return; } mainCanvas.setPointerCapture(e.pointerId); this.touches.set(e.pointerId, x < this.viewport.x + this.viewport.w / 2 ? -1 : 1); };
   private pointerUp = (e: PointerEvent) => { this.touches.delete(e.pointerId); };
-  private key = (e: KeyboardEvent) => { if (e.code === 'Space' && e.type === 'keydown' && !e.repeat) { this.shoot(); e.preventDefault(); return; } const down = e.type === 'keydown'; if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keyDirection = down ? -1 : this.keyDirection === -1 ? 0 : this.keyDirection; if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keyDirection = down ? 1 : this.keyDirection === 1 ? 0 : this.keyDirection; if (e.code === 'KeyT' && down && !e.repeat) { this.tiltEnabled = !this.tiltEnabled; this.tiltNeutral = null; void parti.action('enableTilt', { enabled: this.tiltEnabled }); } };
+  private key = (e: KeyboardEvent) => { if (e.code === 'Space' && e.type === 'keydown' && !e.repeat) { this.shoot(); e.preventDefault(); return; } const down = e.type === 'keydown'; if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keyDirection = down ? -1 : this.keyDirection === -1 ? 0 : this.keyDirection; if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keyDirection = down ? 1 : this.keyDirection === 1 ? 0 : this.keyDirection; if (e.code === 'KeyT' && down && !e.repeat) { this.tiltEnabled = !this.tiltEnabled; this.tiltNeutral = null; this.flow?.enableTilt(this.tiltEnabled); } };
   private orientation(data: { beta: number | null; gamma: number | null; screenAngle: number }) { if (!this.tiltEnabled) return; const raw = data.screenAngle === 90 ? -(data.beta ?? 0) : data.screenAngle === 270 ? data.beta ?? 0 : data.gamma ?? 0; this.tiltNeutral ??= raw; this.tilt = tiltDirection(raw - this.tiltNeutral); }
-  private destroy = () => { for (const d of this.disposers.splice(0)) d(); mainCanvas.removeEventListener('pointerdown', this.pointerDown); mainCanvas.removeEventListener('pointerup', this.pointerUp); mainCanvas.removeEventListener('pointercancel', this.pointerUp); window.removeEventListener('keydown', this.key); window.removeEventListener('keyup', this.key); };
+  private destroy = () => { this.flow?.game.dispose(); this.flow = null; for (const d of this.disposers.splice(0)) d(); mainCanvas.removeEventListener('pointerdown', this.pointerDown); mainCanvas.removeEventListener('pointerup', this.pointerUp); mainCanvas.removeEventListener('pointercancel', this.pointerUp); window.removeEventListener('keydown', this.key); window.removeEventListener('keyup', this.key); };
 }

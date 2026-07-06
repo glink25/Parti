@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@parti/flow": "workspace:*",
     "@parti/worker-sdk": "workspace:*",
     "littlejsengine": "1.18.15"
   },
