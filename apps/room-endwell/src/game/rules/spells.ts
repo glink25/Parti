@@ -1,8 +1,8 @@
-import { beamSpec, blizzardSpec, chainHealSpec, cleanseSpec, conductiveWaterSpec, fireRingSpec, fireShieldSpec, flameJetSpec, frostShieldSpec, frostStreamSpec, gravityWellSpec, groundingShieldSpec, hasteSpec, iceLanceSpec, lavaBoltSpec, lifeBarrierSpec, lifeFlameSpec, lifeSpringSpec, magickaIceWallSpec, meteorSpec, projectileSpec, rainSpec, resurrectSpec, rockShieldSpec, shieldSpec, shatterIceBoltSpec, spraySpec, steamCloudSpec, summonSpec, teleportSpec, thunderstormSpec, tidalImpactSpec, waterShieldSpec, lightningStrikeSpec } from '../../content/spells';
+import { beamSpec, blizzardSpec, chainHealSpec, cleanseSpec, conductiveWaterSpec, fireRingSpec, fireShieldSpec, flameJetSpec, frostShieldSpec, frostStreamSpec, gravityWellSpec, groundingShieldSpec, hasteSpec, iceLanceSpec, lavaBoltSpec, lifeBarrierSpec, lifeFlameSpec, lifeSpringSpec, magickaIceWallSpec, meteorSpec, projectileSpec, rainSpec, resurrectSpec, rockShieldSpec, selfHealSpec, shieldSpec, shatterIceBoltSpec, spraySpec, steamCloudSpec, summonSpec, teleportSpec, thunderstormSpec, tidalImpactSpec, waterShieldSpec, lightningStrikeSpec } from '../../content/spells';
 import type { Element, SpellSpec } from '../contracts';
 
 const exact = (elements: readonly Element[], sequence: readonly Element[]) => elements.length === sequence.length && sequence.every((element, index) => elements[index] === element);
-const recipes: Array<{ sequence: Element[]; spec: (elements: Element[]) => SpellSpec }> = [
+export const SPECIAL_RECIPES: Array<{ sequence: Element[]; spec: (elements: Element[]) => SpellSpec }> = [
   { sequence: ['lightning', 'life', 'lightning'], spec: resurrectSpec },
   { sequence: ['lightning', 'shield', 'lightning'], spec: teleportSpec },
   { sequence: ['life', 'ice', 'shield'], spec: cleanseSpec },
@@ -35,10 +35,13 @@ const recipes: Array<{ sequence: Element[]; spec: (elements: Element[]) => Spell
 ];
 export function resolveSpell(elements: Element[]): SpellSpec {
   if (!elements.length || elements.length > 4) throw new Error('Element sequence must contain 1-4 elements');
-  for (const recipe of recipes) if (exact(elements, recipe.sequence)) return recipe.spec(elements);
+  if (elements.length === 1 && elements[0] === 'life') return selfHealSpec(elements);
+  for (const recipe of SPECIAL_RECIPES) if (exact(elements, recipe.sequence)) return recipe.spec(elements);
   const last = elements.at(-1)!;
   if (last === 'shield') return elements.slice(0, -1).includes('rock') ? summonSpec(elements) : shieldSpec(elements);
   if (last === 'life') return beamSpec(elements);
   if (last === 'rock') return projectileSpec(elements);
   return spraySpec(elements);
 }
+export function isSpecialSpellId(id: string) { return SPECIAL_RECIPES.some((recipe) => recipe.spec(recipe.sequence).id === id); }
+export function specialSpellCatalog() { return SPECIAL_RECIPES.map((recipe) => ({ sequence: [...recipe.sequence], spell: recipe.spec(recipe.sequence) })); }

@@ -1,20 +1,19 @@
-import type { CatalystItem, DamageElement, Element, EquipmentAffix, EquipmentItem, EquipmentSlot, ForgeState, InventoryItem, MerchantState, PlayerEquipment, ScrollId, SpellSpec, Vec2 } from '../contracts';
-import { createScroll, isScroll } from './scrolls';
+import type { CatalystItem, DamageElement, Element, EquipmentAffix, EquipmentItem, EquipmentSlot, InventoryItem, PlayerEquipment, SpellSpec, Vec2 } from '../contracts';
+import { isScroll } from './scrolls';
 
 const ELEMENT_NAMES: Record<Element, string> = { rock: '岩', fire: '火', ice: '冰', life: '生命', lightning: '雷', water: '水', shield: '盾' };
 const SLOT_NAMES: Record<EquipmentSlot, string> = { staff: '法杖', robe: '法袍', ring: '法戒' };
 const NON_SHIELD_ELEMENTS: Array<Exclude<Element, 'shield'>> = ['rock', 'fire', 'ice', 'life', 'lightning', 'water'];
 const DAMAGE_ELEMENTS: DamageElement[] = ['physical', 'rock', 'fire', 'ice', 'life', 'lightning', 'water', 'shield', 'pure'];
-const TEST_SCROLLS: ScrollId[] = ['supernova', 'equilibrium', 'annihilation', 'black-hole'];
 
 type Prototype = { slot: EquipmentSlot; name: string; visualKey: string; tags: string[]; description: string };
 
 const PROTOTYPES: Prototype[] = [
-  { slot: 'staff', name: '焦黑橡木法杖', visualKey: 'staff.charred_oak', tags: ['staff', 'fire'], description: '适合测试元素伤害加成的训练法杖。' },
-  { slot: 'staff', name: '雷纹白蜡法杖', visualKey: 'staff.storm_ash', tags: ['staff', 'lightning'], description: '导引雷元素，让感电和打断更容易观察。' },
+  { slot: 'staff', name: '焦黑橡木法杖', visualKey: 'staff.charred_oak', tags: ['staff', 'fire', 'ruins'], description: '从遗迹余烬中寻回的火元素法杖。' },
+  { slot: 'staff', name: '雷纹白蜡法杖', visualKey: 'staff.storm_ash', tags: ['staff', 'lightning', 'ruins'], description: '古老雷纹仍在杖身中低鸣。' },
   { slot: 'staff', name: '活根法杖', visualKey: 'staff.living_root', tags: ['staff', 'life'], description: '强化生命元素治疗，适合多人配合。' },
   { slot: 'robe', name: '踏霜法袍', visualKey: 'robe.frostwalker', tags: ['robe', 'ice'], description: '轻便的防护法袍，兼顾减伤和移动。' },
-  { slot: 'robe', name: '守誓法袍', visualKey: 'robe.oathguard', tags: ['robe', 'defense'], description: '朴素结实的训练法袍。' },
+  { slot: 'robe', name: '守誓法袍', visualKey: 'robe.oathguard', tags: ['robe', 'defense', 'ruins'], description: '遗迹守卫留下的厚重法袍。' },
   { slot: 'ring', name: '扩域法戒', visualKey: 'ring.widecast', tags: ['ring', 'range'], description: '让法术影响范围更容易被看见。' },
   { slot: 'ring', name: '疾咏法戒', visualKey: 'ring.quickchant', tags: ['ring', 'cast'], description: '缩短施法节奏，方便连续测试技能。' },
 ];
@@ -51,8 +50,11 @@ function randomAffix(slot: EquipmentSlot, random: () => number): EquipmentAffix 
     return { type: 'elementDamageReduction', element: DAMAGE_ELEMENTS[Math.floor(random() * DAMAGE_ELEMENTS.length)]!, value };
   }
   const roll = random();
-  if (roll < .34) return { type: 'chantTimeReduction', value: value * .75 };
-  if (roll < .67) return { type: 'recoveryTimeReduction', value: value * .75 };
+  if (roll < .2) return { type: 'chantTimeReduction', value: value * .75 };
+  if (roll < .4) return { type: 'recoveryTimeReduction', value: value * .75 };
+  if (roll < .55) return { type: 'sprayRangeBonus', value };
+  if (roll < .7) return { type: 'sprayAngleBonus', value };
+  if (roll < .78) return { type: 'beamReflect', value: 1 };
   const deliveries: Array<Extract<EquipmentAffix, { type: 'rangeBonus' }>['delivery']> = ['spray', 'beam', 'projectile', 'area', 'summon'];
   return { type: 'rangeBonus', delivery: deliveries[Math.floor(random() * deliveries.length)]!, value };
 }
@@ -81,45 +83,6 @@ export function generateEquipment(seed: number, index: number): EquipmentItem {
   }
   const value = rarity === 'rare' ? 110 : rarity === 'excellent' ? 70 : 40;
   return { id: `item:${seed.toString(36)}:${index}`, slot: prototype.slot, rarity, name: prototype.name, visualKey: prototype.visualKey, affixes, tags: [...prototype.tags, rarity], description: prototype.description, value, fusionGeneration: 0, sourceItemValues: [value] };
-}
-
-function trainingEquipment(seed: number, index: number, slot: EquipmentSlot): EquipmentItem {
-  const base = generateEquipment(seed ^ 0x74726169, index);
-  const element = NON_SHIELD_ELEMENTS[index % NON_SHIELD_ELEMENTS.length]!;
-  const backupElement: Exclude<Element, 'life' | 'shield'> = element === 'fire' ? 'lightning' : 'fire';
-  const affixes: EquipmentAffix[] = slot === 'staff'
-    ? element === 'life' ? [{ type: 'lifeHealBonus', value: .45 }, { type: 'elementDamageBonus', element: backupElement, value: .3 }] : [{ type: 'elementDamageBonus', element, value: .45 }, { type: 'elementDamageBonus', element: backupElement, value: .3 }]
-    : slot === 'robe'
-      ? [{ type: 'globalDamageReduction', value: .28 }, { type: 'moveSpeedBonus', value: .22 }]
-      : [{ type: 'chantTimeReduction', value: .3 }, { type: 'recoveryTimeReduction', value: .3 }, { type: 'rangeBonus', delivery: 'beam', value: .28 }];
-  return { ...base, id: `test:${seed.toString(36)}:${slot}:${index}`, slot, rarity: 'rare', name: `试炼${SLOT_NAMES[slot]} ${index + 1}`, affixes, tags: [slot, 'test', 'rare'], description: '测试阶段投放的高强度装备，便于快速验证战斗、合成与数值反馈。', value: 220, fusionGeneration: 0, sourceItemValues: [220] };
-}
-
-export function createMerchant(seed: number): MerchantState {
-  const slots: EquipmentSlot[] = ['staff', 'staff', 'staff', 'robe', 'robe', 'ring', 'ring'];
-  const stock: MerchantState['stock'] = slots.map((slot, index) => {
-    const item = trainingEquipment(seed ^ 0x6d657263, index + 10, slot);
-    return { item, price: Math.floor(item.value * .6) };
-  });
-  for (let i = 0; i < 3; i++) stock.push({ item: createCatalyst(seed + i, `merchant:${i}`), price: 40 });
-  for (const id of TEST_SCROLLS) stock.push({ item: createScroll(id, `merchant:${seed}`), price: Math.floor((createScroll(id, 'price').value) * .6) });
-  return { id: 'merchant:wandering', position: { x: 760, y: 200 }, radius: 56, stock };
-}
-
-export function createForge(): ForgeState {
-  return { id: 'forge:training', position: { x: 300, y: 190 }, radius: 64 };
-}
-
-export function createInitialLoot(seed: number) {
-  const slots: EquipmentSlot[] = ['staff', 'staff', 'staff', 'robe', 'ring', 'ring'];
-  const entries: Array<[string, { id: string; position: Vec2; item: InventoryItem; droppedByPlayerId: null; ownerPriorityUntil: number }]> = slots.map((slot, index) => {
-    const item = trainingEquipment(seed ^ 0x6c6f6f74, index, slot);
-    return [`loot:${index}`, { id: `loot:${index}`, position: { x: 330 + index % 3 * 72, y: 410 + Math.floor(index / 3) * 58 }, item, droppedByPlayerId: null, ownerPriorityUntil: 0 }];
-  });
-  entries.push(['loot:orb:0', { id: 'loot:orb:0', position: { x: 570, y: 410 }, item: createCatalyst(seed, 'loot:0'), droppedByPlayerId: null, ownerPriorityUntil: 0 }]);
-  entries.push(['loot:orb:1', { id: 'loot:orb:1', position: { x: 642, y: 410 }, item: createCatalyst(seed + 1, 'loot:1'), droppedByPlayerId: null, ownerPriorityUntil: 0 }]);
-  for (const [index, id] of TEST_SCROLLS.entries()) entries.push([`loot:scroll:${id}`, { id: `loot:scroll:${id}`, position: { x: 534 + index * 66, y: 482 }, item: createScroll(id, `loot:${seed}`), droppedByPlayerId: null, ownerPriorityUntil: 0 }]);
-  return Object.fromEntries(entries);
 }
 
 export function sellPrice(item: InventoryItem) {
@@ -157,6 +120,9 @@ export function affixText(affix: EquipmentAffix) {
   if (affix.type === 'moveSpeedBonus') return `移动速度 +${Math.round(affix.value * 100)}%`;
   if (affix.type === 'chantTimeReduction') return `吟唱时间 -${Math.round(affix.value * 100)}%`;
   if (affix.type === 'recoveryTimeReduction') return `后摇时间 -${Math.round(affix.value * 100)}%`;
+  if (affix.type === 'sprayRangeBonus') return `喷射距离 +${Math.round(affix.value * 100)}%`;
+  if (affix.type === 'sprayAngleBonus') return `喷射角度 +${Math.round(affix.value * 100)}%`;
+  if (affix.type === 'beamReflect') return `射线反射次数 +${affix.value}`;
   return `${affix.delivery} 范围 +${Math.round(affix.value * 100)}%`;
 }
 
@@ -180,6 +146,9 @@ export function applyEquipmentToSpell(spell: SpellSpec, equipment: PlayerEquipme
       else if (item.slot === 'staff' && affix.type === 'lifeHealBonus' && result.payload.heal && result.elements.includes('life')) result.payload.heal *= 1 + affix.value;
       else if (item.slot === 'ring' && affix.type === 'chantTimeReduction') result.chantMs = Math.max(60, Math.round(result.chantMs * (1 - affix.value)));
       else if (item.slot === 'ring' && affix.type === 'recoveryTimeReduction') result.recoveryMs = Math.max(80, Math.round(result.recoveryMs * (1 - affix.value)));
+      else if (item.slot === 'ring' && affix.type === 'sprayRangeBonus' && result.delivery === 'spray') result.range = Math.round(result.range * (1 + affix.value));
+      else if (item.slot === 'ring' && affix.type === 'sprayAngleBonus' && result.delivery === 'spray') result.coneAngle = Math.min(Math.PI * 100 / 180, (result.coneAngle ?? Math.PI / 3) * (1 + affix.value));
+      else if (item.slot === 'ring' && affix.type === 'beamReflect' && result.delivery === 'beam' && result.beam?.mode !== 'pierce') { result.beam!.mode = 'reflect'; result.beam!.maxBounces = (result.beam!.maxBounces ?? 0) + affix.value; }
       else if (item.slot === 'ring' && affix.type === 'rangeBonus' && result.delivery === affix.delivery) {
         result.range = Math.round(result.range * (1 + affix.value));
         result.radius = Math.round(result.radius * (1 + affix.value));

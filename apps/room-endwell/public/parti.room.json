@@ -16,6 +16,7 @@
     "game.finish": {},
     "player.pose": { "payload": "{ sequence, sentAt, position, aim }" },
     "cast.request": { "payload": "{ castId, sequence, elements, aim, target }" },
+    "cast.activate": { "payload": "{ castId }" },
     "cast.aim": { "payload": "{ sequence, aim }" },
     "cast.release": { "payload": "{ castId }" },
     "combat.hit": { "payload": "{ hitId, sourceId, targetId, tick, reason }" }

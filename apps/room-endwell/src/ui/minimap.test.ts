@@ -1,0 +1,9 @@
+import { describe, expect, it } from 'vitest';
+import { generateStage } from '../game/roguelike';
+import { initialState, player } from '../game/rules/state';
+import { buildMinimapModel } from './minimap';
+
+describe('exploration minimap', () => {
+  it('hides unexplored rooms and reveals explored connections and markers', () => { const state = initialState(), stage = state.run.stage = generateStage(33, 0), me = state.players.p1 = player('p1', 'one', 0), next = stage.world.rooms.find((room) => room.id === stage.world.rooms[0]!.connections[0])!; me.position = { ...stage.world.spawn }; state.run.exploredRoomIds = ['room-0']; let model = buildMinimapModel(state, me.id, { x: 0, y: 0, w: 200, h: 140 }); expect(model.rooms.map((room) => room.id)).toEqual(['room-0']); expect(model.lines.some((line) => line.frontier)).toBe(true); expect(model.markers.some((marker) => marker.kind === 'self')).toBe(true); state.run.exploredRoomIds.push(next.id); model = buildMinimapModel(state, me.id, { x: 0, y: 0, w: 200, h: 140 }); expect(model.rooms.map((room) => room.id)).toContain(next.id); expect(model.lines.some((line) => !line.frontier)).toBe(true); });
+  it('does not leak hidden objectives or boss state', () => { const state = initialState(), stage = state.run.stage = generateStage(34, 0), me = state.players.p1 = player('p1', 'one', 0); me.position = stage.world.spawn; state.run.exploredRoomIds = ['room-0']; const model = buildMinimapModel(state, me.id, { x: 0, y: 0, w: 200, h: 140 }); expect(model.markers.some((marker) => marker.kind === 'objective' || marker.kind === 'boss')).toBe(false); });
+});

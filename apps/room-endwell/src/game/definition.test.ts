@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest';
 import type { FlowReducerContext, GameAction } from '@parti/flow';
 import type { GameState, SpellSpec } from './contracts';
 import { endwellGame } from './definition';
-import { spawnSpellEntity } from './rules/entities';
+import { positionAt, spawnSpellEntity } from './rules/entities';
 import { createCatalyst, generateEquipment } from './rules/equipment';
 import { createScroll, resolveScrollSpell } from './rules/scrolls';
-import { initialState, player, trainingMonster } from './rules/state';
+import { initialState, player, testMonster } from './rules/state';
 import { resolveSpell } from './rules/spells';
+import { generateStage, monsterEntity } from './roguelike';
 
 function setup(spell: SpellSpec) { const state = initialState(), p = state.players.p1 = player('p1', 'one', 0), timers: Array<{ action: string; payload: unknown }> = []; state.phase = 'running'; p.cast = { phase: 'chanting', castId: 'p1:cast:1', spell, startedAt: 0, phaseEndsAt: 100, aim: { x: 1, y: 0 }, target: { x: 600, y: 300 } }; const actor = { id: p.id, name: p.name, role: 'host' as const }, ctx: FlowReducerContext<GameState> = { state, role: 'authority', actor, players: [actor], host: actor, now: () => 1000, random: () => .5, timers: { dispatch(_name, _delay, action, payload) { timers.push({ action, payload }); }, clear() {} }, emit() {}, dispatch() {}, kick() {} }; const action = { id: 'a', type: '', payload: null, from: p.id, seq: 1, origin: 'host', createdAt: 0 } as GameAction; return { state, p, ctx, action, timers }; }
 describe('delivery activation', () => {
+  it('predicts activation through hostRelay and rejects forged early activation', () => { const test = setup(resolveSpell(['fire'])), action = endwellGame.actions['cast.activate']!; expect(action.sync.mode).toBe('hostRelay'); test.p.cast.phaseEndsAt = 1200; expect(action.validate!(test.ctx, { castId: 'p1:cast:1' })).toEqual({ ok: false, reason: 'chanting' }); test.p.cast.phaseEndsAt = 1000; expect(action.validate!(test.ctx, { castId: 'p1:cast:1' }).ok).toBe(true); action.reduce(test.ctx, { castId: 'p1:cast:1' }, test.action); expect(test.p.cast.phase).toBe('active'); expect(test.state.entities['p1:cast:1:spray:0']).toBeDefined(); action.reduce(test.ctx, { castId: 'p1:cast:1' }, test.action); expect(Object.keys(test.state.entities)).toEqual(['p1:cast:1:spray:0']); });
+  it('self-heals with one life element and shares discovered special spells', () => { const heal = setup(resolveSpell(['life'])); heal.p.health.current = 55; endwellGame.actions['internal.castActivate']!.reduce(heal.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, heal.action); expect(heal.p.health.current).toBe(75); expect(heal.state.entities).toEqual({}); const special = setup(resolveSpell(['fire', 'life'])); expect(special.state.run.discoveredSpellIds).toEqual(['resurrect']); endwellGame.actions['internal.castActivate']!.reduce(special.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, special.action); expect(special.state.run.discoveredSpellIds).toContain('life-flame'); });
   it('applies shields without spawning a fake hit source', () => { const test = setup(resolveSpell(['fire', 'shield'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); expect(test.p.shields).toHaveLength(1); expect(test.state.entities).toEqual({}); expect(test.p.cast.phase).toBe('recovery'); });
   it('applies special shield ward statuses', () => { const test = setup(resolveSpell(['shield', 'fire'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); expect(test.p.shields[0]?.tags).toContain('fireWard'); expect(test.p.statuses.fireWard).toBeDefined(); });
   it('activates instant teleport and resurrection effects', () => {
@@ -29,11 +32,11 @@ describe('delivery activation', () => {
   it('starts blizzard and advances chilled ticks', () => { const test = setup(resolveSpell(['water', 'ice', 'ice', 'water'])); endwellGame.actions['internal.castActivate']!.reduce(test.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, test.action); const environment = test.state.environment.global!; expect(environment.kind).toBe('blizzard'); for (let i = 0; i < 5; i++) endwellGame.actions['internal.environmentTick']!.reduce(test.ctx, { environmentId: environment.id }, test.action); expect(test.p.statuses.chilled).toBeDefined(); });
   it('activates scroll instant effects and black hole fields', () => {
     const supernova = setup(resolveScrollSpell(createScroll('supernova', 'test').elements, Object.assign(player('tmp', 'tmp', 0), { inventory: [createScroll('supernova', 'test')] }), 0)!);
-    supernova.state.entities['monster:training'] = { ...player('m', 'monster', 0), id: 'monster:training', kind: 'monster', position: { x: 500, y: 300 }, radius: 30, createdAt: 0, expiresAt: null, detached: true };
-    supernova.state.entities['monster:training'].health.current = 400;
+    supernova.state.entities['monster:test'] = { ...player('m', 'monster', 0), id: 'monster:test', kind: 'monster', position: { x: 500, y: 300 }, radius: 30, createdAt: 0, expiresAt: null, detached: true };
+    supernova.state.entities['monster:test'].health.current = 400;
     endwellGame.actions['internal.castActivate']!.reduce(supernova.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, supernova.action);
     expect(supernova.p.health.current).toBe(50);
-    expect(supernova.state.entities['monster:training']?.health.current).toBe(200);
+    expect(supernova.state.entities['monster:test']?.health.current).toBe(200);
 
     const equilibrium = setup(resolveScrollSpell(createScroll('equilibrium', 'test').elements, Object.assign(player('tmp', 'tmp', 0), { inventory: [createScroll('equilibrium', 'test')] }), 0)!);
     equilibrium.p.health.current = 10;
@@ -66,7 +69,7 @@ describe('scroll spell priority', () => {
   });
 });
 
-function economySetup() { const state = initialState(), p = state.players.p1 = player('p1', 'one', 0), actor = { id: p.id, name: p.name, role: 'host' as const }, timers: Array<{ name: string; delay: number; action: string; payload: unknown; actorId?: string }> = [], events: Array<{ type: string; payload: unknown }> = [], ctx: FlowReducerContext<GameState> = { state, role: 'authority', actor, players: [actor], host: actor, now: () => 2000, random: () => .5, timers: { dispatch(name, delay, action, payload, actorId) { timers.push({ name, delay, action, payload, actorId }); }, clear() {} }, emit(type, payload) { events.push({ type, payload }); }, dispatch() {}, kick() {} }, action = { id: 'a', type: '', payload: null, from: p.id, seq: 1, origin: 'host', createdAt: 0 } as GameAction; state.phase = 'running'; return { state, p, ctx, action, timers, events }; }
+function economySetup() { const state = initialState(), p = state.players.p1 = player('p1', 'one', 0), stage = generateStage(7, 0), actor = { id: p.id, name: p.name, role: 'host' as const }, timers: Array<{ name: string; delay: number; action: string; payload: unknown; actorId?: string }> = [], events: Array<{ type: string; payload: unknown }> = [], ctx: FlowReducerContext<GameState> = { state, role: 'authority', actor, players: [actor], host: actor, now: () => 2000, random: () => .5, timers: { dispatch(name, delay, action, payload, actorId) { timers.push({ name, delay, action, payload, actorId }); }, clear() {} }, emit(type, payload) { events.push({ type, payload }); }, dispatch() {}, kick() {} }, action = { id: 'a', type: '', payload: null, from: p.id, seq: 1, origin: 'host', createdAt: 0 } as GameAction; state.phase = 'running'; state.run.stage = stage; state.merchant = stage.merchant; state.forge = stage.forge; p.position = { ...stage.world.spawn }; p.gold = 9999; const item = generateEquipment(stage.stageSeed, 99); state.loot['loot:test'] = { id: 'loot:test', position: { ...p.position }, item, droppedByPlayerId: null, ownerPriorityUntil: 0 }; return { state, p, ctx, action, timers, events }; }
 
 describe('death and respawn rules', () => {
   it('kills players, interrupts their cast, and removes owned active sources', () => {
@@ -89,6 +92,7 @@ describe('death and respawn rules', () => {
     const payloads = [
       ['player.pose', { sequence: 1, sentAt: 2000, position: test.p.position, aim: { x: 1, y: 0 } }],
       ['cast.request', { castId: 'p1:cast:1', sequence: 1, elements: ['fire'], aim: { x: 1, y: 0 }, target: { x: 500, y: 360 } }],
+      ['cast.activate', { castId: 'p1:cast:1' }],
       ['cast.aim', { sequence: 1, aim: { x: 1, y: 0 } }],
       ['cast.release', { castId: 'p1:cast:1' }],
       ['inventory.equip', { itemId: item.id }],
@@ -119,52 +123,58 @@ describe('death and respawn rules', () => {
     expect(endwellGame.actions['player.pose']!.validate!(test.ctx, { sequence: 1, sentAt: 2000, position: test.p.position, aim: { x: 1, y: 0 } }).ok).toBe(true);
   });
 
-  it('respawns the training monster after a delayed authoritative action', () => {
-    const test = economySetup(), monster = trainingMonster(0);
+  it('removes defeated monsters without restoring training content', () => {
+    const test = economySetup(), monster = testMonster(0);
     monster.health.current = 1;
     test.state.entities[monster.id] = monster;
     test.p.cast = { phase: 'active', castId: 'p1:cast:1', spell: resolveSpell(['fire', 'rock']), startedAt: 0, phaseEndsAt: 0, aim: { x: 1, y: 0 }, target: monster.position };
     const source = spawnSpellEntity(test.state, test.p, test.p.cast.spell!, 1000);
     endwellGame.actions['combat.hit']!.reduce(test.ctx, { hitId: 'death:monster', sourceId: source.id, targetId: monster.id, tick: 1, reason: 'hit' }, test.action);
     expect(test.state.entities[monster.id]).toBeUndefined();
-    expect(test.timers).toContainEqual(expect.objectContaining({ action: 'internal.trainingMonsterRespawn', delay: 3000 }));
-    endwellGame.actions['internal.trainingMonsterRespawn']!.reduce(test.ctx, {}, test.action);
-    expect(test.state.entities[monster.id]).toMatchObject({ id: monster.id, kind: 'monster', health: { current: 500, max: 500 } });
+    expect(test.timers.some((timer) => timer.action.includes('Respawn'))).toBe(false);
   });
 });
 
 describe('force motion integration', () => {
   it('integrates player force velocity over authority ticks and decays it', () => {
-    const test = economySetup(), epoch = test.p.positionEpoch;
-    test.p.position = { x: 180, y: 360 };
+    const test = economySetup(), epoch = test.p.positionEpoch, start = { ...test.p.position };
     test.p.forceVelocity = { x: 100, y: 0 };
     endwellGame.systems![0]!.update(test.ctx, .1);
-    expect(test.p.position.x).toBeCloseTo(190);
+    expect(test.p.position.x).toBeCloseTo(start.x + 10);
     expect(test.p.positionEpoch).toBe(epoch + 1);
     expect(test.p.forceVelocity?.x).toBeLessThan(100);
   });
 
   it('lets player pose input oppose gravity-like force instead of snapping to the center', () => {
-    const test = economySetup();
-    test.p.position = { x: 500, y: 360 };
+    const test = economySetup(), start = { ...test.p.position };
     test.p.forceVelocity = { x: -100, y: 0 };
-    endwellGame.actions['player.pose']!.reduce(test.ctx, { sequence: 1, sentAt: 2000, position: { x: 530, y: 360 }, aim: { x: 1, y: 0 } }, test.action);
+    endwellGame.actions['player.pose']!.reduce(test.ctx, { sequence: 1, sentAt: 2000, position: { x: start.x + 30, y: start.y }, aim: { x: 1, y: 0 } }, test.action);
     endwellGame.systems![0]!.update(test.ctx, .1);
-    expect(test.p.position.x).toBeGreaterThan(500);
-    expect(test.p.position.x).toBeLessThan(530);
+    expect(test.p.position.x).toBeGreaterThan(start.x);
+    expect(test.p.position.x).toBeLessThan(start.x + 30);
     expect(test.p.forceVelocity?.x).toBeLessThan(0);
   });
 
   it('integrates monster force velocity without using projectile velocity', () => {
-    const test = economySetup(), monster = test.state.entities['monster:training'] = trainingMonster(0);
-    monster.position = { x: 500, y: 360 };
+    const test = economySetup(), monster = test.state.entities['monster:test'] = testMonster(0);
+    const start = test.state.run.stage!.world.spawn; monster.position = { x: start.x + 100, y: start.y };
     monster.forceVelocity = { x: -80, y: 0 };
     monster.velocity = { x: 999, y: 0 };
     endwellGame.systems![0]!.update(test.ctx, .1);
-    expect(monster.position.x).toBeCloseTo(492);
+    expect(monster.position.x).toBeCloseTo(start.x + 92);
     expect(monster.velocity).toEqual({ x: 999, y: 0 });
     expect(monster.forceVelocity?.x).toBeGreaterThan(-80);
   });
+});
+
+describe('monster unified casting', () => {
+  it('does not deal damage without an active HitSource and exposes chant/recovery', () => { const test = economySetup(), stage = test.state.run.stage!, start = stage.world.spawn, monster = monsterEntity('monster:caster', 'ruins.chaser', 'room-0', { x: start.x + 58, y: start.y }, 1, 0); let now = 2000; test.ctx.now = () => now; test.ctx.dispatch = (type, payload) => { endwellGame.actions[type]!.reduce(test.ctx, payload, test.action); }; test.state.entities[monster.id] = monster; const hp = test.p.health.current; endwellGame.systems![0]!.update(test.ctx, .1); expect(test.p.health.current).toBe(hp); expect(monster.cast.phase).toBe('chanting'); monster.cast.phaseEndsAt = 0; endwellGame.systems![0]!.update(test.ctx, .1); expect(Object.values(test.state.entities).some((entity) => entity.ownerId === monster.id && entity.source?.spell.id === 'ruins-claw')).toBe(true); expect(monster.cast.phase).toBe('recovery'); expect(test.p.health.current).toBe(hp); now += 100; endwellGame.systems![0]!.update(test.ctx, .1); expect(test.p.health.current).toBeLessThan(hp); });
+  it('creates a visible lightning projectile before applying ranged damage', () => { const test = economySetup(), stage = test.state.run.stage!, start = stage.world.spawn, monster = monsterEntity('monster:shooter', 'ruins.shooter', 'room-0', { x: start.x + 250, y: start.y }, 1, 0); let now = 2000; test.ctx.now = () => now; test.ctx.dispatch = (type, payload) => { endwellGame.actions[type]!.reduce(test.ctx, payload, test.action); }; test.state.entities[monster.id] = monster; const hp = test.p.health.current; endwellGame.systems![0]!.update(test.ctx, .1); expect(monster.cast.spell?.delivery).toBe('projectile'); monster.cast.phaseEndsAt = 0; endwellGame.systems![0]!.update(test.ctx, .1); const projectile = Object.values(test.state.entities).find((entity) => entity.ownerId === monster.id && entity.kind === 'projectile'); expect(projectile?.source?.spell.payload.damage?.lightning).toBeGreaterThan(0); expect(projectile?.faction.team).toBe('monster'); expect(test.p.health.current).toBe(hp); now += 1000; endwellGame.systems![0]!.update(test.ctx, 1); expect(test.p.health.current).toBeLessThan(hp); });
+  it('uses a warning entity before a boss area impact', () => { const test = economySetup(), stage = test.state.run.stage!, start = stage.world.spawn, monster = monsterEntity('monster:boss-caster', 'ruins.boss', 'room-0', { x: start.x + 200, y: start.y }, 1, 0, true, true); test.state.entities[monster.id] = monster; endwellGame.systems![0]!.update(test.ctx, .1); expect(monster.cast.spell?.delivery).toBe('area'); monster.cast.phaseEndsAt = 0; endwellGame.systems![0]!.update(test.ctx, .1); expect(monster.cast.phase).toBe('warning'); expect(Object.values(test.state.entities).some((entity) => entity.kind === 'warning' && entity.ownerId === monster.id)).toBe(true); });
+});
+
+describe('authority hit verification', () => {
+  it('accepts geometric hits and rejects forged distant targets', () => { const test = economySetup(), spell = resolveSpell(['fire', 'rock']); test.p.cast = { phase: 'active', castId: 'p1:cast:geometry', spell, startedAt: 0, phaseEndsAt: 0, aim: { x: 1, y: 0 }, target: { x: test.p.position.x + spell.range, y: test.p.position.y } }; const source = spawnSpellEntity(test.state, test.p, spell, 1000), target = testMonster(0); target.id = 'monster:geometry'; target.position = positionAt(source, test.ctx.now()); test.state.entities[target.id] = target; const payload = { hitId: 'geometry:valid', sourceId: source.id, targetId: target.id, tick: 1, reason: 'hit' as const }; expect(endwellGame.actions['combat.hit']!.validate!(test.ctx, payload).ok).toBe(true); target.position = { x: source.position.x, y: source.position.y + 900 }; expect(endwellGame.actions['combat.hit']!.validate!(test.ctx, { ...payload, hitId: 'geometry:forged' }).ok).toBe(false); });
 });
 
 describe('economy reducers', () => {
