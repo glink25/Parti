@@ -1,4 +1,4 @@
-import { CHUNK_HEIGHT, WORLD_WIDTH, type ActiveEffect, type AttackDefinition, type BiomeDefinition, type BossPhaseDefinition, type BossStrategy, type ContactResult, type DynamicEntityState, type EncounterStrategy, type Enemy, type EnemyKind, type EnemyStrategy, type GenerationContext, type PickupKind, type PickupStrategy, type Platform, type PlatformKind, type PlatformStrategy, type RuntimeContext, type RuntimeEffect } from '../game/contracts';
+import { BOSS_SPAWN_Y_MAX, BOSS_SPAWN_Y_MIN, CHUNK_HEIGHT, WORLD_WIDTH, type ActiveEffect, type AttackDefinition, type BiomeDefinition, type BossPhaseDefinition, type BossStrategy, type ContactResult, type DynamicEntityState, type EncounterStrategy, type Enemy, type EnemyKind, type EnemyStrategy, type GenerationContext, type PickupKind, type PickupStrategy, type Platform, type PlatformKind, type PlatformStrategy, type RuntimeContext, type RuntimeEffect } from '../game/contracts';
 import { Registry, contentFingerprint as fingerprint } from '../game/registry';
 import { wrapX } from '../runtime/physics';
 
@@ -46,7 +46,7 @@ const attacks: Record<string, AttackDefinition> = {
 function enemy(id: EnemyKind, weight: number, hp: number, stompable: boolean, controller: Enemy['controller'], attackList: AttackDefinition[] = [], boss = false): EnemyStrategy {
   return {
     id, version: 1, weight, boss,
-    create(c, i, anchor) { const r = c.rng(`enemy:${id}:${i}`), strength = c.difficultyAxes.enemyStrength; return { id: `${c.chunkIndex}:enemy:${id}:${i}`, kind: id, x: anchor?.x ?? r.int(90, 810), y: (anchor?.y ?? c.chunkIndex * CHUNK_HEIGHT + r.int(260, 1380)) + (anchor ? 54 : 0), hp: Math.ceil(hp * (1 + strength * .9)), radius: boss ? 105 : 34, boss, stompable, controller: tuneController(controller, r.float(), anchor), attacks: attackList, drops: [{ pickup: 'shield', weight: 1 }, { pickup: 'rapid', weight: 2 }], anchorId: anchor?.id }; },
+    create(c, i, anchor) { const r = c.rng(`enemy:${id}:${i}`), strength = c.difficultyAxes.enemyStrength; return { id: `${c.chunkIndex}:enemy:${id}:${i}`, kind: id, x: anchor?.x ?? r.int(90, 810), y: (anchor?.y ?? c.chunkIndex * CHUNK_HEIGHT + (boss ? r.int(BOSS_SPAWN_Y_MIN, BOSS_SPAWN_Y_MAX) : r.int(260, 1380))) + (anchor ? 54 : 0), hp: Math.ceil(hp * (1 + strength * .9)), radius: boss ? 105 : 34, boss, stompable, controller: tuneController(controller, r.float(), anchor), attacks: attackList, drops: [{ pickup: 'shield', weight: 1 }, { pickup: 'rapid', weight: 2 }], anchorId: anchor?.id }; },
     position(e, c) { return enemyPosition(e, c); }, contact(e) { return e.stompable ? { effects: [] } : { damageReason: '不可踩踏怪物', effects: [] }; },
     hit(e, damage) { return [{ kind: 'damage', targetId: e.id, amount: damage }]; }, attack(e, _context, sequence) { return e.attacks.length ? e.attacks[sequence % e.attacks.length]! : null; },
     death(e, c) { const r = c.rng(`drop:${e.id}`); return r.float() < .35 ? [{ kind: 'message', text: '怪物掉落奖励' }] : []; },

@@ -33,7 +33,7 @@ export class SkywardScene {
       outcome: (event) => { if (event.outcome === 'shield' && event.playerId !== parti.playerId) this.notify(`${this.playerName(event.playerId)} 的护盾抵消了伤害`); },
     });
     this.flow.game.addSystem({ update: (_, dt) => { const now = performance.now(); for (const p of Object.values(this.state?.players ?? {})) if (p.id !== parti.playerId) { const visual = this.remote[p.id] ??= createRemotePose(p.x, p.y); advanceRemotePose(visual, now, dt); } } });
-    this.flow.game.addSystem({ update: (_, dt) => { const me = this.me(); if (!me?.alive || !this.local.alive || this.pendingDeath) return; this.simulate(dt, performance.now()); } });
+    this.flow.game.addSystem({ update: (_, dt) => { const me = this.me(); if (!me?.alive || !this.local.alive || this.pendingDeath) return; this.simulate(dt); } });
     this.flow.game.addSystem({ update: (_, dt) => this.simulateBullets(dt) });
     this.flow.game.addSystem({ update: () => { if (this.me()?.alive && this.local.alive && !this.pendingDeath) this.interactions(performance.now()); } });
     if (parti.orientation) this.disposers.push(parti.orientation.onData((data) => this.orientation(data)));
@@ -47,13 +47,13 @@ export class SkywardScene {
     if (!me.alive || !this.local.alive || this.pendingDeath) return;
     if (now >= this.telemetryAt) { this.telemetryAt = now + 100; this.flow?.publishPose({ sequence: ++this.poseSequence, x: this.local.x, y: this.local.y, vy: this.local.vy, cameraBottom: this.local.cameraBottom, direction: this.direction }); }
   }
-  private simulate(dt: number, now: number) {
+  private simulate(dt: number) {
     const me = this.me()!, previousY = this.local.y; this.local.x = wrapX(this.local.x + this.direction * MOVE_SPEED * dt);
     const rocket = this.buff(me, 'rocket'), propeller = this.buff(me, 'propeller'), slow = this.buff(me, 'slow-fall'); if (!rocket && !propeller && this.flying) this.groundingUntil = Date.now() + 1200; this.flying = rocket || propeller;
     if (rocket) { const age = Date.now() - me.effects.rocket!.startedAt; this.local.vy = Math.min(760, 280 + age * .18); } else if (propeller) { const age = Date.now() - me.effects.propeller!.startedAt; this.local.vy = Math.min(520, 220 + age * .12); } else { const easing = Date.now() < this.groundingUntil; this.local.vy += ((slow && this.local.vy < 0) || easing ? GRAVITY * .42 : GRAVITY) * dt; }
     this.local.y += this.local.vy * dt;
     if (!rocket && !propeller && this.local.vy <= 0) {
-      const landing = this.platforms(now).find((p) => previousY - PLAYER_RADIUS >= p.y && this.local.y - PLAYER_RADIUS <= p.y && directDistance(this.local.x, p.x) <= p.width / 2 + PLAYER_RADIUS * .42);
+      const landing = this.platforms(Date.now()).find((p) => previousY - PLAYER_RADIUS >= p.y && this.local.y - PLAYER_RADIUS <= p.y && directDistance(this.local.x, p.x) <= p.width / 2 + PLAYER_RADIUS * .42);
       if (landing) {
         const result = platformStrategies.require(landing.kind).contact(landing, this.runtime(Number(landing.id.split(':')[0])), this.state?.entities[landing.id]);
         this.flow?.landPlatform({ platformId: landing.id, sequence: ++this.outcomeSequence });
@@ -80,7 +80,7 @@ export class SkywardScene {
   private receivePose(packet: PosePacket) { if (packet.playerId === parti.playerId) return; const player = this.state?.players[packet.playerId]; const pose = this.remote[packet.playerId] ??= createRemotePose(player?.x ?? packet.x, player?.y ?? packet.y); acceptPose(pose, packet, performance.now()); }
   private visibleChunks() { if (!this.state || this.state.phase !== 'running') return []; const start = Math.max(0, Math.floor(this.local.viewBottom / CHUNK_HEIGHT) - 1), end = Math.floor((this.local.viewBottom + VIEW_HEIGHT) / CHUNK_HEIGHT) + 1; const result = []; for (let i = start; i <= end; i += 1) { let c = this.chunks.get(i); if (!c) { c = generateChunk(this.state.seed, i, Math.max(1, this.state.startedPlayers.length)); this.chunks.set(i, c); } result.push(c); } return result; }
   private platforms(now = Date.now()) { return this.visibleChunks().flatMap((c) => c.platforms.map((p) => ({ chunk: c.index, platform: p }))).filter(({ chunk, platform }) => platformActive(platform, this.state?.entities ?? {}, this.runtime(chunk, now), this.bossDefeated(chunk)) && !this.platformDisabledByBoss(platform.id, now)).map(({ chunk, platform }) => ({ ...platform, ...platformPosition(platform, this.runtime(chunk, now)) })); }
-  private enemies() { const boss = this.activeBoss(), generated = this.visibleChunks().flatMap((c) => c.enemies), summons = boss?.summons ?? []; return [...generated, ...summons].filter((e) => { const s = this.state?.entities[e.id]; return !(s?.kind === 'enemy' && s.defeated) && !(s?.kind === 'summon' && s.defeated) && !(e.boss && this.bossDefeated(Number(e.id.split(':')[0]))); }).map((e) => { const state = this.state?.entities[e.id], position = enemyStrategies.require(e.kind).position(e, this.runtime(Number(e.id.split(':')[0]))); return { ...e, ...position, hp: boss?.enemyId === e.id ? boss.hp : state?.kind === 'enemy' || state?.kind === 'summon' ? state.hp : e.hp }; }); }
+  private enemies() { const boss = this.activeBoss(), generated = this.visibleChunks().flatMap((c) => c.enemies), summons = boss?.summons ?? []; return [...generated, ...summons].filter((e) => { const s = this.state?.entities[e.id]; return !(s?.kind === 'enemy' && s.defeated) && !(s?.kind === 'summon' && s.defeated) && !(e.boss && this.bossDefeated(Number(e.id.split(':')[0]))) && (!e.boss || this.state?.boss?.enemyId === e.id); }).map((e) => { const state = this.state?.entities[e.id], position = enemyStrategies.require(e.kind).position(e, this.runtime(Number(e.id.split(':')[0]))); return { ...e, ...position, hp: boss?.enemyId === e.id ? boss.hp : state?.kind === 'enemy' || state?.kind === 'summon' ? state.hp : e.hp }; }); }
   private pickups() { const generated = this.visibleChunks().flatMap((c) => c.pickups).filter((p) => { const state = this.state?.entities[p.id]; return state?.kind !== 'pickup' || !state.claimedBy; }), drops = Object.values(this.state?.entities ?? {}).flatMap((state) => state.kind === 'pickup' && state.pickup && !state.claimedBy ? [state.pickup] : []); return [...generated, ...drops]; }
   private bossDefeated(chunk: number) { return this.optimisticallyDefeatedBosses.has(chunk) || (this.state ? isBossDefeated(this.state.completedBossCount, chunk) : false); }
   private activeBoss() { const boss = this.state?.boss ?? null; return boss && !this.bossDefeated(boss.chunkIndex) ? boss : null; }

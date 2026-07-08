@@ -4,6 +4,9 @@ export const VIEW_HEIGHT = 1600;
 export const CHUNK_HEIGHT = 1600;
 export const PLAYER_RADIUS = 32;
 export const BOSS_INTERVAL = 10;
+export const BOSS_TRIGGER_OFFSET = 700;
+export const BOSS_SPAWN_Y_MIN = 1300;
+export const BOSS_SPAWN_Y_MAX = 1450;
 
 export type Random = { float(): number; int(min: number, max: number): number; pick<T>(items: readonly T[]): T };
 export type PlatformKind = 'normal' | 'moving' | 'fragile' | 'recovering' | 'spikes' | 'trigger' | 'bridge' | 'spring' | 'boss-exit';
