@@ -1,6 +1,6 @@
 import type { PosePayload, Vec2 } from '../game/contracts';
 
-export type RemotePoseFrame = PosePayload & { playerId: string };
+export type RemotePoseFrame = Omit<PosePayload, 'selectedElements'> & { playerId: string; selectedElements?: PosePayload['selectedElements'] };
 export type RemoteMotion = { previous: RemotePoseFrame; current: RemotePoseFrame; receivedAt: number };
 export const INTERPOLATION_BUFFER_MS = 50;
 export const MAX_EXTRAPOLATION_MS = 100;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GameState, PartiApi } from '../game/contracts';
 import { generateStage } from '../game/roguelike';
+import { generateEquipment } from '../game/rules/equipment';
 import { initialState, player, testMonster } from '../game/rules/state';
 import { createEndwellFlow } from './flow';
 
@@ -26,4 +27,6 @@ describe('local-first flow', () => {
     for (const player of Object.values(state.players)) { expect(flow.game.world.getComponent(player.id, 'Transform')).toEqual(player.position); expect(flow.game.world.getComponent(player.id, 'PositionEpoch')).toBe(player.positionEpoch); }
     flow.game.dispose();
   });
+
+  it('keeps equipment mutations stable while an older authority snapshot is in flight', () => { const harness = apiHarness(), authority = initialState(), stage = authority.run.stage = generateStage(23, 0), p = authority.players.p1 = player('p1', 'one', 0), item = generateEquipment(23, 0); authority.phase = 'running'; p.position = { ...stage.world.spawn }; p.inventory.push(item); let visible: GameState | null = null; const flow = createEndwellFlow(harness.api, { state: (state) => { visible = state; }, event() {} }); harness.state(structuredClone(authority)); flow.equip(item.id); expect(flow.game.state.get<GameState>('')!.players.p1!.equipment[item.slot]?.id).toBe(item.id); harness.state(structuredClone(authority)); expect(visible!.players.p1!.equipment[item.slot]?.id).toBe(item.id); const confirmed = structuredClone(authority); confirmed.players.p1!.inventory = []; confirmed.players.p1!.equipment[item.slot] = item; harness.state(confirmed); expect(visible!.players.p1!.equipment[item.slot]?.id).toBe(item.id); flow.unequip(item.id); harness.state(structuredClone(confirmed)); expect(visible!.players.p1!.inventory.some((entry) => entry.id === item.id)).toBe(true); flow.game.dispose(); });
 });

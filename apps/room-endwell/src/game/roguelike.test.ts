@@ -38,4 +38,5 @@ describe('deterministic roguelike blueprint', () => {
     expect(STAGES).toHaveLength(3);
   });
   it('places merchants and forges in distinct clear floor areas', () => { for (let seed = 0; seed < 40; seed++) { const stage = generateStage(seed, seed % 3), merchantRoom = roomAt(stage, stage.merchant.position)?.id, forgeRoom = roomAt(stage, stage.forge.position)?.id; expect(merchantRoom).toBeDefined(); expect(forgeRoom).toBeDefined(); expect(merchantRoom).not.toBe(forgeRoom); expect(isWalkable(stage, stage.merchant.position, stage.merchant.radius)).toBe(true); expect(isWalkable(stage, stage.forge.position, stage.forge.radius)).toBe(true); } });
+  it('splits larger deterministic encounters into two or three complete waves', () => { const stage = generateStage(77, 0); for (const encounter of stage.encounters) { expect(encounter.totalWaves).toBeGreaterThanOrEqual(2); expect(encounter.totalWaves).toBeLessThanOrEqual(3); expect(encounter.currentWave).toBe(0); expect(encounter.waves.flat()).toHaveLength(encounter.monsterIds.length); expect(new Set(encounter.waves.flat())).toEqual(new Set(encounter.monsterIds)); } });
 });

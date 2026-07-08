@@ -18,10 +18,10 @@ function offensive(elements: readonly Element[]) { return elements.filter((eleme
 export function hitPayload(elements: readonly Element[], allowHeal = true): HitPayload { const vector = elementVector(elements), attack = offensive(elements), damage: Partial<Record<DamageElement, number>> = {}, statusBuildup: HitPayload['statusBuildup'] = {}, effects: NonNullable<HitPayload['effects']> = [];
   if (!attack.length && vector.life && allowHeal) return { heal: 12 * vector.life };
   if (vector.fire) { damage.fire = 8 * vector.fire; statusBuildup.burning = 30 * vector.fire; }
-  if (vector.water) { damage.water = 5 * vector.water; statusBuildup.wet = 38 * vector.water; effects.push({ type: 'knockback', force: 80 + vector.water * 25 }); }
+  if (vector.water) { damage.water = 5 * vector.water; statusBuildup.wet = 38 * vector.water; effects.push({ type: 'knockback', force: 120 + vector.water * 35 }); }
   if (vector.lightning) { damage.lightning = 7 * vector.lightning; statusBuildup.shocked = 28 * vector.lightning; effects.push({ type: 'interrupt', power: 18 + vector.lightning * 8 }); }
-  if (vector.ice) { damage.ice = 6 * vector.ice; statusBuildup.chilled = 35 * vector.ice; }
-  if (vector.rock) { damage.rock = 10 * vector.rock; damage.physical = 3 * vector.rock; effects.push({ type: 'knockback', force: 130 + vector.rock * 45 }); }
+  if (vector.ice) { damage.ice = 6 * vector.ice; statusBuildup.chilled = 45 * vector.ice; }
+  if (vector.rock) { damage.rock = 10 * vector.rock; damage.physical = 3 * vector.rock; effects.push({ type: 'knockback', force: 180 + vector.rock * 55 }); }
   return { damage, statusBuildup, effects };
 }
 function base(elements: Element[], delivery: SpellSpec['delivery'], values: Partial<SpellSpec>): SpellSpec { const count = elements.length; return { id: `${delivery}:${elements.join('-')}`, name: `${elements.map((element) => names[element]).join('·')}${{ spray: '喷射', beam: '射线', projectile: '弹', summon: '召唤', area: '陨石', environment: '降雨', shield: '护盾', instant: '秘术' }[delivery]}`, elements: [...elements], elementVector: elementVector(elements), delivery, payload: hitPayload(elements), chantMs: 160 + Math.max(0, count - 1) * 120, recoveryMs: 240 + count * 45, detached: false, channelled: false, lifetimeMs: 4000, range: 240, radius: 42, targeting: attachedTargeting, blocking: attachedBlocking, tags: ['spell', ...new Set(elements)], visualKey: `${delivery}.${elements.join('-')}`, ...values };

@@ -30,21 +30,21 @@ export function beamSegments(state: GameState, source: EntityState, now: number)
   return result;
 }
 
-export function intersectsSource(source: EntityState, target: { position: Vec2; radius: number }, now: number, previous?: Vec2, state?: GameState): boolean {
+export function intersectsSource(source: EntityState, target: { position: Vec2; radius: number }, now: number, previous?: Vec2, state?: GameState, tolerance = 0): boolean {
   const spell = source.source?.spell; if (!spell) return false; const position = positionAt(source, now);
-  if (spell.delivery === 'projectile') return pointSegmentDistance(target.position, previous ?? position, position) <= source.radius + target.radius;
-  if (spell.delivery === 'spray') { const origin = source.position, delta = { x: target.position.x - origin.x, y: target.position.y - origin.y }, distance = Math.hypot(delta.x, delta.y); if (distance > spell.range + target.radius || distance < .001) return false; const direction = source.direction ?? { x: 1, y: 0 }, halfAngle = (spell.coneAngle ?? Math.PI / 3) / 2; return (delta.x * direction.x + delta.y * direction.y) / distance >= Math.cos(halfAngle); }
-  if (spell.delivery === 'beam') { const segments = state ? beamSegments(state, source, now) : [{ from: source.position, to: add(source.position, source.direction ?? { x: 1, y: 0 }, spell.range) }]; return segments.some((segment) => pointSegmentDistance(target.position, segment.from, segment.to) <= (spell.beam?.width ?? spell.radius) + target.radius); }
-  if (spell.delivery === 'area' || spell.delivery === 'summon' && source.kind === 'field') return Math.hypot(target.position.x - source.position.x, target.position.y - source.position.y) <= source.radius + target.radius;
+  if (spell.delivery === 'projectile') return pointSegmentDistance(target.position, previous ?? position, position) <= source.radius + target.radius + tolerance;
+  if (spell.delivery === 'spray') { const origin = source.position, delta = { x: target.position.x - origin.x, y: target.position.y - origin.y }, distance = Math.hypot(delta.x, delta.y); if (distance > spell.range + target.radius + tolerance || distance < .001) return false; const direction = source.direction ?? { x: 1, y: 0 }, halfAngle = (spell.coneAngle ?? Math.PI / 3) / 2 + Math.asin(Math.min(.45, (target.radius + tolerance) / distance)); return (delta.x * direction.x + delta.y * direction.y) / distance >= Math.cos(halfAngle); }
+  if (spell.delivery === 'beam') { const segments = state ? beamSegments(state, source, now) : [{ from: source.position, to: add(source.position, source.direction ?? { x: 1, y: 0 }, spell.range) }]; return segments.some((segment) => pointSegmentDistance(target.position, segment.from, segment.to) <= (spell.beam?.width ?? spell.radius) + target.radius + tolerance); }
+  if (spell.delivery === 'area' || spell.delivery === 'summon' && source.kind === 'field') return Math.hypot(target.position.x - source.position.x, target.position.y - source.position.y) <= source.radius + target.radius + tolerance;
   return false;
 }
 
-export function collisionCandidates(state: GameState, source: EntityState, now: number, previous?: Vec2): CollisionCandidate[] {
+export function collisionCandidates(state: GameState, source: EntityState, now: number, previous?: Vec2, tolerance = 0): CollisionCandidate[] {
   const spell = source.source?.spell, owner = source.ownerId ? state.players[source.ownerId] ?? state.entities[source.ownerId] : undefined; if (!spell || !owner || 'alive' in owner && !owner.alive) return [];
-  const candidates = targets(state, source, now).flatMap((target) => { if (target.id === source.ownerId && !spell.targeting.canHitSelf || !intersectsSource(source, target, now, previous, state)) return []; const hittable = canTarget(source.ownerId ?? source.id, target.id, owner, target.combatant, spell.targeting); if (!hittable && !blocks(source, target)) return []; return [{ target, reason: hittable ? 'hit' as const : 'blocked' as const }]; });
+  const candidates = targets(state, source, now).flatMap((target) => { if (target.id === source.ownerId && !spell.targeting.canHitSelf || !intersectsSource(source, target, now, previous, state, tolerance)) return []; const hittable = canTarget(source.ownerId ?? source.id, target.id, owner, target.combatant, spell.targeting); if (!hittable && !blocks(source, target)) return []; return [{ target, reason: hittable ? 'hit' as const : 'blocked' as const }]; });
   if (spell.delivery === 'beam') { const segments = beamSegments(state, source, now), order = (target: CollisionTarget) => { let total = 0; for (const segment of segments) { if (pointSegmentDistance(target.position, segment.from, segment.to) <= target.radius + (spell.beam?.width ?? spell.radius)) return total + Math.hypot(target.position.x - segment.from.x, target.position.y - segment.from.y); total += Math.hypot(segment.to.x - segment.from.x, segment.to.y - segment.from.y); } return Infinity; }; return candidates.sort((a, b) => order(a.target) - order(b.target)); }
   candidates.sort((a, b) => Math.hypot(a.target.position.x - source.position.x, a.target.position.y - source.position.y) - Math.hypot(b.target.position.x - source.position.x, b.target.position.y - source.position.y));
   return spell.delivery === 'projectile' && !spell.tags.includes('pierce') ? candidates.slice(0, 1) : candidates;
 }
 
-export function verifiesHit(state: GameState, source: EntityState, targetId: string, reason: 'hit' | 'blocked', now: number) { return collisionCandidates(state, source, now, source.position).some((candidate) => candidate.target.id === targetId && candidate.reason === reason); }
+export function verifiesHit(state: GameState, source: EntityState, targetId: string, reason: 'hit' | 'blocked', now: number) { return collisionCandidates(state, source, now, source.position, 18).some((candidate) => candidate.target.id === targetId && candidate.reason === reason); }
