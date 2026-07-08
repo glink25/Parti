@@ -44,11 +44,23 @@ export function findRoom(id: string): RoomEntry | undefined {
 }
 
 export async function loadPackageSource(sourceId: string): Promise<RoomPackage> {
+  return loadPackageSourceWithProgress(sourceId);
+}
+
+export async function loadPackageSourceWithProgress(
+  sourceId: string,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<RoomPackage> {
   const builtin = findRoom(sourceId);
-  if (builtin) return loadPackageFromUrl(builtin.baseUrl, builtin.files);
+  if (builtin) {
+    return loadPackageFromUrl(builtin.baseUrl, builtin.files, { onProgress });
+  }
+  onProgress?.(0, 1);
   const input = await getTemplatePackage(sourceId);
   if (!input) throw new PackageSourceNotFoundError(sourceId);
-  return createPackage(input);
+  const pkg = await createPackage(input);
+  onProgress?.(1, 1);
+  return pkg;
 }
 
 export class PackageSourceNotFoundError extends Error {

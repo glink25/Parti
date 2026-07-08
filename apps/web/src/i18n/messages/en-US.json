@@ -126,6 +126,8 @@
       "selected": "Selected",
       "continueEdit": "Continue editing",
       "deleteAria": "Delete {name}",
+      "loading": "Loading {progress}%",
+      "loadFailed": "Load failed",
       "replaceTitle": "Replace current content?",
       "replaceDescription": "Switching to \"{name}\" will replace your code and extra files. This cannot be undone.",
       "keepCurrent": "Keep current content",

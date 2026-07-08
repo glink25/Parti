@@ -126,6 +126,8 @@
       "selected": "已选择",
       "continueEdit": "继续编辑",
       "deleteAria": "删除 {name}",
+      "loading": "加载中 {progress}%",
+      "loadFailed": "加载失败",
       "replaceTitle": "替换当前内容？",
       "replaceDescription": "切换到「{name}」会替换当前代码和附加文件，此操作无法撤销。",
       "keepCurrent": "保留当前内容",

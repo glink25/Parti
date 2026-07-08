@@ -106,20 +106,36 @@ export function getWorkerSource(pkg: RoomPackage): string {
   return decodeText(src);
 }
 
+export interface LoadPackageProgress {
+  onProgress?: (loaded: number, total: number) => void;
+}
+
 /**
  * 从静态 baseUrl 加载 Room Package（fetch parti.room.json 与各入口文件）。
  * 例如 baseUrl = '/rooms/counter/'。
  */
-export async function loadPackageFromUrl(baseUrl: string, filePaths: string[]): Promise<RoomPackage> {
+export async function loadPackageFromUrl(
+  baseUrl: string,
+  filePaths: string[],
+  options?: LoadPackageProgress,
+): Promise<RoomPackage> {
   const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const filesToFetch = filePaths.filter((file) => file !== 'parti.room.json');
+  const total = 1 + filesToFetch.length;
+  let loaded = 0;
+  const report = () => options?.onProgress?.(loaded, total);
+
   const manifestRaw = await fetchBytes(`${base}parti.room.json`);
+  loaded += 1;
+  report();
   const manifest = validateManifest(JSON.parse(decodeText(manifestRaw)));
 
   const files: Record<string, Uint8Array> = {};
-  for (const file of filePaths) {
-    if (file === 'parti.room.json') continue;
+  for (const file of filesToFetch) {
     const path = normalizePackagePath(file);
     files[path] = await fetchBytes(`${base}${path.split('/').map(encodeURIComponent).join('/')}`);
+    loaded += 1;
+    report();
   }
   return createPackage({ manifest, files });
 }

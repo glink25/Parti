@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
   ArrowLeftIcon,
@@ -12,7 +12,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { createPackage, decodeText, encodeText, type RoomPackageInput } from '@parti/room-packager';
+import { createPackage, decodeText, encodeText, type RoomPackage, type RoomPackageInput } from '@parti/room-packager';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,7 +22,7 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import { createRoomSnapshot } from '../lib/customRooms';
 import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom';
 import { deleteImportedTemplate } from '../lib/templates';
-import { getTemplateList, loadPackageSource, type TemplateListEntry } from '../lib/rooms';
+import { getTemplateList, loadPackageSourceWithProgress, type TemplateListEntry } from '../lib/rooms';
 import { useLocale } from '@/i18n/LocaleProvider';
 import { formatResolveError, templateDescription } from '@/i18n/formatErrors';
 import {
@@ -41,6 +41,16 @@ function formatError(intl: ReturnType<typeof useIntl>, reason: unknown): string 
   return formatResolveError(intl, reason);
 }
 
+type TemplateLoadState =
+  | { status: 'idle' }
+  | { status: 'loading'; progress: number }
+  | { status: 'ready'; pkg: RoomPackage }
+  | { status: 'error' };
+
+function templateLoadState(states: Record<string, TemplateLoadState>, id: string): TemplateLoadState {
+  return states[id] ?? { status: 'idle' };
+}
+
 export function EditorView() {
   const intl = useIntl();
   const { locale } = useLocale();
@@ -52,18 +62,24 @@ export function EditorView() {
   const [extraFiles, setExtraFiles] = useState<Record<string, Uint8Array>>({});
   const [activeFile, setActiveFile] = useState<EditorFile>('manifest');
   const [templates, setTemplates] = useState<TemplateListEntry[]>([]);
-  const [activeTemplate, setActiveTemplate] = useState<string>('blank');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('blank');
+  const [loadedTemplateId, setLoadedTemplateId] = useState<string>('blank');
+  const [templateLoadStates, setTemplateLoadStates] = useState<Record<string, TemplateLoadState>>({});
+  const selectedTemplateIdRef = useRef(selectedTemplateId);
   const [pendingTemplate, setPendingTemplate] = useState<SelectableTemplate | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [templateBusy, setTemplateBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [githubUrl, setGithubUrl] = useState('');
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [aiCopyError, setAiCopyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    selectedTemplateIdRef.current = selectedTemplateId;
+  }, [selectedTemplateId]);
 
   useEffect(() => {
     void (async () => {
@@ -78,46 +94,89 @@ export function EditorView() {
     return list;
   }
 
-  async function applyTemplate(template: SelectableTemplate): Promise<void> {
-    setTemplateBusy(true);
-    setError(null);
+  function applyPackageToEditor(pkg: RoomPackage, templateId: string): void {
+    const uiName = pkg.manifest.entry.ui;
+    const workerName = pkg.manifest.entry.worker;
+    setManifestText(JSON.stringify(pkg.manifest, null, 2));
+    setHtmlText(pkg.files[uiName] ? decodeText(pkg.files[uiName]) : '');
+    setWorkerText(pkg.files[workerName] ? decodeText(pkg.files[workerName]) : '');
+    setExtraFiles(
+      Object.fromEntries(
+        Object.entries(pkg.files).filter(([name]) => name !== uiName && name !== workerName),
+      ),
+    );
+    setLoadedTemplateId(templateId);
+    setActiveFile('manifest');
+    setDirty(false);
+  }
+
+  function applyBlankTemplate(): void {
+    setManifestText(blankManifest(locale));
+    setHtmlText(getDefaultHtml(locale));
+    setWorkerText(DEFAULT_WORKER);
+    setExtraFiles({});
+    setLoadedTemplateId('blank');
+    setActiveFile('manifest');
+    setDirty(false);
+  }
+
+  async function startTemplateLoad(templateId: string): Promise<void> {
+    setTemplateLoadStates((previous) => ({ ...previous, [templateId]: { status: 'loading', progress: 0 } }));
     try {
-      if (template.id === 'blank') {
-        setManifestText(blankManifest(locale));
-        setHtmlText(getDefaultHtml(locale));
-        setWorkerText(DEFAULT_WORKER);
-        setExtraFiles({});
-      } else {
-        const pkg = await loadPackageSource(template.id);
-        const uiName = pkg.manifest.entry.ui;
-        const workerName = pkg.manifest.entry.worker;
-        setManifestText(JSON.stringify(pkg.manifest, null, 2));
-        setHtmlText(pkg.files[uiName] ? decodeText(pkg.files[uiName]) : '');
-        setWorkerText(pkg.files[workerName] ? decodeText(pkg.files[workerName]) : '');
-        setExtraFiles(
-          Object.fromEntries(
-            Object.entries(pkg.files).filter(([name]) => name !== uiName && name !== workerName),
-          ),
-        );
+      const pkg = await loadPackageSourceWithProgress(templateId, (loaded, total) => {
+        const progress = total > 0 ? Math.round((loaded / total) * 100) : 0;
+        setTemplateLoadStates((previous) => {
+          const current = previous[templateId];
+          if (current?.status !== 'loading') return previous;
+          return { ...previous, [templateId]: { status: 'loading', progress } };
+        });
+      });
+      setTemplateLoadStates((previous) => ({ ...previous, [templateId]: { status: 'ready', pkg } }));
+      if (selectedTemplateIdRef.current === templateId) {
+        applyPackageToEditor(pkg, templateId);
       }
-      setActiveTemplate(template.id);
-      setActiveFile('manifest');
-      setDirty(false);
     } catch (reason) {
-      setError(formatError(intl, reason));
-    } finally {
-      setTemplateBusy(false);
-      setPendingTemplate(null);
+      setTemplateLoadStates((previous) => ({ ...previous, [templateId]: { status: 'error' } }));
+      if (selectedTemplateIdRef.current === templateId) {
+        setError(formatError(intl, reason));
+      }
     }
   }
 
+  async function commitTemplateSelection(template: SelectableTemplate): Promise<void> {
+    setSelectedTemplateId(template.id);
+    setError(null);
+    setPendingTemplate(null);
+
+    if (template.id === 'blank') {
+      applyBlankTemplate();
+      return;
+    }
+
+    const existing = templateLoadStates[template.id];
+    if (existing?.status === 'ready') {
+      applyPackageToEditor(existing.pkg, template.id);
+      return;
+    }
+    if (existing?.status === 'loading') {
+      return;
+    }
+
+    await startTemplateLoad(template.id);
+  }
+
   function chooseTemplate(template: SelectableTemplate): void {
-    if (template.id === activeTemplate) return;
-    if (dirty) {
+    if (template.id === selectedTemplateId) {
+      const existing = templateLoadStates[template.id];
+      if (template.id === 'blank' && loadedTemplateId === 'blank') return;
+      if (existing?.status === 'loading') return;
+      if (existing?.status === 'ready' && loadedTemplateId === template.id) return;
+    }
+    if (dirty && template.id !== loadedTemplateId) {
       setPendingTemplate(template);
       return;
     }
-    void applyTemplate(template);
+    void commitTemplateSelection(template);
   }
 
   async function buildEditorInput(): Promise<RoomPackageInput | null> {
@@ -147,10 +206,15 @@ export function EditorView() {
   }
 
   async function onCreate(target: 'local' | 'peer'): Promise<void> {
+    const ready = selectedTemplateId === 'blank'
+      ? loadedTemplateId === 'blank'
+      : templateLoadStates[selectedTemplateId]?.status === 'ready' && loadedTemplateId === selectedTemplateId;
+    if (!ready) return;
+
     setBusy(true);
     try {
-      const created = !dirty && activeTemplate !== 'blank'
-        ? await createRoomSnapshot({ sourceId: activeTemplate, target })
+      const created = !dirty && loadedTemplateId !== 'blank'
+        ? await createRoomSnapshot({ sourceId: loadedTemplateId, target })
         : await (async () => {
             const input = await buildEditorInput();
             if (!input) return null;
@@ -159,7 +223,7 @@ export function EditorView() {
               target,
               source: {
                 type: 'editor',
-                ...(activeTemplate !== 'blank' ? { basedOn: activeTemplate } : {}),
+                ...(loadedTemplateId !== 'blank' ? { basedOn: loadedTemplateId } : {}),
               },
             });
           })();
@@ -190,7 +254,7 @@ export function EditorView() {
       const id = await task();
       const list = await reloadTemplates();
       const entry = list.find((t) => t.id === id);
-      if (entry) await applyTemplate(entry);
+      if (entry) await commitTemplateSelection(entry);
     } catch (reason) {
       setError(formatError(intl, reason));
     } finally {
@@ -216,7 +280,14 @@ export function EditorView() {
   async function onDeleteTemplate(entry: TemplateListEntry): Promise<void> {
     await deleteImportedTemplate(entry.id);
     await reloadTemplates();
-    if (activeTemplate === entry.id) await applyTemplate(blankTemplate);
+    setTemplateLoadStates((previous) => {
+      const next = { ...previous };
+      delete next[entry.id];
+      return next;
+    });
+    if (selectedTemplateId === entry.id || loadedTemplateId === entry.id) {
+      await commitTemplateSelection(blankTemplate);
+    }
   }
 
   async function copyAiPrompt(): Promise<void> {
@@ -230,7 +301,10 @@ export function EditorView() {
     window.setTimeout(() => setAiPromptCopied(false), 1800);
   }
 
-  const isBlank = activeTemplate === 'blank';
+  const isBlank = selectedTemplateId === 'blank';
+  const selectionReady = isBlank
+    ? loadedTemplateId === 'blank'
+    : templateLoadStates[selectedTemplateId]?.status === 'ready' && loadedTemplateId === selectedTemplateId;
   const goCreate = showEditor || !isBlank;
   const fileValue = activeFile === 'manifest' ? manifestText : activeFile === 'html' ? htmlText : workerText;
   const fileLabel = activeFile === 'manifest' ? 'parti.room.json' : activeFile === 'html' ? 'index.html' : 'room.worker.js';
@@ -290,7 +364,7 @@ export function EditorView() {
               <button
                 type="button"
                 className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
-                disabled={templateBusy || importing}
+                disabled={importing}
                 onClick={() => chooseTemplate(blankTemplate)}
               >
                 <SparklesIcon /><FormattedMessage id="editor.newRoom.blank" />
@@ -322,41 +396,60 @@ export function EditorView() {
             </div>
 
             {templates.map((template) => {
-              const selected = activeTemplate === template.id;
+              const selected = selectedTemplateId === template.id;
+              const loadState = templateLoadState(templateLoadStates, template.id);
+              const templateReady = loadState.status === 'ready' && loadedTemplateId === template.id;
               return (
                 <div className="relative" key={template.id}>
                   <button
                     type="button"
                     className={cn(
-                      'relative flex w-full cursor-pointer flex-col items-stretch overflow-hidden rounded-[18px] border border-border bg-surface text-left text-foreground shadow-[0_10px_28px_rgba(91,72,15,0.07)] transition-[transform,box-shadow,border-color] duration-150 hover:not-disabled:-translate-y-[3px] hover:not-disabled:border-border-strong hover:not-disabled:shadow-[0_20px_46px_rgba(91,72,15,0.16)] disabled:cursor-default disabled:opacity-70',
+                      'relative flex w-full cursor-pointer flex-col items-stretch overflow-hidden rounded-[18px] border border-border bg-surface text-left text-foreground shadow-[0_10px_28px_rgba(91,72,15,0.07)] transition-[transform,box-shadow,border-color] duration-150 hover:not-disabled:-translate-y-[3px] hover:not-disabled:border-border-strong hover:not-disabled:shadow-[0_20px_46px_rgba(91,72,15,0.16)]',
                       selected && 'border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
                     )}
-                    disabled={templateBusy}
                     onClick={() => chooseTemplate(template)}
                   >
                     <span
-                      className="block aspect-[16/10] w-full bg-[linear-gradient(135deg,rgba(155,113,0,0.22),rgba(139,92,246,0.18)_55%,rgba(81,219,147,0.2))] bg-cover bg-center"
+                      className="relative block aspect-[16/10] w-full bg-[linear-gradient(135deg,rgba(155,113,0,0.22),rgba(139,92,246,0.18)_55%,rgba(81,219,147,0.2))] bg-cover bg-center"
                       aria-hidden="true"
                       style={template.cover ? { backgroundImage: `url(${template.cover})` } : undefined}
-                    />
+                    >
+                      {loadState.status === 'loading' && (
+                        <span className="absolute inset-0 z-[1] flex flex-col justify-end bg-black/45">
+                          <span className="px-3 py-2.5 text-[11px] font-semibold text-white">
+                            <FormattedMessage id="editor.template.loading" values={{ progress: loadState.progress }} />
+                          </span>
+                          <span className="h-1 w-full bg-white/20">
+                            <span
+                              className="block h-full bg-primary-bright transition-[width] duration-150"
+                              style={{ width: `${loadState.progress}%` }}
+                            />
+                          </span>
+                        </span>
+                      )}
+                    </span>
                     <span className="flex flex-col gap-2 px-[13px] pt-3 pb-3.5 md:px-5 md:pt-[18px] md:pb-5">
                       <b className="text-sm md:text-base">{template.name}</b>
                       <small className="text-xs font-medium leading-[1.55] text-muted-foreground">
                         {templateDescription(intl, template)}
                       </small>
                     </span>
-                    {selected && (
+                    {selected && loadState.status !== 'error' && (
                       <span className="absolute top-3 right-3 rounded-full bg-success/15 px-2.5 py-[3px] text-[10px] font-bold text-success">
                         <FormattedMessage id="editor.template.selected" />
                       </span>
                     )}
+                    {loadState.status === 'error' && (
+                      <span className="absolute top-3 right-3 rounded-full bg-destructive/15 px-2.5 py-[3px] text-[10px] font-bold text-destructive">
+                        <FormattedMessage id="editor.template.loadFailed" />
+                      </span>
+                    )}
                   </button>
-                  {selected && (
+                  {selected && templateReady && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="absolute top-2.5 left-2.5 z-[2] h-auto gap-[3px] px-2 py-[3px] text-[11px] [&_svg]:size-3"
-                      disabled={templateBusy}
                       onClick={() => setShowEditor(true)}
                     >
                       <PencilIcon data-icon="inline-start" /><FormattedMessage id="editor.template.continueEdit" />
@@ -367,7 +460,7 @@ export function EditorView() {
                       variant="ghost"
                       size="icon-xs"
                       className="absolute top-2.5 right-2.5 z-[2] text-muted-foreground hover:text-destructive"
-                      disabled={templateBusy || importing}
+                      disabled={importing || loadState.status === 'loading'}
                       aria-label={intl.formatMessage({ id: 'editor.template.deleteAria' }, { name: template.name })}
                       onClick={() => void onDeleteTemplate(template)}
                     >
@@ -435,9 +528,9 @@ export function EditorView() {
       </section>
       )}
 
-      <EditorActionDock canCreate={goCreate} busy={busy} templateBusy={templateBusy} onEdit={() => setShowEditor(true)} onCreate={(target) => void onCreate(target)} />
+      <EditorActionDock canCreate={goCreate} busy={busy} selectionReady={selectionReady} onEdit={() => setShowEditor(true)} onCreate={(target) => void onCreate(target)} />
 
-      <TemplateReplaceDialog pending={pendingTemplate} onCancel={() => setPendingTemplate(null)} onConfirm={() => { if (pendingTemplate) void applyTemplate(pendingTemplate); }} />
+      <TemplateReplaceDialog pending={pendingTemplate} onCancel={() => setPendingTemplate(null)} onConfirm={() => { if (pendingTemplate) void commitTemplateSelection(pendingTemplate); }} />
       <AiCreationDialog open={aiDialogOpen} copied={aiPromptCopied} error={aiCopyError} onOpenChange={(open) => { setAiDialogOpen(open); if (!open) { setAiPromptCopied(false); setAiCopyError(null); } }} onCopy={() => void copyAiPrompt()} />
     </div>
   );

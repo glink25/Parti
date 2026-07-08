@@ -223,7 +223,7 @@ export function RoomControlsSheet({
   if (!open) return null;
   return (
     <Sheet open onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
+      <SheetContent autoFocus={false} side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
         <SheetHeader className="border-b px-5 py-4 text-left">
           <SheetTitle><FormattedMessage id={sheetTitleId} /></SheetTitle>
           <SheetDescription><FormattedMessage id={sheetDescriptionId} /></SheetDescription>
