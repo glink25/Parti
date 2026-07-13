@@ -21,7 +21,7 @@ export interface RoomFrameViewport {
 export const ROOM_FRAME_GRID_AREAS = {
   desktop: { gridArea: '1 / 1 / span 7 / span 7' },
   phone: { gridArea: '1 / 8 / span 7 / span 3' },
-  tablet: { gridArea: '8 / 1 / span 3 / span 10' },
+  tablet: { gridArea: '8 / 1 / span 5 / span 10' },
 } as const satisfies Record<string, CSSProperties>;
 
 export type RoomFrameGridKey = keyof typeof ROOM_FRAME_GRID_AREAS;

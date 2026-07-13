@@ -87,15 +87,15 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
 
   return (
     <div className="mx-auto w-[min(1240px,100%)]">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">
           {intl.formatMessage({ id: 'local.title' }, { name: loaded.pkg.manifest.name })}
         </h2>
         <Button asChild variant="outline"><a href="#/"><FormattedMessage id="editor.backToLobby" /></a></Button>
       </div>
       <div
-        className="mb-4 grid w-full grid-cols-10 grid-rows-10 gap-2"
-        style={{ aspectRatio: '1 / 1', maxHeight: 'min(80vh, 900px)' }}
+        className="mb-4 grid w-full grid-cols-10 grid-rows-12 gap-2"
+        style={{ height: 'min(calc(160dvh - 200px), 1600px)' }}
       >
         {loaded.seats.map((seat) => (
           <RoomFrame
