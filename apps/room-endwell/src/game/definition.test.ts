@@ -55,6 +55,10 @@ describe('delivery activation', () => {
   });
 });
 
+describe('cast target modes', () => {
+  it('forces self-targeted spells to the caster position', () => { for (const elements of [['life'], ['shield'], ['fire', 'shield', 'fire']] as const) { const test = economySetup(), result = endwellGame.actions['cast.request']!.validate!(test.ctx, { castId: 'p1:cast:1', sequence: 1, elements: [...elements], aim: { x: 1, y: 0 }, target: { x: 9999, y: 9999 } }); expect(result).toMatchObject({ ok: true, payload: { target: test.p.position } }); } });
+});
+
 describe('scroll spell priority', () => {
   it('uses owned ready scrolls before normal element resolution and writes cooldown', () => {
     const test = economySetup(), scroll = createScroll('supernova', 'test');

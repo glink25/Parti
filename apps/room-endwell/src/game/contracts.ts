@@ -3,6 +3,7 @@ export type Element = 'rock' | 'fire' | 'ice' | 'life' | 'lightning' | 'water' |
 export type DamageElement = 'physical' | Element | 'pure';
 export type ElementStatusType = 'wet' | 'burning' | 'chilled' | 'frozen' | 'shocked' | 'poisoned' | 'shielded' | 'stoneArmor' | 'regenerating' | 'hasted' | 'fireWard' | 'frostWard' | 'waterWard' | 'grounded';
 export type DeliveryType = 'spray' | 'beam' | 'projectile' | 'summon' | 'area' | 'environment' | 'shield' | 'instant';
+export type SpellTargetMode = 'self' | 'direction' | 'point';
 export type CastPhase = 'idle' | 'chanting' | 'warning' | 'active' | 'recovery' | 'interrupted';
 export type FactionTeam = 'player' | 'monster' | 'neutral' | 'environment';
 export type EquipmentSlot = 'staff' | 'robe' | 'ring';
@@ -78,6 +79,6 @@ export type MerchantItemPayload = { merchantId: string; itemId: string };
 export type ForgeFusePayload = { forgeId: string; itemIds: string[] };
 export type HitEvent = { hitId: string; sourceId: string; ownerId?: string; targetId: string; payload: HitPayload; delivery: DeliveryType; detached: boolean; tags: string[] };
 export type HitResolution = { accepted: boolean; events: GameEvent[] };
-export type GameEvent = { type: 'damage_applied'; targetId: string; amount: number; element: DamageElement } | { type: 'damage_immune'; targetId: string; element?: DamageElement; reason: 'invincible' | 'absorbed' | 'status' } | { type: 'heal_applied'; targetId: string; amount: number } | { type: 'status_applied'; targetId: string; status: ElementStatusType } | { type: 'reaction_triggered'; id: string; targetId: string } | { type: 'cast_started' | 'cast_interrupted'; casterId: string; spellId?: string; reason?: string } | { type: 'entity_spawned' | 'entity_destroyed'; entityId: string };
+export type GameEvent = { type: 'damage_applied'; targetId: string; amount: number; element: DamageElement; sourceId: string; largeImpact: boolean } | { type: 'damage_immune'; targetId: string; element?: DamageElement; reason: 'invincible' | 'absorbed' | 'status' } | { type: 'heal_applied'; targetId: string; amount: number } | { type: 'status_applied'; targetId: string; status: ElementStatusType } | { type: 'reaction_triggered'; id: string; targetId: string } | { type: 'cast_started' | 'cast_interrupted'; casterId: string; spellId?: string; reason?: string } | { type: 'entity_spawned'; entityId: string } | { type: 'entity_destroyed'; entityId: string; kind: EntityKind; reason: 'killed' | 'expired' };
 export type PartiApi = { playerId: string | null; getState(): unknown; onState(handler: (state: unknown) => void): () => void; onEvent(event: string, handler: (payload: unknown) => void): () => void; action(action: string, payload?: unknown): Promise<{ ok: true }>; ready(): void; leave(): void };
 declare global { const parti: PartiApi; }

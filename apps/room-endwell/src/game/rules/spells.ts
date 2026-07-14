@@ -1,5 +1,5 @@
 import { beamSpec, blizzardSpec, chainHealSpec, cleanseSpec, conductiveWaterSpec, fireRingSpec, fireShieldSpec, flameJetSpec, frostShieldSpec, frostStreamSpec, gravityWellSpec, groundingShieldSpec, hasteSpec, iceLanceSpec, lavaBoltSpec, lifeBarrierSpec, lifeFlameSpec, lifeSpringSpec, magickaIceWallSpec, meteorSpec, projectileSpec, rainSpec, resurrectSpec, rockShieldSpec, selfHealSpec, shieldSpec, shatterIceBoltSpec, spraySpec, steamCloudSpec, summonSpec, teleportSpec, thunderstormSpec, tidalImpactSpec, waterShieldSpec, lightningStrikeSpec } from '../../content/spells';
-import type { Element, SpellSpec } from '../contracts';
+import type { Element, SpellSpec, SpellTargetMode } from '../contracts';
 
 const exact = (elements: readonly Element[], sequence: readonly Element[]) => elements.length === sequence.length && sequence.every((element, index) => elements[index] === element);
 export const SPECIAL_RECIPES: Array<{ sequence: Element[]; spec: (elements: Element[]) => SpellSpec }> = [
@@ -43,5 +43,6 @@ export function resolveSpell(elements: Element[]): SpellSpec {
   if (last === 'rock') return projectileSpec(elements);
   return spraySpec(elements);
 }
+export function spellTargetMode(spell: SpellSpec): SpellTargetMode { if (spell.delivery === 'shield' || spell.delivery === 'environment' || spell.summon?.positionMode === 'self' || spell.instant && ['selfHeal', 'haste', 'supernova', 'equilibrium'].includes(spell.instant.kind)) return 'self'; if (spell.delivery === 'spray' || spell.delivery === 'beam' || spell.delivery === 'projectile') return 'direction'; return 'point'; }
 export function isSpecialSpellId(id: string) { return SPECIAL_RECIPES.some((recipe) => recipe.spec(recipe.sequence).id === id); }
 export function specialSpellCatalog() { return SPECIAL_RECIPES.map((recipe) => ({ sequence: [...recipe.sequence], spell: recipe.spec(recipe.sequence) })); }

@@ -1,6 +1,7 @@
 import type { Element, EntityState, PlayerState, TerrainState, Vec2 } from '../game/contracts';
 import { atlasSource, EndwellAssets, TILE_SPRITES, type AssetKey, type TileSprite } from './assets';
 import { sprayParticles, visualElementLayers } from './spellVisualGeometry';
+import { sampleMonsterDeathEffect, type MonsterDeathEffect } from '../runtime/monsterDeathEffect';
 
 export const ELEMENT_COLORS: Record<Element, string> = { rock: '#b6926a', fire: '#ff6547', ice: '#7de9ff', life: '#75e88c', lightning: '#bd91ff', water: '#4aa5ff', shield: '#ffe06b' };
 
@@ -59,6 +60,20 @@ export class EndwellVisuals {
   softParticle(c: CanvasRenderingContext2D, key: 'explosion' | 'flash' | 'whitePuff' | 'blackSmoke', pos: Vec2, size: number, elapsed: number, alpha = .5) { const cell = key === 'explosion' ? 8 : key === 'flash' ? 7 : key === 'blackSmoke' ? 13 : 11, t = (elapsed % 700) / 700, rendered = size * (.72 + t * .42); this.atlasCell(c, 'vfx', cell, pos.x - rendered / 2, pos.y - rendered / 2, rendered, rendered, { alpha: alpha * (1 - t * .55), blend: 'screen', rotation: elapsed / 1300 }); }
   aura(c: CanvasRenderingContext2D, pos: Vec2, radius: number, color: string, alpha: number) { const gradient = c.createRadialGradient(pos.x, pos.y, radius * .1, pos.x, pos.y, radius); gradient.addColorStop(0, colorWithAlpha(color, alpha * 1.8)); gradient.addColorStop(1, colorWithAlpha(color, 0)); c.fillStyle = gradient; c.beginPath(); c.arc(pos.x, pos.y, radius, 0, Math.PI * 2); c.fill(); }
   combatImpact(c: CanvasRenderingContext2D, impact: CombatImpact, now: number) { const t = Math.max(0, Math.min(1, (now - impact.createdAt) / impact.duration)), ease = 1 - (1 - t) ** 3, size = (impact.kind === 'death' ? 148 : 76) * (.45 + ease * .65); this.atlasCell(c, 'vfx', impact.kind === 'death' ? 15 : 7, impact.position.x - size / 2, impact.position.y - size / 2, size, size, { alpha: 1 - t, blend: 'screen', rotation: impact.seed * .013 + t * .3 }); }
+  monsterDeath(c: CanvasRenderingContext2D, effect: MonsterDeathEffect, now: number) {
+    const image = this.assets.image('atlas'); if (!image) return;
+    const sprite = TILE_SPRITES[effect.visual], source = atlasSource(image, sprite.cell), anchor = sprite.anchorY ?? 0;
+    const elementColor = effect.element in ELEMENT_COLORS ? ELEMENT_COLORS[effect.element as Element] : effect.element === 'pure' ? '#ffffff' : '#e3b181';
+    for (const [fragmentIndex, fragment] of sampleMonsterDeathEffect(effect, now).entries()) {
+      c.save(); c.globalAlpha = fragment.alpha; c.translate(fragment.position.x, fragment.position.y); c.rotate(fragment.rotation);
+      c.beginPath(); fragment.vertices.forEach((radius, index) => { const angle = index / fragment.vertices.length * Math.PI * 2, length = fragment.size * radius, x = Math.cos(angle) * length, y = Math.sin(angle) * length; if (!index) c.moveTo(x, y); else c.lineTo(x, y); }); c.closePath(); c.clip();
+      if (effect.flip) c.scale(-1, 1);
+      const textureX = effect.flip ? -fragment.textureOffset.x : fragment.textureOffset.x;
+      c.drawImage(image, source.x, source.y, source.w, source.h, -sprite.drawWidth / 2 - textureX, -sprite.drawHeight / 2 + anchor - fragment.textureOffset.y, sprite.drawWidth, sprite.drawHeight);
+      c.restore();
+      if (fragmentIndex % 3 === 0) { c.save(); c.globalAlpha = fragment.alpha * .65; c.fillStyle = elementColor; c.shadowColor = elementColor; c.shadowBlur = 6; c.translate(fragment.position.x - fragment.size * .25, fragment.position.y + fragment.size * .18); c.rotate(fragment.rotation); c.fillRect(-1.5, -1.5, 3, 3); c.restore(); }
+    }
+  }
   elementSigil(c: CanvasRenderingContext2D, element: Element, x: number, y: number, radius: number, selectedCount = 0) { const cells: Record<Element, number> = { rock: 0, fire: 1, ice: 2, life: 7, lightning: 4, water: 5, shield: 6 }, pulse = selectedCount ? 1 + Math.sin(performance.now() / 90) * .07 : 1, size = radius * 2.22 * pulse; c.save(); if (selectedCount) { c.shadowColor = ELEMENT_COLORS[element]; c.shadowBlur = 22; } this.atlasCell(c, 'ui', cells[element], x - size / 2, y - size / 2, size, size); if (element === 'life') this.atlasCell(c, 'vfx', 3, x - radius * .72, y - radius * .72, radius * 1.44, radius * 1.44, { blend: 'screen' }); c.restore(); }
 
   uiFrame(c: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, cell = 8, alpha = 1) {

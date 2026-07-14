@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ELEMENTS } from '../../content/spells';
 import type { Element } from '../contracts';
 import { applySpellModifiers } from './modifiers';
-import { resolveSpell } from './spells';
+import { resolveSpell, spellTargetMode } from './spells';
 
 function sequences(length: number, prefix: Element[] = []): Element[][] { if (!length) return [prefix]; return ELEMENTS.flatMap((element) => sequences(length - 1, [...prefix, element])); }
 describe('generated spell resolver', () => {
@@ -43,6 +43,8 @@ describe('generated spell resolver', () => {
     for (const [elements, id] of cases) expect(resolveSpell(elements)).toMatchObject({ id, elements });
   });
   it('covers all seven single elements without fallback', () => { expect(ELEMENTS.map((element) => resolveSpell([element]).delivery)).toEqual(['projectile', 'spray', 'spray', 'instant', 'spray', 'spray', 'shield']); });
+  it('classifies self, direction, and point targeting consistently', () => { expect(spellTargetMode(resolveSpell(['life']))).toBe('self'); expect(spellTargetMode(resolveSpell(['shield']))).toBe('self'); expect(spellTargetMode(resolveSpell(['fire', 'shield', 'fire']))).toBe('self'); expect(spellTargetMode(resolveSpell(['fire']))).toBe('direction'); expect(spellTargetMode(resolveSpell(['rock']))).toBe('direction'); expect(spellTargetMode(resolveSpell(['fire', 'rock', 'rock', 'fire']))).toBe('point'); expect(spellTargetMode(resolveSpell(['lightning', 'shield', 'lightning']))).toBe('point'); });
+  it('marks only configured large-impact recipes', () => { for (const elements of [[['fire', 'rock', 'rock', 'fire']], [['lightning', 'fire', 'fire', 'lightning']], [['rock', 'shield', 'lightning', 'rock']]] as Element[][][]) expect(resolveSpell(elements[0]!).tags).toContain('large-impact'); expect(resolveSpell(['fire']).tags).not.toContain('large-impact'); expect(resolveSpell(['water', 'lightning']).tags).not.toContain('large-impact'); });
   it('separates projectile, hostile area, and healing-field targeting', () => { expect(resolveSpell(['rock']).targeting).toMatchObject({ canHitSelf: false, canHitAllies: true }); expect(resolveSpell(['fire', 'rock', 'rock', 'fire']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true }); expect(resolveSpell(['fire', 'rock', 'shield']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true }); expect(resolveSpell(['life', 'rock', 'shield']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true, canHitEnemies: false }); expect(resolveSpell(['water', 'life']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true, canHitEnemies: false }); });
   it('applies modifiers without mutating generated specs', () => { const base = resolveSpell(['fire', 'rock']), changed = applySpellModifiers(base, [{ stat: 'speed', op: 'multiply', value: 1.5 }]); expect(changed.speed).toBe((base.speed ?? 0) * 1.5); expect(base.speed).toBe(460); });
 });
