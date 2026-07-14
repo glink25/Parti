@@ -1,5 +1,5 @@
 {
-  "name": "@parti/room-skyward-2",
+  "name": "@parti/room-skyward",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@parti/flow": "workspace:*",
     "@parti/worker-sdk": "workspace:*",
     "littlejsengine": "1.18.15"
   },
