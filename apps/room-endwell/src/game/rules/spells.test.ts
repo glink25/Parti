@@ -43,5 +43,6 @@ describe('generated spell resolver', () => {
     for (const [elements, id] of cases) expect(resolveSpell(elements)).toMatchObject({ id, elements });
   });
   it('covers all seven single elements without fallback', () => { expect(ELEMENTS.map((element) => resolveSpell([element]).delivery)).toEqual(['projectile', 'spray', 'spray', 'instant', 'spray', 'spray', 'shield']); });
+  it('separates projectile, hostile area, and healing-field targeting', () => { expect(resolveSpell(['rock']).targeting).toMatchObject({ canHitSelf: false, canHitAllies: true }); expect(resolveSpell(['fire', 'rock', 'rock', 'fire']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true }); expect(resolveSpell(['fire', 'rock', 'shield']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true }); expect(resolveSpell(['life', 'rock', 'shield']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true, canHitEnemies: false }); expect(resolveSpell(['water', 'life']).targeting).toMatchObject({ canHitSelf: true, canHitAllies: true, canHitEnemies: false }); });
   it('applies modifiers without mutating generated specs', () => { const base = resolveSpell(['fire', 'rock']), changed = applySpellModifiers(base, [{ stat: 'speed', op: 'multiply', value: 1.5 }]); expect(changed.speed).toBe((base.speed ?? 0) * 1.5); expect(base.speed).toBe(460); });
 });
