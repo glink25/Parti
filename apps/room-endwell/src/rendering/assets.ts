@@ -1,33 +1,33 @@
-export type AssetKey = 'dungeon' | 'explosion' | 'flash' | 'whitePuff' | 'blackSmoke';
+export type AssetKey = 'atlas' | 'world' | 'ui' | 'vfx' | 'tiles';
 
-export type TileSprite = { tile: number; drawWidth: number; drawHeight: number; anchorY?: number };
+export type TileSprite = { cell: number; drawWidth: number; drawHeight: number; anchorY?: number };
 
 export const TILE_SPRITES = {
-  player: { tile: 84, drawWidth: 52, drawHeight: 52, anchorY: 8 },
-  ally: { tile: 85, drawWidth: 52, drawHeight: 52, anchorY: 8 },
-  chaser: { tile: 109, drawWidth: 52, drawHeight: 52, anchorY: 7 },
-  shooter: { tile: 111, drawWidth: 50, drawHeight: 50, anchorY: 7 },
-  guardian: { tile: 97, drawWidth: 64, drawHeight: 64, anchorY: 9 },
-  boss: { tile: 97, drawWidth: 112, drawHeight: 112, anchorY: 15 },
-  merchant: { tile: 88, drawWidth: 52, drawHeight: 52, anchorY: 8 },
-  forge: { tile: 35, drawWidth: 70, drawHeight: 70 },
-  loot: { tile: 125, drawWidth: 36, drawHeight: 36 },
-  lootStaff: { tile: 125, drawWidth: 36, drawHeight: 36 },
-  lootRobe: { tile: 100, drawWidth: 36, drawHeight: 36 },
-  lootRing: { tile: 102, drawWidth: 32, drawHeight: 32 },
-  lootScroll: { tile: 101, drawWidth: 34, drawHeight: 34 },
-  lootCatalyst: { tile: 114, drawWidth: 34, drawHeight: 34 },
-  obstacle: { tile: 69, drawWidth: 64, drawHeight: 64 },
-  rune: { tile: 47, drawWidth: 64, drawHeight: 64 },
-  portal: { tile: 59, drawWidth: 86, drawHeight: 86 },
+  player: { cell: 0, drawWidth: 74, drawHeight: 74, anchorY: 3 },
+  ally: { cell: 1, drawWidth: 72, drawHeight: 72, anchorY: 3 },
+  chaser: { cell: 2, drawWidth: 70, drawHeight: 62, anchorY: 5 },
+  shooter: { cell: 3, drawWidth: 66, drawHeight: 72, anchorY: 2 },
+  guardian: { cell: 4, drawWidth: 78, drawHeight: 78, anchorY: 6 },
+  boss: { cell: 5, drawWidth: 142, drawHeight: 142, anchorY: 12 },
+  merchant: { cell: 6, drawWidth: 76, drawHeight: 82, anchorY: 2 },
+  forge: { cell: 7, drawWidth: 88, drawHeight: 88 },
+  obstacle: { cell: 8, drawWidth: 82, drawHeight: 82 },
+  portal: { cell: 9, drawWidth: 94, drawHeight: 94 },
+  rune: { cell: 10, drawWidth: 72, drawHeight: 72 },
+  loot: { cell: 11, drawWidth: 42, drawHeight: 42 },
+  lootStaff: { cell: 12, drawWidth: 46, drawHeight: 46 },
+  lootRobe: { cell: 13, drawWidth: 44, drawHeight: 44 },
+  lootRing: { cell: 14, drawWidth: 40, drawHeight: 40 },
+  lootScroll: { cell: 15, drawWidth: 42, drawHeight: 42 },
+  lootCatalyst: { cell: 10, drawWidth: 38, drawHeight: 38 },
 } satisfies Record<string, TileSprite>;
 
 const paths: Record<AssetKey, string[]> = {
-  dungeon: ['/assets/endwell/world/tiny-dungeon.png'],
-  explosion: Array.from({ length: 9 }, (_, i) => `/assets/endwell/effects/explosion/explosion${String(i).padStart(2, '0')}.png`),
-  flash: Array.from({ length: 9 }, (_, i) => `/assets/endwell/effects/flash/flash${String(i).padStart(2, '0')}.png`),
-  whitePuff: Array.from({ length: 25 }, (_, i) => `/assets/endwell/effects/white-puff/whitePuff${String(i).padStart(2, '0')}.png`),
-  blackSmoke: Array.from({ length: 25 }, (_, i) => `/assets/endwell/effects/black-smoke/blackSmoke${String(i).padStart(2, '0')}.png`),
+  atlas: ['/assets/endwell/atlas/endwell-sprites.webp'],
+  world: ['/assets/endwell/atlas/endwell-world.webp'],
+  ui: ['/assets/endwell/atlas/endwell-ui.webp'],
+  vfx: ['/assets/endwell/atlas/endwell-vfx.webp'],
+  tiles: ['/assets/endwell/atlas/endwell-ruins-tiles.webp?v=1'],
 };
 
 export class EndwellAssets {
@@ -44,17 +44,15 @@ export class EndwellAssets {
   }
 
   image(key: AssetKey, index = 0) { const list = this.images.get(key) ?? []; return list[index % Math.max(1, list.length)]; }
-  frame(key: AssetKey, elapsedMs: number, frameMs = 70) { const list = this.images.get(key) ?? []; return list[Math.floor(Math.max(0, elapsedMs) / frameMs) % Math.max(1, list.length)]; }
-  frameCount(key: AssetKey) { return this.images.get(key)?.length ?? 0; }
 }
 
 function loadImage(src: string) {
   return new Promise<HTMLImageElement | null>((resolve) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => resolve(null);
-    image.src = src;
+    const image = new Image(); image.onload = () => resolve(image); image.onerror = () => resolve(null); image.src = src;
   });
 }
 
-export function tileSource(tile: number) { return { x: tile % 12 * 16, y: Math.floor(tile / 12) * 16, w: 16, h: 16 }; }
+export function atlasSource(image: HTMLImageElement, cell: number) {
+  const w = image.naturalWidth / 4, h = image.naturalHeight / 4;
+  return { x: cell % 4 * w, y: Math.floor(cell / 4) * h, w, h };
+}

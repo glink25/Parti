@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { TILE_SPRITES, tileSource } from './assets';
+import { atlasSource, TILE_SPRITES } from './assets';
 import { colorWithAlpha } from './visuals';
 
 describe('Endwell visual asset mapping', () => {
-  it('maps packed dungeon tile ids to 16px source cells', () => {
-    expect(tileSource(0)).toEqual({ x: 0, y: 0, w: 16, h: 16 });
-    expect(tileSource(13)).toEqual({ x: 16, y: 16, w: 16, h: 16 });
-    expect(tileSource(131)).toEqual({ x: 176, y: 160, w: 16, h: 16 });
+  it('maps authored sprites to a four-by-four atlas', () => {
+    const image = { naturalWidth: 1200, naturalHeight: 1200 } as HTMLImageElement;
+    expect(atlasSource(image, 0)).toEqual({ x: 0, y: 0, w: 300, h: 300 });
+    expect(atlasSource(image, 5)).toEqual({ x: 300, y: 300, w: 300, h: 300 });
+    expect(atlasSource(image, 15)).toEqual({ x: 900, y: 900, w: 300, h: 300 });
   });
 
   it('provides distinct gameplay silhouettes', () => {
-    expect(new Set([TILE_SPRITES.player.tile, TILE_SPRITES.chaser.tile, TILE_SPRITES.shooter.tile, TILE_SPRITES.guardian.tile]).size).toBe(4);
+    expect(new Set([TILE_SPRITES.player.cell, TILE_SPRITES.chaser.cell, TILE_SPRITES.shooter.cell, TILE_SPRITES.guardian.cell]).size).toBe(4);
     expect(TILE_SPRITES.boss.drawWidth).toBeGreaterThan(TILE_SPRITES.guardian.drawWidth);
   });
 
