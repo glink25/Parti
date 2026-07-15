@@ -133,6 +133,7 @@ packages/worker-sdk/       defineRoom, RoomEngine, and Worker host
 packages/client-sdk/       iframe parti API and host-page sandbox bridge
 packages/transport-local/  In-memory transport for previews and tests
 packages/transport-peerjs/ PeerJS / WebRTC transport for online rooms
+packages/transport-lan/    LocalSend signaling and WebRTC DataChannel LAN transport
 packages/room-packager/    Manifest validation and content-addressed room packages
 supabase/                  Optional lobby database migration and Edge Function
 docs/                      Room development, API, and runtime documentation
@@ -161,3 +162,4 @@ The runtime follows these core principles: Runtime First, Protocol Stable, User 
 | [Host Runtime](./docs/host-runtime.md) | Admission, capacity, recovery, and security boundaries |
 | [Protocol reference](./docs/protocol-reference.md) | Low-level messages, synchronization, and error codes |
 | [Lobby service](./docs/lobby-service.md) | REST API, leases, deployment, and CORS |
+| [LAN direct mode](./docs/lan-direct.en.md) | LocalSend discovery, network boundaries, self-hosting, and privacy |

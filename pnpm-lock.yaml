@@ -33,6 +33,9 @@ importers:
       vite:
         specifier: ^6.0.5
         version: 6.4.3(@types/node@26.0.1)(jiti@2.7.0)(lightningcss@1.32.0)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.0.1)(lightningcss@1.32.0)
 
   apps/room-endwell:
     dependencies:
@@ -199,6 +202,9 @@ importers:
       '@parti/transport-common':
         specifier: workspace:*
         version: link:../../packages/transport-common
+      '@parti/transport-lan':
+        specifier: workspace:*
+        version: link:../../packages/transport-lan
       '@parti/transport-local':
         specifier: workspace:*
         version: link:../../packages/transport-local
@@ -326,6 +332,12 @@ importers:
       uuid:
         specifier: ^14.0.1
         version: 14.0.1
+
+  packages/transport-lan:
+    dependencies:
+      '@parti/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/transport-local:
     dependencies:

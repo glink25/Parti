@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BUILTIN_PEERJS_ID, BUILTIN_SUPABASE_ID, deleteCustomTransportProfile,
-  createTransportAdapter, getSelectedTransportProfile, getTransportProfiles, peerOptionsFromServerUrl,
+  BUILTIN_LAN_ID, BUILTIN_PEERJS_ID, BUILTIN_SUPABASE_ID, deleteCustomTransportProfile,
+  createTransportAdapter, getLanDiscoveryConfig, getSelectedTransportProfile, getTransportProfiles, peerOptionsFromServerUrl,
   saveCustomTransportProfile, selectTransportProfile, validateTransportConfig,
 } from './transportConfig';
 
@@ -18,10 +18,10 @@ class MemoryStorage implements Storage {
 describe('transport profiles', () => {
   it('offers built-ins according to deployment configuration', () => {
     const storage = new MemoryStorage();
-    expect(getTransportProfiles(storage, {}).map((profile) => profile.id)).toEqual([BUILTIN_PEERJS_ID]);
+    expect(getTransportProfiles(storage, {}).map((profile) => profile.id)).toEqual([BUILTIN_PEERJS_ID, BUILTIN_LAN_ID]);
     expect(getTransportProfiles(storage, {
       supabaseUrl: 'https://project.supabase.co', supabasePublishableKey: 'sb_publishable_public',
-    }).map((profile) => profile.id)).toEqual([BUILTIN_PEERJS_ID, BUILTIN_SUPABASE_ID]);
+    }).map((profile) => profile.id)).toEqual([BUILTIN_PEERJS_ID, BUILTIN_LAN_ID, BUILTIN_SUPABASE_ID]);
   });
 
   it('creates, edits, selects and deletes custom profiles', () => {
@@ -57,5 +57,21 @@ describe('transport profiles', () => {
     expect(() => validateTransportConfig({
       adapter: 'common', provider: 'supabase', url: 'https://project.supabase.co', publishableKey: 'sb_secret_nope',
     })).toThrow();
+    expect(validateTransportConfig({ adapter: 'lan', serverUrl: 'wss://signal.example.com/v1/ws' })).toEqual({
+      adapter: 'lan', serverUrl: 'wss://signal.example.com/v1/ws',
+    });
+    expect(() => validateTransportConfig({ adapter: 'lan', serverUrl: 'ws://signal.example.com/v1/ws' })).toThrow();
+  });
+
+  it('keeps the most recently selected LAN profile for lobby discovery', () => {
+    const storage = new MemoryStorage();
+    expect(getLanDiscoveryConfig(storage, {})).toEqual({ adapter: 'lan' });
+    const custom = saveCustomTransportProfile({
+      name: 'Office LAN', config: { adapter: 'lan', serverUrl: 'wss://office.example.com/v1/ws' },
+    }, undefined, storage);
+    selectTransportProfile(BUILTIN_PEERJS_ID, storage, {});
+    expect(getLanDiscoveryConfig(storage, {})).toEqual(custom.config);
+    deleteCustomTransportProfile(custom.id, storage);
+    expect(getLanDiscoveryConfig(storage, {})).toEqual({ adapter: 'lan' });
   });
 });

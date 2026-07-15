@@ -51,6 +51,11 @@ import {
 import type { ReplayRecordingController } from '../replays/recorder';
 import { ENABLE_REPLAYS } from '../lib/featureFlags';
 import { configuredTransport, type TransportConfig } from '../lib/transportConfig';
+import {
+  publishLanRoom,
+  type LanRoomAnnouncement,
+  type LanRoomPublication,
+} from '@parti/transport-lan';
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
@@ -91,7 +96,7 @@ function PeerHostView({ roomId, transportConfig }: { roomId?: string; transportC
   } : {
     title: pkg.manifest.name,
     password: '',
-    isPublic: false,
+    isPublic: transportConfig.adapter === 'lan',
     replayEnabled: false,
   };
   return <PeerHostSession pkg={pkg} initialSettings={initialSettings} transportConfig={transportConfig} />;
@@ -139,6 +144,7 @@ function PeerHostSession({
   }, []);
   const recordingRef = useRef<ReplayRecordingController | null>(null);
   const publisherRef = useRef<LobbyPublisher | null>(null);
+  const lanPublicationRef = useRef<LanRoomPublication | null>(null);
   const started = useRef(false);
   const lastLobbySyncAtRef = useRef(0);
   const lobbySyncTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -167,8 +173,21 @@ function PeerHostSession({
           portVersion: 0,
         });
         setAdmission(peerHost.host.getAdmissionStatus());
+        if (transportConfig.adapter === 'lan') {
+          const publication = publishLanRoom({
+            ...(transportConfig.serverUrl ? { serverUrl: transportConfig.serverUrl } : {}),
+            hostId: peerHost.hostPeerId,
+            roomId,
+            announcement: initialSettings.isPublic
+              ? lanAnnouncement(pkg, initialSettings, peerHost.host.getAdmissionStatus())
+              : null,
+          });
+          lanPublicationRef.current = publication;
+          registerRoomDisposer(roomId, () => publication.close());
+          setLobbyStatus(initialSettings.isPublic ? 'published' : 'private');
+        }
         const baseUrl = lobbyServiceUrl();
-        if (baseUrl) {
+        if (transportConfig.adapter !== 'lan' && baseUrl) {
           const publisher = new LobbyPublisher(roomId, new LobbyClient(baseUrl), (status) => {
             setLobbyStatus(status);
             setLobbyError(null);
@@ -182,7 +201,7 @@ function PeerHostSession({
               setLobbyError(reason instanceof Error ? reason.message : String(reason));
             });
           }
-        } else if (initialSettings.isPublic) {
+        } else if (transportConfig.adapter !== 'lan' && initialSettings.isPublic) {
           const privateSettings = { ...initialSettings, isPublic: false };
           settingsRef.current = privateSettings;
           setSettings(privateSettings);
@@ -192,7 +211,9 @@ function PeerHostSession({
         peerHost.host.admissionStatusChanged.on((status) => {
           setAdmission(status);
           const current = settingsRef.current;
-          if (current.isPublic && publisherRef.current) {
+          if (transportConfig.adapter === 'lan') {
+            lanPublicationRef.current?.update(current.isPublic ? lanAnnouncement(pkg, current, status) : null);
+          } else if (current.isPublic && publisherRef.current) {
             void publisherRef.current.sync(lobbyInput(pkg, peerHost.hostPeerId, transportConfig, current, status));
           }
         });
@@ -301,8 +322,12 @@ function PeerHostSession({
     setSettings(next);
     saveHostRoomSettings(roomId, next);
     state.host.setAdmissionController(createPasswordAdmissionController(next.password));
-    if (!options?.skipLobbySync && next.isPublic && publisherRef.current) {
-      scheduleLobbySync();
+    if (!options?.skipLobbySync && next.isPublic) {
+      if (transportConfig.adapter === 'lan') {
+        lanPublicationRef.current?.update(lanAnnouncement(pkg, next, state.host.getAdmissionStatus()));
+      } else if (publisherRef.current) {
+        scheduleLobbySync();
+      }
     }
   }
 
@@ -325,6 +350,13 @@ function PeerHostSession({
     if (Date.now() - lastPublicToggleAtRef.current < PUBLIC_TOGGLE_COOLDOWN_MS) return;
     setPublicToggleBusy(true);
     try {
+      if (transportConfig.adapter === 'lan') {
+        const next = { ...settings, isPublic: !settings.isPublic };
+        lanPublicationRef.current?.update(next.isPublic ? lanAnnouncement(pkg, next, admission) : null);
+        applySettings(next, { skipLobbySync: true });
+        setLobbyStatus(next.isPublic ? 'published' : 'private');
+        return;
+      }
       if (settings.isPublic) {
         await publisherRef.current?.unpublish();
         applySettings({ ...settings, isPublic: false }, { skipLobbySync: true });
@@ -383,6 +415,7 @@ function PeerHostSession({
     admission: activeAdmission,
     lobbyStatus,
     lobbyError,
+    visibilityMode: transportConfig.adapter === 'lan' ? 'lan' : 'online',
     inviteUrl,
     copied,
     transportConfig,
@@ -448,7 +481,7 @@ function PeerHostSession({
         </div>
         {!fullscreen && <ResponsiveRoomControls open={controlsOpen} onOpenChange={setControlsOpen} props={controlsProps} />}
       </div>
-      {!fullscreen && import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName="peerjs" />}
+      {!fullscreen && import.meta.env.DEV && <DevTools host={state.host} packageHash={pkg.packageHash} transportName={transportConfig.adapter} />}
       <InviteQrDialog
         open={qrOpen}
         onOpenChange={setQrOpen}
@@ -627,6 +660,7 @@ function PeerJoinView({
     admission: { activePlayers: 0, reservedPlayers: 0, maxPlayers: null, joinable: true },
     lobbyStatus: 'private',
     lobbyError: null,
+    visibilityMode: transportConfig.adapter === 'lan' ? 'lan' : 'online',
     inviteUrl,
     copied,
     transportConfig,
@@ -721,6 +755,21 @@ function lobbyInput(
     roomId: pkg.manifest.id,
     connectionInfo,
     transportConfig,
+    title: settings.title.trim() || pkg.manifest.name,
+    packageName: pkg.manifest.name,
+    playerCount: admission.activePlayers,
+    maxPlayers: admission.maxPlayers,
+    joinable: admission.joinable,
+    credentialRequired: Boolean(settings.password),
+  };
+}
+
+function lanAnnouncement(
+  pkg: RoomPackage,
+  settings: HostRoomSettings,
+  admission: RoomAdmissionStatus,
+): LanRoomAnnouncement {
+  return {
     title: settings.title.trim() || pkg.manifest.name,
     packageName: pkg.manifest.name,
     playerCount: admission.activePlayers,

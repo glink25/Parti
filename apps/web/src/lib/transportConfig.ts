@@ -3,6 +3,7 @@ import { createUuid } from './ids';
 
 export type TransportConfig =
   | { adapter: 'peerjs'; serverUrl?: string }
+  | { adapter: 'lan'; serverUrl?: string }
   | { adapter: 'common'; provider: 'supabase'; url: string; publishableKey: string };
 
 export interface TransportProfile {
@@ -14,13 +15,22 @@ export interface TransportProfile {
 
 export type CustomTransportProfileInput = Pick<TransportProfile, 'name' | 'config'>;
 export const BUILTIN_PEERJS_ID = 'builtin:peerjs';
+export const BUILTIN_LAN_ID = 'builtin:lan';
 export const BUILTIN_SUPABASE_ID = 'builtin:supabase';
 export const MAX_TRANSPORT_PROFILE_NAME_LENGTH = 50;
 const PROFILES_KEY = 'parti:transport-profiles:v1';
 const SELECTED_KEY = 'parti:transport-profile:selected:v1';
+const LAST_LAN_KEY = 'parti:transport-profile:last-lan:v1';
 const LEGACY_PREFERENCE_KEY = 'parti:transport-preference';
+export const TRANSPORT_PROFILES_CHANGED_EVENT = 'parti:transport-profiles-changed';
 
 interface TransportEnvironment { supabaseUrl?: string; supabasePublishableKey?: string }
+
+function notifyProfilesChanged(storage: Storage): void {
+  if (typeof window !== 'undefined' && storage === localStorage) {
+    window.dispatchEvent(new Event(TRANSPORT_PROFILES_CHANGED_EVENT));
+  }
+}
 
 function environment(): TransportEnvironment {
   return {
@@ -43,6 +53,16 @@ function validateServiceUrl(value: string, label: string): string {
   return url.toString().replace(/\/$/, '');
 }
 
+function validateWebSocketUrl(value: string): string {
+  if (!value || value.length > 512) throw new Error('Signaling server URL is invalid');
+  const url = new URL(value);
+  if (url.protocol !== 'wss:' && !(url.protocol === 'ws:' && isLocalHost(url.hostname))) {
+    throw new Error('Signaling server must use WSS');
+  }
+  if (url.username || url.password || url.search || url.hash) throw new Error('Signaling server URL is unsafe');
+  return url.toString().replace(/\/$/, '');
+}
+
 function isSecretKey(key: string): boolean {
   if (/^(sb_secret_|service_role)/i.test(key)) return true;
   const parts = key.split('.');
@@ -58,6 +78,11 @@ export function validateTransportConfig(config: TransportConfig): TransportConfi
     return config.serverUrl
       ? { adapter: 'peerjs', serverUrl: validateServiceUrl(config.serverUrl, 'PeerServer URL') }
       : { adapter: 'peerjs' };
+  }
+  if (config.adapter === 'lan') {
+    return config.serverUrl
+      ? { adapter: 'lan', serverUrl: validateWebSocketUrl(config.serverUrl) }
+      : { adapter: 'lan' };
   }
   if (config.provider !== 'supabase') throw new Error('Unsupported common transport provider');
   if (!config.publishableKey || config.publishableKey.length > 2048) throw new Error('Invalid Supabase transport configuration');
@@ -82,6 +107,7 @@ export function peerOptionsFromServerUrl(serverUrl: string): Record<string, unkn
 function builtInProfiles(env: TransportEnvironment): TransportProfile[] {
   const profiles: TransportProfile[] = [
     { id: BUILTIN_PEERJS_ID, name: 'PeerJS / WebRTC', config: { adapter: 'peerjs' }, custom: false },
+    { id: BUILTIN_LAN_ID, name: 'LAN Direct / LocalSend WebRTC', config: { adapter: 'lan' }, custom: false },
   ];
   if (env.supabaseUrl && env.supabasePublishableKey) {
     try {
@@ -146,6 +172,8 @@ export function selectTransportProfile(id: string, storage: Storage = localStora
   const profile = getTransportProfiles(storage, env).find((item) => item.id === id);
   if (!profile) throw new Error('Transport profile not found');
   storage.setItem(SELECTED_KEY, profile.id);
+  if (profile.config.adapter === 'lan') storage.setItem(LAST_LAN_KEY, profile.id);
+  notifyProfilesChanged(storage);
   return profile;
 }
 
@@ -158,6 +186,9 @@ export function saveCustomTransportProfile(
   if (input.config.adapter === 'peerjs' && !input.config.serverUrl) {
     throw new Error('PeerServer URL is required for a custom PeerJS profile');
   }
+  if (input.config.adapter === 'lan' && !input.config.serverUrl) {
+    throw new Error('Signaling server URL is required for a custom LAN profile');
+  }
   const profile: TransportProfile = {
     id: id ?? `custom:${createUuid()}`,
     name: validateProfileName(input.name),
@@ -169,6 +200,8 @@ export function saveCustomTransportProfile(
   if (index >= 0) custom[index] = profile; else custom.push(profile);
   saveCustomProfiles(storage, custom);
   if (!id) storage.setItem(SELECTED_KEY, profile.id);
+  if (profile.config.adapter === 'lan') storage.setItem(LAST_LAN_KEY, profile.id);
+  notifyProfilesChanged(storage);
   return profile;
 }
 
@@ -177,6 +210,20 @@ export function deleteCustomTransportProfile(id: string, storage: Storage = loca
   if (!custom.some((profile) => profile.id === id)) throw new Error('Transport profile not found');
   saveCustomProfiles(storage, custom.filter((profile) => profile.id !== id));
   if (storage.getItem(SELECTED_KEY) === id) storage.setItem(SELECTED_KEY, BUILTIN_PEERJS_ID);
+  if (storage.getItem(LAST_LAN_KEY) === id) storage.setItem(LAST_LAN_KEY, BUILTIN_LAN_ID);
+  notifyProfilesChanged(storage);
+}
+
+export function getLanDiscoveryConfig(
+  storage: Storage = localStorage,
+  env = environment(),
+): Extract<TransportConfig, { adapter: 'lan' }> {
+  const profiles = getTransportProfiles(storage, env);
+  const lastId = storage.getItem(LAST_LAN_KEY) ?? BUILTIN_LAN_ID;
+  const profile = profiles.find((item) => item.id === lastId && item.config.adapter === 'lan')
+    ?? profiles.find((item) => item.id === BUILTIN_LAN_ID)!;
+  if (storage.getItem(LAST_LAN_KEY) !== profile.id) storage.setItem(LAST_LAN_KEY, profile.id);
+  return profile.config as Extract<TransportConfig, { adapter: 'lan' }>;
 }
 
 export function configuredTransport(): TransportConfig {
@@ -188,6 +235,10 @@ export async function createTransportAdapter(config: TransportConfig): Promise<T
   if (valid.adapter === 'peerjs') {
     const { PeerJSTransportAdapter } = await import('@parti/transport-peerjs');
     return new PeerJSTransportAdapter(valid.serverUrl ? { peerOptions: peerOptionsFromServerUrl(valid.serverUrl) } : {});
+  }
+  if (valid.adapter === 'lan') {
+    const { LanTransportAdapter } = await import('@parti/transport-lan');
+    return new LanTransportAdapter(valid.serverUrl ? { serverUrl: valid.serverUrl } : {});
   }
   const { CommonTransportAdapter, SupabaseRealtimeProvider } = await import('@parti/transport-common');
   return new CommonTransportAdapter(new SupabaseRealtimeProvider({ url: valid.url, publishableKey: valid.publishableKey }));

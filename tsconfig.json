@@ -8,6 +8,7 @@
     { "path": "./packages/transport-local" },
     { "path": "./packages/transport-peerjs" },
     { "path": "./packages/transport-common" },
+    { "path": "./packages/transport-lan" },
     { "path": "./packages/room-packager" },
     { "path": "./apps/web" }
   ]

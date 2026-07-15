@@ -25,6 +25,7 @@ export type RoomControlsProps = {
   admission: RoomAdmissionStatus;
   lobbyStatus: LobbyStatusKey;
   lobbyError: string | null;
+  visibilityMode: 'online' | 'lan';
   inviteUrl: string;
   copied: boolean;
   transportConfig: TransportConfig;
@@ -149,7 +150,8 @@ function RefreshRoomCard() {
 
 function SettingsCard({ props }: { props: RoomControlsProps }) {
   const intl = useIntl();
-  const { settings, passwordDraft, lobbyStatus, lobbyError, publicToggleBusy, replayBusy, replayError, onPasswordDraftChange, onApplySettings, onTogglePublic, onToggleReplay } = props;
+  const { settings, passwordDraft, lobbyStatus, lobbyError, visibilityMode, publicToggleBusy, replayBusy, replayError, onPasswordDraftChange, onApplySettings, onTogglePublic, onToggleReplay } = props;
+  const isLan = visibilityMode === 'lan';
   const [titleDraft, setTitleDraft] = useState(settings.title);
   useEffect(() => { setTitleDraft(settings.title); }, [settings.title]);
 
@@ -167,7 +169,9 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
           <CardTitle className="mt-1 text-lg"><FormattedMessage id="peer.settings.title" /></CardTitle>
         </div>
         <Badge variant={settings.isPublic ? 'default' : 'secondary'}>
-          <FormattedMessage id={settings.isPublic ? 'peer.settings.public' : 'peer.settings.private'} />
+          <FormattedMessage id={isLan
+            ? settings.isPublic ? 'peer.settings.lanVisible' : 'peer.settings.lanHidden'
+            : settings.isPublic ? 'peer.settings.public' : 'peer.settings.private'} />
         </Badge>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -192,7 +196,9 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
         </Label>
         <div>
           <Button type="button" variant={settings.isPublic ? 'outline' : 'default'} disabled={publicToggleBusy} onClick={onTogglePublic}>
-            <FormattedMessage id={settings.isPublic ? 'peer.settings.makePrivate' : 'peer.settings.makePublic'} />
+            <FormattedMessage id={isLan
+              ? settings.isPublic ? 'peer.settings.hideFromLan' : 'peer.settings.showOnLan'
+              : settings.isPublic ? 'peer.settings.makePrivate' : 'peer.settings.makePublic'} />
           </Button>
         </div>
         {ENABLE_REPLAYS && <div className="rounded-xl border border-border bg-background/55 p-3">
@@ -209,7 +215,9 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
           {replayError && <div className="mt-2 text-[10px] text-destructive">{replayError}</div>}
         </div>}
         <span className="text-[10px] text-muted-foreground">
-          {formatLobbyStatus(intl, lobbyStatus)}
+          {isLan
+            ? intl.formatMessage({ id: settings.isPublic ? 'peer.settings.lanVisibleHint' : 'peer.settings.lanHiddenHint' })
+            : formatLobbyStatus(intl, lobbyStatus)}
           {lobbyError ? ` · ${lobbyError}` : ''}
         </span>
         <RefreshRoomControl />

@@ -134,6 +134,7 @@ packages/worker-sdk/      defineRoom、RoomEngine 与 Worker 宿主
 packages/client-sdk/      iframe 中的 parti API 与宿主页沙箱桥
 packages/transport-local/ 本地预览和测试使用的内存 Transport
 packages/transport-peerjs/基于 PeerJS / WebRTC 的联机 Transport
+packages/transport-lan/   基于 LocalSend 信令与 WebRTC DataChannel 的局域网 Transport
 packages/room-packager/   Manifest 校验与内容寻址房间包
 supabase/                 可选的在线大厅数据库迁移与 Edge Function
 docs/                     房间开发、API 和 Runtime 文档
@@ -162,3 +163,4 @@ Runtime 的核心原则是：Runtime First、Protocol Stable、User Code Untrust
 | [Host Runtime](./docs/host-runtime.md) | 准入、容量、恢复与安全边界 |
 | [协议参考](./docs/protocol-reference.md) | 底层消息、状态同步与错误码 |
 | [大厅服务](./docs/lobby-service.md) | REST API、租约、部署与 CORS |
+| [局域网直连](./docs/lan-direct.md) | LocalSend 发现、网络边界、自建服务与隐私说明 |

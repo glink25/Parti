@@ -99,10 +99,22 @@ describe('peer routes', () => {
     expect(url).toContain('server=https%3A%2F%2Fpeer.example.com%2Fpeerjs');
   });
 
+  it('round-trips LAN links and omits the default signaling server', () => {
+    const defaultUrl = buildInviteUrl('https://parti.test', '/', 'counter', 'stable-host', '', { adapter: 'lan' });
+    expect(defaultUrl).toBe('https://parti.test/#/online/join/counter/stable-host?adapter=lan');
+    expect(parsePeerRoute(new URL(defaultUrl).hash).transportConfig).toEqual({ adapter: 'lan' });
+
+    const config: TransportConfig = { adapter: 'lan', serverUrl: 'wss://lan.example.com/v1/ws' };
+    const customUrl = buildInviteUrl('https://parti.test', '/', 'counter', 'stable-host', '', config);
+    expect(parsePeerRoute(new URL(customUrl).hash).transportConfig).toEqual(config);
+    expect(customUrl).toContain('server=wss%3A%2F%2Flan.example.com%2Fv1%2Fws');
+  });
+
   it('rejects unsafe common transport links', () => {
     expect(parseInviteInput('#/online/join/room/info?adapter=common&provider=supabase&url=http%3A%2F%2Fevil.test&key=sb_publishable_x')).toBeNull();
     expect(parseInviteInput('#/online/join/room/info?adapter=common&provider=supabase&url=https%3A%2F%2Fproject.supabase.co&key=sb_secret_x')).toBeNull();
     expect(parseInviteInput('#/online/join/room/info?adapter=peerjs&server=http%3A%2F%2Fevil.test')).toBeNull();
+    expect(parseInviteInput('#/online/join/room/info?adapter=lan&server=ws%3A%2F%2Fevil.test%2Fv1%2Fws')).toBeNull();
   });
 
   it('returns null for invalid invite input', () => {

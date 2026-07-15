@@ -123,7 +123,8 @@ UI 侧可通过保留事件 `parti.onEvent('__error', ({ code, message }) => ...
 - `game:rpc` / `game:rpc-result`
 - 主机迁移（host migration）
 - 云端托管 Room Worker
-- Socket.IO / WebSocket 等 PeerJS 之外的 Transport
+- Socket.IO 等尚未提供适配器的 Transport
 
-当前可用：**Local（本地预览）+ PeerJS（联机）两种 Transport，snapshot 同步，
-内置重连与持久化恢复。**
+当前可用：**Local（本地预览）+ PeerJS（全网直连）+ LAN（LocalSend 发现与 WebRTC
+DataChannel 直连）+ Common/Supabase Realtime**。所有实现复用相同 Room 协议、snapshot
+同步、重连与持久化恢复；LAN 的网络边界与信令隐私见[局域网直连](./lan-direct.md)。

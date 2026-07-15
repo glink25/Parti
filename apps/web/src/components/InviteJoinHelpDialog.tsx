@@ -21,6 +21,7 @@ export function InviteJoinHelpDialog({
 }) {
   const intl = useIntl();
   const isPeerjs = transportConfig.adapter === 'peerjs';
+  const isLan = transportConfig.adapter === 'lan';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -38,13 +39,13 @@ export function InviteJoinHelpDialog({
             </div>
             <div className="mt-1 text-sm font-medium text-foreground">
               {intl.formatMessage({
-                id: isPeerjs ? 'peer.invite.joinHelpCurrentPeerjs' : 'peer.invite.joinHelpCurrentSupabase',
+                id: isLan ? 'peer.invite.joinHelpCurrentLan' : isPeerjs ? 'peer.invite.joinHelpCurrentPeerjs' : 'peer.invite.joinHelpCurrentSupabase',
               })}
             </div>
           </div>
           <p className="text-sm leading-relaxed text-muted-foreground">
             {intl.formatMessage({
-              id: isPeerjs ? 'peer.invite.joinHelpBodyPeerjs' : 'peer.invite.joinHelpBodySupabase',
+              id: isLan ? 'peer.invite.joinHelpBodyLan' : isPeerjs ? 'peer.invite.joinHelpBodyPeerjs' : 'peer.invite.joinHelpBodySupabase',
             })}
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">

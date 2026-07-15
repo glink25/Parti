@@ -13,7 +13,7 @@ import {
   type TransportConfig, type TransportProfile,
 } from '@/lib/transportConfig';
 
-type FormType = 'peerjs' | 'supabase';
+type FormType = 'peerjs' | 'lan' | 'supabase';
 interface Draft { id?: string; name: string; type: FormType; serverUrl: string; supabaseUrl: string; publishableKey: string }
 
 function emptyDraft(): Draft {
@@ -21,9 +21,13 @@ function emptyDraft(): Draft {
 }
 
 function draftFor(profile: TransportProfile): Draft {
-  return profile.config.adapter === 'peerjs'
-    ? { id: profile.id, name: profile.name, type: 'peerjs', serverUrl: profile.config.serverUrl ?? '', supabaseUrl: '', publishableKey: '' }
-    : { id: profile.id, name: profile.name, type: 'supabase', serverUrl: '', supabaseUrl: profile.config.url, publishableKey: profile.config.publishableKey };
+  if (profile.config.adapter === 'peerjs') {
+    return { id: profile.id, name: profile.name, type: 'peerjs', serverUrl: profile.config.serverUrl ?? '', supabaseUrl: '', publishableKey: '' };
+  }
+  if (profile.config.adapter === 'lan') {
+    return { id: profile.id, name: profile.name, type: 'lan', serverUrl: profile.config.serverUrl ?? '', supabaseUrl: '', publishableKey: '' };
+  }
+  return { id: profile.id, name: profile.name, type: 'supabase', serverUrl: '', supabaseUrl: profile.config.url, publishableKey: profile.config.publishableKey };
 }
 
 export function TransportProfilesDialog({ open, onOpenChange, onProfilesChange }: {
@@ -44,7 +48,9 @@ export function TransportProfilesDialog({ open, onOpenChange, onProfilesChange }
     try {
       const config: TransportConfig = draft.type === 'peerjs'
         ? { adapter: 'peerjs', ...(draft.serverUrl.trim() ? { serverUrl: draft.serverUrl.trim() } : {}) }
-        : { adapter: 'common', provider: 'supabase', url: draft.supabaseUrl.trim(), publishableKey: draft.publishableKey.trim() };
+        : draft.type === 'lan'
+          ? { adapter: 'lan', serverUrl: draft.serverUrl.trim() }
+          : { adapter: 'common', provider: 'supabase', url: draft.supabaseUrl.trim(), publishableKey: draft.publishableKey.trim() };
       saveCustomTransportProfile({ name: draft.name, config }, draft.id);
       setDraft(null);
       setError(null);
@@ -69,7 +75,7 @@ export function TransportProfilesDialog({ open, onOpenChange, onProfilesChange }
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{profile.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {profile.config.adapter === 'peerjs' ? 'PeerJS' : 'Supabase Realtime'}
+                    {profile.config.adapter === 'peerjs' ? 'PeerJS' : profile.config.adapter === 'lan' ? 'LocalSend WebRTC' : 'Supabase Realtime'}
                     {!profile.custom && ` · ${intl.formatMessage({ id: 'user.settings.profilesBuiltIn' })}`}
                   </div>
                 </div>
@@ -101,14 +107,15 @@ export function TransportProfilesDialog({ open, onOpenChange, onProfilesChange }
                 <SelectTrigger id="transport-profile-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="peerjs">PeerJS / WebRTC</SelectItem>
+                  <SelectItem value="lan">LAN Direct / LocalSend WebRTC</SelectItem>
                   <SelectItem value="supabase">Common / Supabase Realtime</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {draft.type === 'peerjs' ? (
+            {draft.type === 'peerjs' || draft.type === 'lan' ? (
               <div className="grid gap-2">
-                <Label htmlFor="transport-peer-url">{intl.formatMessage({ id: 'user.settings.profilesPeerUrl' })}</Label>
-                <Input id="transport-peer-url" type="url" placeholder="https://peer.example.com/peerjs" value={draft.serverUrl} onChange={(event) => setDraft({ ...draft, serverUrl: event.target.value })} />
+                <Label htmlFor="transport-server-url">{intl.formatMessage({ id: draft.type === 'lan' ? 'user.settings.profilesLanUrl' : 'user.settings.profilesPeerUrl' })}</Label>
+                <Input id="transport-server-url" type="url" placeholder={draft.type === 'lan' ? 'wss://lan.example.com/v1/ws' : 'https://peer.example.com/peerjs'} value={draft.serverUrl} onChange={(event) => setDraft({ ...draft, serverUrl: event.target.value })} />
               </div>
             ) : (
               <>

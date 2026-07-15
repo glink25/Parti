@@ -15,6 +15,7 @@
     "@parti/core": "workspace:*",
     "@parti/room-packager": "workspace:*",
     "@parti/transport-common": "workspace:*",
+    "@parti/transport-lan": "workspace:*",
     "@parti/transport-local": "workspace:*",
     "@parti/transport-peerjs": "workspace:*",
     "@parti/worker-sdk": "workspace:*",
