@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useIntl } from 'react-intl';
 import { Maximize2Icon } from 'lucide-react';
 import {
@@ -8,9 +8,16 @@ import {
 } from '@parti/client-sdk';
 import type { RoomPackage } from '@parti/room-packager';
 import { Button } from '@/components/ui/button';
-import { RoomImmersiveCapsule } from '@/components/RoomImmersiveCapsule';
+import {
+  ROOM_IMMERSIVE_CAPSULE_CORNER_CLASS,
+  RoomImmersiveCapsule,
+} from '@/components/RoomImmersiveCapsule';
 import { cn } from '@/lib/utils';
 import { createPackageUrl } from '@/lib/packageUiLoader';
+
+const CornerSnapShell = lazy(() =>
+  import('./CornerSnapShell').then((module) => ({ default: module.CornerSnapShell })),
+);
 
 export interface RoomFrameViewport {
   aspectRatio?: string;
@@ -153,12 +160,26 @@ export function RoomFrame({
         </div>
       )}
       {fullscreen && onExitFullscreen && (
-        <RoomImmersiveCapsule
-          onMore={onFullscreenMore}
-          onExit={onExitFullscreen}
-          exitAriaLabelId={exitAriaLabelId}
-          exitTitleId={exitTitleId}
-        />
+        <Suspense
+          fallback={
+            <RoomImmersiveCapsule
+              className={cn('z-10', ROOM_IMMERSIVE_CAPSULE_CORNER_CLASS)}
+              onMore={onFullscreenMore}
+              onExit={onExitFullscreen}
+              exitAriaLabelId={exitAriaLabelId}
+              exitTitleId={exitTitleId}
+            />
+          }
+        >
+          <CornerSnapShell defaultCorner="top-right">
+            <RoomImmersiveCapsule
+              onMore={onFullscreenMore}
+              onExit={onExitFullscreen}
+              exitAriaLabelId={exitAriaLabelId}
+              exitTitleId={exitTitleId}
+            />
+          </CornerSnapShell>
+        </Suspense>
       )}
       {viewport ? (
         <div

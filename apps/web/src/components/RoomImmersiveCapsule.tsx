@@ -16,6 +16,10 @@ function ExitImmersiveIcon({ className }: { className?: string }) {
   );
 }
 
+/** Corner inset matching CornerSnapShell default (margin 16 + safe-area). */
+export const ROOM_IMMERSIVE_CAPSULE_CORNER_CLASS =
+  'absolute top-[calc(16px+env(safe-area-inset-top))] right-[calc(16px+env(safe-area-inset-right))]';
+
 export function RoomImmersiveCapsule({
   onMore,
   onExit,
@@ -36,8 +40,7 @@ export function RoomImmersiveCapsule({
   return (
     <div
       className={cn(
-        'absolute z-10 flex items-center overflow-hidden rounded-full border border-white/15 bg-black/45 shadow-[0_4px_8px_rgba(0,0,0,0.15)] backdrop-blur-md',
-        'top-[calc(16px+env(safe-area-inset-top))] right-[calc(16px+env(safe-area-inset-right))]',
+        'flex items-center overflow-hidden rounded-full border border-white/15 bg-black/45 shadow-[0_4px_8px_rgba(0,0,0,0.15)] backdrop-blur-md',
         className,
       )}
     >
