@@ -1,4 +1,11 @@
-import { mainCanvas, mainContext, mousePosScreen, mouseWasPressed } from 'littlejsengine';
+import {
+  mainCanvas,
+  mainContext,
+  mouseIsDown,
+  mousePosScreen,
+  mouseWasPressed,
+  mouseWasReleased,
+} from 'littlejsengine';
 import type { Card, GameState, PlayerState } from '../game/types';
 import { DoudizhuAnimationQueue, easeOutCubic, type DoudizhuAnimation } from './DoudizhuAnimationQueue';
 import { doudizhuPresentationMask } from './DoudizhuPresentation';
@@ -18,12 +25,26 @@ type HitRegion = {
   onClick: () => void;
 };
 
+type HandHitRegion = Omit<HitRegion, 'onClick'> & {
+  cardId: string;
+  index: number;
+};
+
+type SelectionGesture = {
+  select: boolean;
+  startIndex: number;
+  lastIndex: number;
+  initialSelectedCardIds: Set<string>;
+};
+
 export class DoudizhuScene {
   private state: GameState | null = null;
   private hand: Card[] = [];
   private selected = new Set<string>();
   private disposers: Array<() => void> = [];
   private hitRegions: HitRegion[] = [];
+  private handHitRegions: HandHitRegion[] = [];
+  private selectionGesture: SelectionGesture | null = null;
   private flash = '';
   private flashTimer?: number;
   private pixelRatio = 1;
@@ -38,6 +59,7 @@ export class DoudizhuScene {
       parti.onEvent('hand:update', (payload) => {
         this.hand = (payload as { hand: Card[] }).hand;
         this.selected.clear();
+        this.endSelectionGesture();
       }),
       parti.onEvent('game:invalid', (payload) => {
         this.showFlash((payload as { message: string }).message);
@@ -58,11 +80,28 @@ export class DoudizhuScene {
     this.pixelRatio = mainCanvas.width / Math.max(1, mainCanvas.clientWidth);
     const pointerX = mousePosScreen.x / this.pixelRatio;
     const pointerY = mousePosScreen.y / this.pixelRatio;
+    const hoveredCard = [...this.handHitRegions].reverse().find((hit) => this.contains(hit, pointerX, pointerY));
     const hovered = [...this.hitRegions].reverse().find((hit) => this.contains(hit, pointerX, pointerY));
-    mainCanvas.style.cursor = hovered ? 'pointer' : '';
+    mainCanvas.style.cursor = hoveredCard || hovered ? 'pointer' : '';
 
     this.activeAnimation = this.animations.update(performance.now());
-    if (hovered && mouseWasPressed(0) && !this.animations.isInputBlocked()) hovered.onClick();
+    if (this.animations.isInputBlocked()) {
+      this.endSelectionGesture();
+      return;
+    }
+
+    if (this.selectionGesture) {
+      if (mouseWasReleased(0) || !mouseIsDown(0)) {
+        this.endSelectionGesture();
+      } else if (hoveredCard) {
+        this.extendSelectionGesture(hoveredCard.index);
+      }
+      return;
+    }
+
+    if (!mouseWasPressed(0)) return;
+    if (hoveredCard) this.beginSelectionGesture(hoveredCard);
+    else if (hovered) hovered.onClick();
   }
 
   render() {
@@ -74,6 +113,7 @@ export class DoudizhuScene {
     context.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
     context.clearRect(0, 0, width, height);
     this.hitRegions = [];
+    this.handHitRegions = [];
 
     this.fillRect(0, 0, width, height, TABLE);
     this.drawVignette(width, height);
@@ -95,12 +135,17 @@ export class DoudizhuScene {
   }
 
   private destroy = () => {
+    this.endSelectionGesture();
     for (const dispose of this.disposers.splice(0)) dispose();
     if (this.flashTimer) window.clearTimeout(this.flashTimer);
     document.removeEventListener('visibilitychange', this.visibility);
   };
 
-  private visibility = () => { if (document.hidden) this.animations.skipToLatest(); };
+  private visibility = () => {
+    if (!document.hidden) return;
+    this.endSelectionGesture();
+    this.animations.skipToLatest();
+  };
 
   private receiveAction(payload: unknown) {
     const event = payload as Partial<DoudizhuAnimation> & { actionId?: string; occurredAt?: number };
@@ -210,17 +255,52 @@ export class DoudizhuScene {
       const x = startX + index * overlap;
       const cardY = y - (selected ? 22 : 0);
       this.drawCard(x, cardY, card, cardWidth, cardHeight, selected);
-      this.hitRegions.push({
+      this.handHitRegions.push({
         x,
         y: cardY,
         width: index === visibleHand.length - 1 ? cardWidth : overlap,
         height: cardHeight,
-        onClick: () => {
-          if (this.selected.has(card.id)) this.selected.delete(card.id);
-          else this.selected.add(card.id);
-        },
+        cardId: card.id,
+        index,
       });
     });
+  }
+
+  private beginSelectionGesture(card: HandHitRegion) {
+    this.selectionGesture = {
+      select: !this.selected.has(card.cardId),
+      startIndex: card.index,
+      lastIndex: card.index,
+      initialSelectedCardIds: new Set(this.selected),
+    };
+    this.applySelectionRange(card.index);
+  }
+
+  private extendSelectionGesture(index: number) {
+    const gesture = this.selectionGesture;
+    if (!gesture || gesture.lastIndex === index) return;
+
+    gesture.lastIndex = index;
+    this.applySelectionRange(index);
+  }
+
+  private applySelectionRange(endIndex: number) {
+    const gesture = this.selectionGesture;
+    if (!gesture) return;
+
+    const rangeStart = Math.min(gesture.startIndex, endIndex);
+    const rangeEnd = Math.max(gesture.startIndex, endIndex);
+    for (const card of this.handHitRegions) {
+      const selected = card.index >= rangeStart && card.index <= rangeEnd
+        ? gesture.select
+        : gesture.initialSelectedCardIds.has(card.cardId);
+      if (selected) this.selected.add(card.cardId);
+      else this.selected.delete(card.cardId);
+    }
+  }
+
+  private endSelectionGesture() {
+    this.selectionGesture = null;
   }
 
   private drawActions(width: number, height: number) {
@@ -394,7 +474,7 @@ export class DoudizhuScene {
     if (line) context.fillText(line, x, lineY);
   }
 
-  private contains(hit: HitRegion, x: number, y: number) {
+  private contains(hit: Pick<HitRegion, 'x' | 'y' | 'width' | 'height'>, x: number, y: number) {
     return x >= hit.x && x <= hit.x + hit.width && y >= hit.y && y <= hit.y + hit.height;
   }
 
