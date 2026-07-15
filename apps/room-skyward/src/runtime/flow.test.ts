@@ -41,7 +41,7 @@ describe('boss encounter sync', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(1000); });
   afterEach(() => { vi.useRealTimers(); });
 
-  const bossChunk = 9, triggerY = bossChunk * CHUNK_HEIGHT + BOSS_TRIGGER_OFFSET, poseAbove = (seq: number) => ({ sequence: seq, x: 450, y: triggerY + 100, vy: 100, cameraBottom: triggerY - 1100, direction: 0 });
+  const bossChunk = 11, triggerY = bossChunk * CHUNK_HEIGHT + BOSS_TRIGGER_OFFSET, poseAbove = (seq: number) => ({ sequence: seq, x: 450, y: triggerY + 100, vy: 100, cameraBottom: triggerY - 1100, direction: 0 });
 
   it('starts the boss encounter once the lone player reaches the trigger Y', () => {
     const { flow, getState } = setupFlow('p1a', runningState({ p1a: playerFixture('p1a', 100) }));

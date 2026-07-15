@@ -32,11 +32,11 @@ describe('packaged worker', () => {
     definition.onCreate?.(context); definition.onJoin?.(context, host);
     definition.actions?.setReady?.(context, { player: host, actionId: 'ready:1', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:1', type: 'setReady', payload: { ready: true }, from: 'host', seq: 1, origin: 'local', createdAt: 1 } } });
     expect(state).toMatchObject({ phase: 'running', hostId: 'host', startedPlayers: ['host'] });
-    const triggerY = 9 * CHUNK_HEIGHT + BOSS_TRIGGER_OFFSET;
+    const triggerY = 11 * CHUNK_HEIGHT + BOSS_TRIGGER_OFFSET;
     state.players.host!.effects.rocket = { id: 'rocket', startedAt: 0, endsAt: 6500, stacks: 1, sourceId: 'test' };
-    definition.actions?.publishPose?.(context, { player: host, actionId: 'pose:1', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:2', type: 'publishPose', payload: { sequence: 1, x: 450, y: triggerY + 500, vy: 860, cameraBottom: triggerY - 500, direction: 0 }, from: 'host', seq: 2, origin: 'local', createdAt: 2 } } });
+    definition.actions?.publishPose?.(context, { player: host, actionId: 'pose:1', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:2', type: 'publishPose', payload: { sequence: 1, x: 450, y: triggerY + 500, vy: 1050, cameraBottom: triggerY - 500, direction: 0 }, from: 'host', seq: 2, origin: 'local', createdAt: 2 } } });
     expect(state.players.host).toMatchObject({ y: triggerY, vy: 0, effects: { rocket: { phase: 'ending', forcedEndingAt: 1000 } } });
-    expect(state.teamVoidY).toBe(9 * CHUNK_HEIGHT + BOSS_ARENA_FLOOR_OFFSET);
+    expect(state.teamVoidY).toBe(11 * CHUNK_HEIGHT + BOSS_ARENA_FLOOR_OFFSET);
     expect(state.players.host!.cameraBottom).toBe(state.teamVoidY);
   });
 });

@@ -1,7 +1,7 @@
 import type { AttackDefinition, EnemyKind, PickupKind, PlatformKind } from '../game/contracts';
 
 export type ScreenPoint = { x: number; y: number };
-export type PlatformArt = { kind: PlatformKind; color: string; warning: boolean; breaking?: boolean; changedAt?: number; spikeRange?: [number, number] };
+export type PlatformArt = { kind: PlatformKind; color: string; warning: boolean; breaking?: boolean; changedAt?: number; spikeRange?: [number, number]; springCompression?: number };
 
 const backgrounds = Object.fromEntries(['aurora', 'garden', 'storm'].map((id) => {
   const image = new Image(); image.src = `/assets/skyward-2/backgrounds/${id}.jpg`; return [id, image];
@@ -36,7 +36,7 @@ export function drawPlatformArt(c: CanvasRenderingContext2D, s: ScreenPoint, w: 
   if (art.kind === 'moving') { c.strokeStyle='#d9fbff'; c.beginPath(); c.moveTo(s.x-15*scale,s.y); c.lineTo(s.x+15*scale,s.y); c.stroke(); path(c,[[s.x-18*scale,s.y],[s.x-10*scale,s.y-6*scale],[s.x-10*scale,s.y+6*scale]]); c.fillStyle='#d9fbff'; c.fill(); path(c,[[s.x+18*scale,s.y],[s.x+10*scale,s.y-6*scale],[s.x+10*scale,s.y+6*scale]]); c.fill(); }
   if (art.kind === 'recovering') { c.strokeStyle='#553c55'; c.beginPath(); c.moveTo(s.x-8*scale,y); c.lineTo(s.x+2*scale,y+8*scale); c.lineTo(s.x+14*scale,y+2*scale); c.stroke(); }
   if (art.kind === 'trigger') { circle(c,s.x,s.y,7*scale); c.fillStyle='#eafff7'; c.fill(); c.stroke(); }
-  if (art.kind === 'spring') { c.strokeStyle='#fff4a8'; c.beginPath(); for(let i=-2;i<=2;i++) c.lineTo(s.x+i*8*scale,s.y+(i%2?6:-6)*scale); c.stroke(); }
+  if (art.kind === 'spring') { const compression=art.springCompression??0,pulse=.82+Math.sin(performance.now()*.014)*.18,coil=(1-compression*.7)*pulse;c.save();c.translate(0,compression*5*scale);glow(c,'#ffe16a',10*scale*pulse);c.strokeStyle='#fff8bd';c.lineWidth=Math.max(3,4*scale);c.beginPath();for(let i=-3;i<=3;i++)c.lineTo(s.x+i*8*scale,s.y+(i%2?7:-7)*scale*coil);c.stroke();c.globalAlpha=.5+.25*pulse;circle(c,s.x,s.y,23*scale*(1+compression*.35));c.stroke();c.restore(); }
   if (art.kind === 'boss-exit') { glow(c,'#ffd35a',12*scale); c.strokeStyle='#fff2a8'; c.strokeRect(s.x-w*.25,y-7*scale,w*.5,5*scale); }
   if (art.spikeRange) { const left=s.x-w/2+w*art.spikeRange[0], right=s.x-w/2+w*art.spikeRange[1]; c.fillStyle='#f4f7ff'; for(let x=left;x<right;x+=18*scale){ path(c,[[x,y],[x+9*scale,y-20*scale],[x+18*scale,y]]); c.fill(); c.stroke(); } }
   c.restore();

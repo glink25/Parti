@@ -14,7 +14,7 @@ biomes.register({ id: 'storm', name: '雷暴层', background: '#24183f', platfor
 function pickupPool() { return ([['shield', 2], ['rapid', 3], ['power', 2], ['spread', 1], ['pierce', 1], ['rocket', 1], ['propeller', 2], ['super-jump', 2], ['slow-fall', 2]] as const).map(([id, weight]) => ({ id, weight })); }
 function runtimeEffect(entityId: string, state: DynamicEntityState): RuntimeEffect { return { kind: 'entity-state', entityId, state }; }
 function basePlatform(id: PlatformKind, safe: boolean, weight: number, generate: PlatformStrategy['generate'] = (p) => ({ ...p, kind: id }), contact: PlatformStrategy['contact'] = () => ({ bounceVelocity: JUMP_SPEED, effects: [] })): PlatformStrategy {
-  return { id, version: 1, safe, weight, generate: (p, c, i) => generate({ ...p, kind: id }, c, i), contact, transition: (p, c, state) => transitionPlatform(p, c, state), render: (p, c, state) => renderPlatform(p, c, state) };
+  return { id, version: 2, safe, weight, generate: (p, c, i) => generate({ ...p, kind: id }, c, i), contact, transition: (p, c, state) => transitionPlatform(p, c, state), render: (p, c, state) => renderPlatform(p, c, state) };
 }
 export const platformStrategies = new Registry<PlatformStrategy>();
 platformStrategies.register(basePlatform('normal', true, 5));
@@ -45,7 +45,7 @@ const attacks: Record<string, AttackDefinition> = {
 };
 function enemy(id: EnemyKind, weight: number, hp: number, stompable: boolean, controller: Enemy['controller'], attackList: AttackDefinition[] = [], boss = false): EnemyStrategy {
   return {
-    id, version: 1, weight, boss,
+    id, version: 2, weight, boss,
     create(c, i, anchor) { const r = c.rng(`enemy:${id}:${i}`), strength = c.difficultyAxes.enemyStrength; return { id: `${c.chunkIndex}:enemy:${id}:${i}`, kind: id, x: anchor?.x ?? (boss ? WORLD_WIDTH / 2 : r.int(90, 810)), y: (anchor?.y ?? c.chunkIndex * CHUNK_HEIGHT + (boss ? r.int(BOSS_SPAWN_Y_MIN, BOSS_SPAWN_Y_MAX) : r.int(260, 1380))) + (anchor ? 54 : 0), hp: Math.ceil(hp * (1 + strength * .9)), radius: boss ? 105 : 34, boss, stompable, controller: tuneController(controller, r.float(), anchor), attacks: attackList, drops: [{ pickup: 'shield', weight: 1 }, { pickup: 'rapid', weight: 2 }], anchorId: anchor?.id }; },
     position(e, c) { return enemyPosition(e, c); }, contact(e) { return e.stompable ? { effects: [] } : { damageReason: '不可踩踏怪物', effects: [] }; },
     hit(e, damage) { return [{ kind: 'damage', targetId: e.id, amount: damage }]; }, attack(e, _context, sequence) { return e.attacks.length ? e.attacks[sequence % e.attacks.length]! : null; },
@@ -53,7 +53,23 @@ function enemy(id: EnemyKind, weight: number, hp: number, stompable: boolean, co
   };
 }
 function tuneController(c: Enemy['controller'], phase: number, anchor: Platform | null): Enemy['controller'] { if (c.kind === 'stationary') return c; if (c.kind === 'occupy') return { ...c, platformId: anchor?.id ?? c.platformId, phase }; return { ...c, phase }; }
-export function enemyPosition(e: Enemy, c: RuntimeContext) { const control = e.controller; if (control.kind === 'stationary' || control.kind === 'occupy') return { x: e.x, y: e.y }; const t = (c.now - c.startedAt) / control.periodMs * Math.PI * 2 + control.phase * Math.PI * 2, offset = Math.sin(t) * control.range; if (control.kind === 'charge') return { x: Math.max(0, Math.min(WORLD_WIDTH, e.x + Math.max(0, offset) * Math.sign(Math.cos(t)))), y: e.y }; return control.axis === 'x' ? { x: Math.max(0, Math.min(WORLD_WIDTH, e.x + offset)), y: e.y } : { x: e.x, y: e.y + offset }; }
+function smoothstep(value: number) { const t = Math.max(0, Math.min(1, value)); return t * t * (3 - 2 * t); }
+function chargeWave(cycle: number) {
+  if (cycle < .18) return -1;
+  if (cycle < .43) return -1 + smoothstep((cycle - .18) / .25) * 2;
+  if (cycle < .61) return 1;
+  return 1 - smoothstep((cycle - .61) / .39) * 2;
+}
+export function enemyPosition(e: Enemy, c: RuntimeContext) {
+  const control = e.controller;
+  if (control.kind === 'stationary' || control.kind === 'occupy') return { x: e.x, y: e.y };
+  const elapsedCycles = (c.now - c.startedAt) / control.periodMs + control.phase;
+  if (control.kind === 'float' && control.axis === 'y') return { x: e.x, y: e.y + Math.sin(elapsedCycles * Math.PI * 2) * control.range };
+  const center = Math.max(e.radius, Math.min(WORLD_WIDTH - e.radius, e.x));
+  const range = Math.max(0, Math.min(control.range, center - e.radius, WORLD_WIDTH - e.radius - center));
+  const wave = control.kind === 'charge' ? chargeWave(((elapsedCycles % 1) + 1) % 1) : Math.sin(elapsedCycles * Math.PI * 2);
+  return { x: center + wave * range, y: e.y };
+}
 export const enemyStrategies = new Registry<EnemyStrategy>();
 enemyStrategies.register(enemy('sentry', 3, 1, true, { kind: 'stationary' }, [attacks.shot!]));
 enemyStrategies.register(enemy('floater', 2, 1, true, { kind: 'float', axis: 'y', range: 70, periodMs: 3000, phase: 0 }, [attacks.shot!]));
@@ -64,7 +80,7 @@ enemyStrategies.register(enemy('occupier', 1.5, 2, true, { kind: 'occupy', platf
 export const pickupStrategies = new Registry<PickupStrategy>();
 export const PICKUP_PRESENTATION: Record<PickupKind, { name: string; description: string }> = { shield: { name: '护盾', description: '抵消一次伤害' }, rapid: { name: '快速射击', description: '大幅提升射速' }, power: { name: '强力', description: '子弹伤害提升' }, spread: { name: '散射', description: '同时发射三枚子弹' }, pierce: { name: '穿透', description: '子弹可贯穿敌人' }, rocket: { name: '火箭', description: '高速飞行并免疫伤害' }, propeller: { name: '螺旋桨', description: '稳定飞行并免疫伤害' }, 'super-jump': { name: '超级跳跃', description: '强化每次弹跳' }, 'slow-fall': { name: '缓降', description: '降低下落速度' } };
 for (const [id, weight, durationMs] of [['shield', 1.2, 0], ['rapid', 1.4, 12000], ['power', 1.2, 14000], ['spread', .65, 10000], ['pierce', .65, 10000], ['rocket', .7, 5500], ['propeller', .9, 6500], ['super-jump', 1, 12000], ['slow-fall', 1, 12000]] as const) {
-  pickupStrategies.register({ id, version: 2, weight, durationMs, create(c, i, anchor) { return { id: `${c.chunkIndex}:pickup:${id}:${i}`, kind: id, x: anchor.x, y: anchor.y + 70, durationMs }; }, claim(p, c) { return [{ kind: 'apply-effect', effect: effectFor(p.kind, p.id, p.durationMs, c.now) }]; }, refresh(current, p, now) { return { ...current, startedAt: now, endsAt: p.kind === 'shield' ? null : now + p.durationMs, stacks: 1, sourceId: p.id, phase: 'starting', forcedEndingAt: undefined }; }, end(effect) { return effect.id === 'rocket' || effect.id === 'propeller' ? [{ kind: 'message', text: '飞行结束，正在缓降' }] : []; }, hud(effect, now) { const label = PICKUP_PRESENTATION[id].name; return effect.endsAt == null ? `${label} ×1` : `${label} ${Math.max(0, Math.ceil((effect.endsAt - now) / 1000))}s`; } });
+  pickupStrategies.register({ id, version: 3, weight, durationMs, create(c, i, anchor) { return { id: `${c.chunkIndex}:pickup:${id}:${i}`, kind: id, x: anchor.x, y: anchor.y + 70, durationMs }; }, claim(p, c) { return [{ kind: 'apply-effect', effect: effectFor(p.kind, p.id, p.durationMs, c.now) }]; }, refresh(current, p, now) { return { ...current, startedAt: now, endsAt: p.kind === 'shield' ? null : now + p.durationMs, stacks: 1, sourceId: p.id, phase: 'starting', forcedEndingAt: undefined }; }, end(effect) { return effect.id === 'rocket' || effect.id === 'propeller' ? [{ kind: 'message', text: '飞行结束，正在下落' }] : []; }, hud(effect, now) { const label = PICKUP_PRESENTATION[id].name; return effect.endsAt == null ? `${label} ×1` : `${label} ${Math.max(0, Math.ceil((effect.endsAt - now) / 1000))}s`; } });
 }
 export function effectFor(id: PickupKind, sourceId: string, durationMs: number, now: number): ActiveEffect { return { id, startedAt: now, endsAt: id === 'shield' ? null : now + durationMs, stacks: 1, sourceId, phase: 'starting' }; }
 
