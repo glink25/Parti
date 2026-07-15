@@ -262,13 +262,15 @@ export function RoomControlsSheet({
   if (!open) return null;
   return (
     <Sheet open onOpenChange={onOpenChange}>
-      <SheetContent autoFocus={false} side="bottom" className="max-h-[88dvh] rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
-        <SheetHeader className="border-b px-5 py-4 text-left">
+      <SheetContent autoFocus={false} side="bottom" className="max-h-[88dvh] overflow-hidden rounded-t-3xl border-border bg-popover px-0 pb-[env(safe-area-inset-bottom)]">
+        <SheetHeader className="shrink-0 border-b px-5 py-4 text-left">
           <SheetTitle><FormattedMessage id={sheetTitleId} /></SheetTitle>
           <SheetDescription><FormattedMessage id={sheetDescriptionId} /></SheetDescription>
         </SheetHeader>
-        <div className={cn('grid gap-3 overflow-y-auto px-4 pb-5', showSettings && 'sm:grid-cols-2')}>
-          <ControlsContent props={props} showSettings={showSettings} showAdmissionStatus={showAdmissionStatus} />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5">
+          <div className={cn('grid gap-3', showSettings && 'sm:grid-cols-2')}>
+            <ControlsContent props={props} showSettings={showSettings} showAdmissionStatus={showAdmissionStatus} />
+          </div>
         </div>
       </SheetContent>
     </Sheet>
