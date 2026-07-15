@@ -1,0 +1,22 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "room-werewolf",
+  "name": "狼人杀 · 月夜审判",
+  "version": "0.1.0",
+  "packageMode": "filesystem",
+  "description": "由游戏上帝自动主持的完整狼人杀，亦支持单机牌盒发牌与验牌。",
+  "author": { "name": "Parti" },
+  "entry": { "ui": "index.html", "worker": "worker.js" },
+  "room": { "minPlayers": 6, "maxPlayers": 12, "allowSpectators": false },
+  "sync": { "mode": "snapshot" },
+  "permissions": { "network": false, "storage": "session", "camera": false, "microphone": false, "clipboard": false, "sensors": [] },
+  "actions": {
+    "settings:setDeck": { "payload": "{ roles: Role[] }" },
+    "settings:setRules": { "payload": "RuleSettings" },
+    "game:start": {},
+    "game:restart": {},
+    "stage:submit": { "payload": "stage-specific uniform action" },
+    "sheriff:badge": { "payload": "{ targetId: string | null }" }
+  }
+}
