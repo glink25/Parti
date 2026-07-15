@@ -27,7 +27,8 @@
     "sensors": []
   },
   "actions": {
-    "settings:setMode": { "payload": "{ mode: 'classic' | 'blank' | 'custom' }" },
+    "settings:setMode": { "payload": "{ mode: 'classic' | 'custom' }" },
+    "settings:setIncludeBlank": { "payload": "{ enabled: boolean }" },
     "settings:setCategories": { "payload": "{ categories: string[] }" },
     "round:deal": { "payload": "{ civilianWord?: string; undercoverWord?: string }" },
     "round:eliminateSelf": {}

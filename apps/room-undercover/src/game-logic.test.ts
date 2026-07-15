@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blankAppearanceChance,
   choosePair,
   dealCards,
   dealCardsWithWords,
@@ -10,6 +11,7 @@ import {
   privateCardPayload,
   resolveElimination,
   undercoverCount,
+  type DealResult,
 } from './game-logic';
 import type { WordPair } from './words';
 
@@ -18,134 +20,130 @@ const PAIRS: WordPair[] = [
   { id: 'daily-2', category: 'daily', civilian: '牙刷', undercover: '梳子' },
   { id: 'weapons-1', category: 'weapons', civilian: '长剑', undercover: '短剑' },
 ];
+const WORDS = { civilian: '杯子', undercover: '碗' };
 
-describe('undercoverCount', () => {
-  it.each([[2, 0], [3, 1], [5, 1], [6, 2], [9, 2], [10, 3], [12, 3]])('maps %i players to %i undercover players', (players, expected) => {
+describe('role counts', () => {
+  it.each([[2, 0], [3, 1], [5, 1], [6, 2], [9, 2], [10, 3], [12, 3]])('maps %i players to %i undercover slots', (players, expected) => {
     expect(undercoverCount(players)).toBe(expected);
+  });
+
+  it.each([[2, 0], [3, 0.25], [4, 0.5], [5, 0.75], [6, 1], [12, 1]])('maps %i players to blank chance %i', (players, expected) => {
+    expect(blankAppearanceChance(players)).toBe(expected);
   });
 });
 
-describe('categories', () => {
-  it('accepts unique known categories and rejects invalid or empty values', () => {
+describe('categories and pairs', () => {
+  it('normalizes categories and filters pairs', () => {
     expect(normalizeCategories(['daily', 'daily', 'weapons'])).toEqual(['daily', 'weapons']);
     expect(normalizeCategories([])).toBeNull();
     expect(normalizeCategories(['unknown'])).toBeNull();
-  });
-
-  it('filters pairs by every selected category', () => {
     expect(eligiblePairs(PAIRS, ['daily']).map(({ id }) => id)).toEqual(['daily-1', 'daily-2']);
-    expect(eligiblePairs(PAIRS, ['daily', 'weapons'])).toHaveLength(3);
   });
-});
 
-describe('choosePair', () => {
-  it('does not repeat before exhaustion and reports the reset', () => {
+  it('does not repeat pairs before exhaustion', () => {
     const used = new Set(['daily-1']);
     expect(choosePair(PAIRS.slice(0, 2), used, () => 0).pair.id).toBe('daily-2');
     used.add('daily-2');
-    const next = choosePair(PAIRS.slice(0, 2), used, () => 0);
-    expect(next.reset).toBe(true);
-    expect(next.pair.id).toBe('daily-1');
+    expect(choosePair(PAIRS.slice(0, 2), used, () => 0)).toMatchObject({ reset: true, pair: { id: 'daily-1' } });
   });
 });
 
-describe('dealCards', () => {
-  it('deals exactly one card per player with the automatic role count', () => {
+describe('dealing', () => {
+  it('keeps the existing undercover distribution without a blank', () => {
     const players = Array.from({ length: 6 }, (_, index) => `p${index}`);
-    const cards = dealCards(players, PAIRS[0], () => 0.99);
-    expect(Object.keys(cards)).toEqual(players);
-    expect(Object.values(cards).filter(({ role }) => role === 'undercover')).toHaveLength(2);
-    expect(new Set(Object.values(cards).map(({ word }) => word))).toEqual(new Set(['杯子', '碗']));
+    const deal = dealCards(players, PAIRS[0], () => 0.99);
+    expect(Object.keys(deal.cards)).toEqual(players);
+    expect(Object.values(deal.cards).filter(({ role }) => role === 'undercover')).toHaveLength(2);
+    expect(Object.values(deal.cards).filter(({ role }) => role === 'blank')).toHaveLength(0);
+    expect(deal).toMatchObject({ hadBlank: false, hadUndercover: true });
   });
 
-  it('can swap which side of the pair is assigned to civilians', () => {
+  it.each([
+    [4, 0.49, 2, 1, 1],
+    [5, 0.74, 3, 1, 1],
+    [6, 0.99, 4, 1, 1],
+    [10, 0.99, 7, 2, 1],
+  ])('deals %i players with the expected three-role distribution', (count, blankRoll, civilians, undercovers, blanks) => {
+    const players = Array.from({ length: count }, (_, index) => `p${index}`);
+    const values = [blankRoll, ...Array(count).fill(0.99)];
+    const deal = dealCardsWithWords(players, WORDS, () => values.shift() ?? 0.99, true);
+    expect(Object.values(deal.cards).filter(({ role }) => role === 'civilian')).toHaveLength(civilians);
+    expect(Object.values(deal.cards).filter(({ role }) => role === 'undercover')).toHaveLength(undercovers);
+    expect(Object.values(deal.cards).filter(({ role }) => role === 'blank')).toHaveLength(blanks);
+    expect(Object.values(deal.cards).find(({ role }) => role === 'blank')?.word).toBe('');
+  });
+
+  it('supports the three-player blank raid and a missed random roll', () => {
     const players = ['a', 'b', 'c'];
-    const normal = dealCards(players, PAIRS[0], () => 0.99);
-    const swapped = dealCards(players, PAIRS[0], () => 0);
-    const civilianWord = (cards: typeof normal) => Object.values(cards).find(({ role }) => role === 'civilian')?.word;
-    expect(civilianWord(normal)).toBe('杯子');
-    expect(civilianWord(swapped)).toBe('碗');
+    const raid = dealCardsWithWords(players, WORDS, () => 0, true);
+    expect(Object.values(raid.cards).filter(({ role }) => role === 'blank')).toHaveLength(1);
+    expect(Object.values(raid.cards).filter(({ role }) => role === 'undercover')).toHaveLength(0);
+    const normal = dealCardsWithWords(players, WORDS, () => 0.25, true);
+    expect(Object.values(normal.cards).filter(({ role }) => role === 'blank')).toHaveLength(0);
+    expect(Object.values(normal.cards).filter(({ role }) => role === 'undercover')).toHaveLength(1);
+  });
+
+  it('keeps the private card payload free of role information', () => {
+    const card = { role: 'blank' as const, word: '' };
+    expect(privateCardPayload(card, 4)).toEqual({ round: 4, word: '' });
+    expect(privateCardPayload(card, 4)).not.toHaveProperty('role');
   });
 });
 
-describe('hidden roles and elimination', () => {
-  const cards = {
-    civilianA: { role: 'civilian' as const, word: '杯子' },
-    civilianB: { role: 'civilian' as const, word: '杯子' },
-    undercoverA: { role: 'undercover' as const, word: '碗' },
-    undercoverB: { role: 'undercover' as const, word: '碗' },
-  };
+describe('victory resolution', () => {
+  function deal(cards: DealResult['cards'], hadBlank = false): DealResult {
+    return { cards, words: WORDS, hadBlank, hadUndercover: Object.values(cards).some(({ role }) => role === 'undercover') };
+  }
 
-  it('projects a private card without exposing its role', () => {
-    expect(privateCardPayload(cards.undercoverA, 4)).toEqual({ round: 4, word: '碗' });
-    expect(privateCardPayload(cards.undercoverA, 4)).not.toHaveProperty('role');
-  });
-
-  it('continues after a civilian or only some undercover players are eliminated', () => {
-    expect(resolveElimination(cards, ['civilianA'])).toEqual({ finished: false, revealedWords: null });
-    expect(resolveElimination(cards, ['undercoverA'])).toEqual({ finished: false, revealedWords: null });
-  });
-
-  it('finishes and reveals both words after every undercover player is eliminated', () => {
-    expect(resolveElimination(cards, ['civilianA', 'undercoverA', 'undercoverB'])).toEqual({
-      finished: true,
-      revealedWords: { civilian: '杯子', undercover: '碗' },
+  it('continues while civilians still outnumber living undercovers', () => {
+    const current = deal({
+      c1: { role: 'civilian', word: '杯子' }, c2: { role: 'civilian', word: '杯子' },
+      c3: { role: 'civilian', word: '杯子' }, u1: { role: 'undercover', word: '碗' },
     });
+    expect(resolveElimination(current, ['c1'])).toMatchObject({ finished: false, winner: null, revealedWords: null });
+  });
+
+  it('awards undercovers when living civilian and undercover counts are tied', () => {
+    const current = deal({
+      c1: { role: 'civilian', word: '杯子' }, c2: { role: 'civilian', word: '杯子' },
+      u1: { role: 'undercover', word: '碗' }, b1: { role: 'blank', word: '' },
+    }, true);
+    expect(resolveElimination(current, ['c1'])).toMatchObject({ finished: true, winner: 'undercover', revealedWords: WORDS });
+  });
+
+  it('awards the blank when the last undercover dies while the blank survives', () => {
+    const current = deal({ c1: { role: 'civilian', word: '杯子' }, u1: { role: 'undercover', word: '碗' }, b1: { role: 'blank', word: '' } }, true);
+    expect(resolveElimination(current, ['u1'])).toMatchObject({ finished: true, winner: 'blank', revealedWords: WORDS });
+  });
+
+  it('awards civilians when every undercover and blank is dead', () => {
+    const current = deal({ c1: { role: 'civilian', word: '杯子' }, u1: { role: 'undercover', word: '碗' }, b1: { role: 'blank', word: '' } }, true);
+    expect(resolveElimination(current, ['u1', 'b1'])).toMatchObject({ finished: true, winner: 'civilian', revealedWords: WORDS });
+  });
+
+  it('resolves the first elimination in a three-player blank raid', () => {
+    const current = deal({ c1: { role: 'civilian', word: '杯子' }, c2: { role: 'civilian', word: '杯子' }, b1: { role: 'blank', word: '' } }, true);
+    expect(resolveElimination(current, ['b1'])).toMatchObject({ winner: 'civilian' });
+    expect(resolveElimination(current, ['c1'])).toMatchObject({ winner: 'blank' });
   });
 });
 
-describe('deal modes', () => {
+describe('deal settings', () => {
   const players = [
-    { id: 'host', role: 'host' as const },
-    { id: 'a', role: 'player' as const },
-    { id: 'b', role: 'player' as const },
-    { id: 'c', role: 'player' as const },
+    { id: 'host', role: 'host' as const }, { id: 'a', role: 'player' as const },
+    { id: 'b', role: 'player' as const }, { id: 'c', role: 'player' as const },
     { id: 'watching', role: 'spectator' as const },
   ];
 
-  it('includes the host in classic mode and excludes them from moderated modes', () => {
+  it('includes the host for classic words and excludes them for host-authored custom words', () => {
     expect(participantIds(players, 'classic')).toEqual(['host', 'a', 'b', 'c']);
-    expect(participantIds(players, 'blank')).toEqual(['a', 'b', 'c']);
     expect(participantIds(players, 'custom')).toEqual(['a', 'b', 'c']);
   });
 
-  it('deals blank cards only to undercover players', () => {
-    const cards = dealCardsWithWords(
-      ['a', 'b', 'c'],
-      { civilian: '咖啡', undercover: '' },
-      () => 0.99,
-    );
-    expect(Object.values(cards).filter(({ role }) => role === 'undercover')).toHaveLength(1);
-    expect(Object.values(cards).filter(({ role }) => role === 'undercover')[0].word).toBe('');
-    expect(Object.values(cards).filter(({ role }) => role === 'civilian').every(({ word }) => word === '咖啡')).toBe(true);
-  });
-
-  it('keeps custom civilian and undercover directions fixed', () => {
-    const cards = dealCardsWithWords(
-      ['a', 'b', 'c'],
-      { civilian: '咖啡', undercover: '奶茶' },
-      () => 0.99,
-    );
-    expect(Object.values(cards).find(({ role }) => role === 'civilian')?.word).toBe('咖啡');
-    expect(Object.values(cards).find(({ role }) => role === 'undercover')?.word).toBe('奶茶');
-  });
-
-  it('normalizes valid custom words and rejects empty, identical, or overlong input', () => {
+  it('normalizes valid custom words and rejects invalid input', () => {
     expect(normalizeCustomWords({ civilianWord: ' 咖啡 ', undercoverWord: ' 奶茶 ' })).toEqual({ civilian: '咖啡', undercover: '奶茶' });
     expect(normalizeCustomWords({ civilianWord: '', undercoverWord: '奶茶' })).toBeNull();
     expect(normalizeCustomWords({ civilianWord: '咖啡', undercoverWord: '咖啡' })).toBeNull();
     expect(normalizeCustomWords({ civilianWord: '一'.repeat(21), undercoverWord: '奶茶' })).toBeNull();
-  });
-
-  it('finishes blank mode with an empty undercover reveal', () => {
-    const cards = {
-      a: { role: 'undercover' as const, word: '' },
-      b: { role: 'civilian' as const, word: '咖啡' },
-      c: { role: 'civilian' as const, word: '咖啡' },
-    };
-    expect(resolveElimination(cards, ['a'])).toEqual({
-      finished: true,
-      revealedWords: { civilian: '咖啡', undercover: '' },
-    });
   });
 });

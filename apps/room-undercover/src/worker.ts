@@ -9,9 +9,10 @@ import {
   participantIds,
   privateCardPayload,
   resolveElimination,
-  type Card,
+  type DealResult,
   type DealMode,
   type RevealedWords,
+  type Winner,
 } from './game-logic';
 import { WORD_PAIRS, type Category } from './words';
 
@@ -22,12 +23,16 @@ type RoomState = {
   hostId: string | null;
   players: PublicPlayer[];
   selectedMode: DealMode;
+  selectedIncludeBlank: boolean;
   roundMode: DealMode | null;
   selectedCategories: Category[];
   round: number;
   dealtPlayerIds: string[];
   eliminatedPlayerIds: string[];
   revealedWords: RevealedWords | null;
+  winner: Winner | null;
+  resultHadBlank: boolean;
+  resultHadUndercover: boolean;
   notice: string | null;
 };
 type Context = {
@@ -39,7 +44,7 @@ type Context = {
   log(...args: unknown[]): void;
 };
 
-let currentCards: Record<string, Card> = {};
+let currentDeal: DealResult | null = null;
 const usedPairIds = new Set<string>();
 
 function syncPlayers(ctx: Context) {
@@ -54,7 +59,7 @@ function isHost(ctx: Context, player: Player) {
 }
 
 function sendCard(ctx: Context, playerId: string) {
-  const card = currentCards[playerId];
+  const card = currentDeal?.cards[playerId];
   if (!card) return;
   ctx.send(playerId, 'undercover:card', privateCardPayload(card, ctx.state.round));
 }
@@ -68,12 +73,16 @@ export default defineRoom({
       hostId: null,
       players: [],
       selectedMode: 'classic',
+      selectedIncludeBlank: false,
       roundMode: null,
       selectedCategories: ['entertainment', 'daily'],
       round: 0,
       dealtPlayerIds: [],
       eliminatedPlayerIds: [],
       revealedWords: null,
+      winner: null,
+      resultHadBlank: false,
+      resultHadUndercover: false,
       notice: null,
     };
   },
@@ -89,19 +98,22 @@ export default defineRoom({
 
   onReconnect(ctx: Context, player: Player) {
     syncPlayers(ctx);
-    if (currentCards[player.id] && !ctx.state.dealtPlayerIds.includes(player.id)) {
+    if (currentDeal?.cards[player.id] && !ctx.state.dealtPlayerIds.includes(player.id)) {
       ctx.state.dealtPlayerIds.push(player.id);
     }
     sendCard(ctx, player.id);
   },
 
   onRestore(ctx: Context) {
-    currentCards = {};
+    currentDeal = null;
     usedPairIds.clear();
     ctx.state.phase = 'waiting';
     ctx.state.dealtPlayerIds = [];
     ctx.state.eliminatedPlayerIds = [];
     ctx.state.revealedWords = null;
+    ctx.state.winner = null;
+    ctx.state.resultHadBlank = false;
+    ctx.state.resultHadUndercover = false;
     ctx.state.roundMode = null;
     ctx.state.notice = '房间已恢复，请房主重新发牌';
     syncPlayers(ctx);
@@ -111,8 +123,16 @@ export default defineRoom({
     'settings:setMode'(ctx: Context, event: { player: Player; payload: unknown }) {
       if (!isHost(ctx, event.player)) return;
       const mode = (event.payload as { mode?: unknown } | null)?.mode;
-      if (mode !== 'classic' && mode !== 'blank' && mode !== 'custom') return;
+      if (mode !== 'classic' && mode !== 'custom') return;
       ctx.state.selectedMode = mode;
+      ctx.state.notice = null;
+    },
+
+    'settings:setIncludeBlank'(ctx: Context, event: { player: Player; payload: unknown }) {
+      if (!isHost(ctx, event.player)) return;
+      const enabled = (event.payload as { enabled?: unknown } | null)?.enabled;
+      if (typeof enabled !== 'boolean') return;
+      ctx.state.selectedIncludeBlank = enabled;
       ctx.state.notice = null;
     },
 
@@ -142,7 +162,7 @@ export default defineRoom({
           ctx.state.notice = '请填写两个不同且不超过 20 个字的自定义词语';
           return;
         }
-        currentCards = dealCardsWithWords(playerIds, words, () => ctx.random());
+        currentDeal = dealCardsWithWords(playerIds, words, () => ctx.random(), ctx.state.selectedIncludeBlank);
       } else {
         const candidates = eligiblePairs(WORD_PAIRS, ctx.state.selectedCategories);
         const { pair, reset } = choosePair(candidates, usedPairIds, () => ctx.random());
@@ -150,16 +170,7 @@ export default defineRoom({
           for (const candidate of candidates) usedPairIds.delete(candidate.id);
         }
         usedPairIds.add(pair.id);
-        if (mode === 'blank') {
-          const civilian = ctx.random() < 0.5 ? pair.civilian : pair.undercover;
-          currentCards = dealCardsWithWords(
-            playerIds,
-            { civilian, undercover: '' },
-            () => ctx.random(),
-          );
-        } else {
-          currentCards = dealCards(playerIds, pair, () => ctx.random());
-        }
+        currentDeal = dealCards(playerIds, pair, () => ctx.random(), ctx.state.selectedIncludeBlank);
       }
 
       ctx.state.round += 1;
@@ -168,6 +179,9 @@ export default defineRoom({
       ctx.state.dealtPlayerIds = playerIds;
       ctx.state.eliminatedPlayerIds = [];
       ctx.state.revealedWords = null;
+      ctx.state.winner = null;
+      ctx.state.resultHadBlank = false;
+      ctx.state.resultHadUndercover = false;
       ctx.state.notice = null;
       syncPlayers(ctx);
       for (const playerId of playerIds) sendCard(ctx, playerId);
@@ -178,14 +192,17 @@ export default defineRoom({
       if (ctx.state.phase !== 'active') return;
       const playerId = event.player.id;
       const isPresent = ctx.players.some((player) => player.id === playerId && player.role !== 'spectator');
-      if (!isPresent || !ctx.state.dealtPlayerIds.includes(playerId) || !currentCards[playerId]) return;
+      if (!isPresent || !ctx.state.dealtPlayerIds.includes(playerId) || !currentDeal?.cards[playerId]) return;
       if (ctx.state.eliminatedPlayerIds.includes(playerId)) return;
 
       ctx.state.eliminatedPlayerIds.push(playerId);
-      const result = resolveElimination(currentCards, ctx.state.eliminatedPlayerIds);
+      const result = resolveElimination(currentDeal, ctx.state.eliminatedPlayerIds);
       if (result.finished) {
         ctx.state.phase = 'finished';
         ctx.state.revealedWords = result.revealedWords;
+        ctx.state.winner = result.winner;
+        ctx.state.resultHadBlank = result.hadBlank;
+        ctx.state.resultHadUndercover = result.hadUndercover;
       }
     },
   },

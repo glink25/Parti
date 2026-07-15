@@ -1,15 +1,37 @@
 import { CATEGORIES, type Category, type WordPair } from './words';
 
-export type Role = 'civilian' | 'undercover';
+export type Role = 'civilian' | 'undercover' | 'blank';
+export type Winner = Role;
 export type Card = { role: Role; word: string };
 export type RevealedWords = { civilian: string; undercover: string };
-export type DealMode = 'classic' | 'blank' | 'custom';
+export type DealMode = 'classic' | 'custom';
+export type DealResult = {
+  cards: Record<string, Card>;
+  words: RevealedWords;
+  hadBlank: boolean;
+  hadUndercover: boolean;
+};
+export type EliminationResult = {
+  finished: boolean;
+  winner: Winner | null;
+  revealedWords: RevealedWords | null;
+  hadBlank: boolean;
+  hadUndercover: boolean;
+};
 
 export function undercoverCount(playerCount: number): number {
   if (playerCount < 3) return 0;
   if (playerCount <= 5) return 1;
   if (playerCount <= 9) return 2;
   return 3;
+}
+
+export function blankAppearanceChance(playerCount: number): number {
+  if (playerCount < 3) return 0;
+  if (playerCount === 3) return 0.25;
+  if (playerCount === 4) return 0.5;
+  if (playerCount === 5) return 0.75;
+  return 1;
 }
 
 export function isCategory(value: unknown): value is Category {
@@ -45,7 +67,8 @@ export function dealCards(
   playerIds: string[],
   pair: WordPair,
   random: () => number,
-): Record<string, Card> {
+  includeBlank = false,
+): DealResult {
   const swapWords = random() < 0.5;
   return dealCardsWithWords(
     playerIds,
@@ -53,6 +76,7 @@ export function dealCards(
       ? { civilian: pair.undercover, undercover: pair.civilian }
       : { civilian: pair.civilian, undercover: pair.undercover },
     random,
+    includeBlank,
   );
 }
 
@@ -60,19 +84,27 @@ export function dealCardsWithWords(
   playerIds: string[],
   words: RevealedWords,
   random: () => number,
-): Record<string, Card> {
+  includeBlank = false,
+): DealResult {
+  const hasBlank = includeBlank && random() < blankAppearanceChance(playerIds.length);
   const shuffled = [...playerIds];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const target = Math.floor(random() * (index + 1));
     [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
   }
 
-  const undercoverIds = new Set(shuffled.slice(0, undercoverCount(playerIds.length)));
-
-  return Object.fromEntries(playerIds.map((id) => {
-    const role: Role = undercoverIds.has(id) ? 'undercover' : 'civilian';
-    return [id, { role, word: role === 'undercover' ? words.undercover : words.civilian }];
+  const blankId = hasBlank ? shuffled[0] : null;
+  const undercovers = hasBlank
+    ? (playerIds.length === 3 ? 0 : Math.max(1, undercoverCount(playerIds.length) - (playerIds.length >= 6 ? 1 : 0)))
+    : undercoverCount(playerIds.length);
+  const undercoverIds = new Set(shuffled.slice(hasBlank ? 1 : 0, (hasBlank ? 1 : 0) + undercovers));
+  const cards = Object.fromEntries(playerIds.map((id) => {
+    const role: Role = id === blankId ? 'blank' : undercoverIds.has(id) ? 'undercover' : 'civilian';
+    const word = role === 'blank' ? '' : role === 'undercover' ? words.undercover : words.civilian;
+    return [id, { role, word }];
   }));
+
+  return { cards, words, hadBlank: hasBlank, hadUndercover: undercovers > 0 };
 }
 
 export function participantIds(
@@ -84,9 +116,7 @@ export function participantIds(
     .map((player) => player.id);
 }
 
-export function normalizeCustomWords(
-  value: unknown,
-): RevealedWords | null {
+export function normalizeCustomWords(value: unknown): RevealedWords | null {
   if (!value || typeof value !== 'object') return null;
   const payload = value as { civilianWord?: unknown; undercoverWord?: unknown };
   if (typeof payload.civilianWord !== 'string' || typeof payload.undercoverWord !== 'string') return null;
@@ -102,20 +132,26 @@ export function privateCardPayload(card: Card, round: number): { round: number; 
 }
 
 export function resolveElimination(
-  cards: Record<string, Card>,
+  deal: DealResult,
   eliminatedPlayerIds: string[],
-): { finished: boolean; revealedWords: RevealedWords | null } {
+): EliminationResult {
   const eliminated = new Set(eliminatedPlayerIds);
-  const finished = Object.entries(cards).every(
-    ([playerId, card]) => card.role !== 'undercover' || eliminated.has(playerId),
-  );
-  if (!finished) return { finished: false, revealedWords: null };
+  const alive = Object.entries(deal.cards)
+    .filter(([playerId]) => !eliminated.has(playerId))
+    .map(([, card]) => card);
+  const aliveUndercover = alive.filter(({ role }) => role === 'undercover').length;
+  const aliveCivilian = alive.filter(({ role }) => role === 'civilian').length;
+  const aliveBlank = alive.some(({ role }) => role === 'blank');
 
-  const civilianCard = Object.values(cards).find((card) => card.role === 'civilian');
-  const undercoverCard = Object.values(cards).find((card) => card.role === 'undercover');
-  if (!civilianCard || !undercoverCard) return { finished: false, revealedWords: null };
+  let winner: Winner | null = null;
+  if (aliveUndercover === 0) winner = aliveBlank ? 'blank' : 'civilian';
+  else if (aliveCivilian <= aliveUndercover) winner = 'undercover';
+
   return {
-    finished: true,
-    revealedWords: { civilian: civilianCard.word, undercover: undercoverCard.word },
+    finished: winner !== null,
+    winner,
+    revealedWords: winner ? deal.words : null,
+    hadBlank: deal.hadBlank,
+    hadUndercover: deal.hadUndercover,
   };
 }
