@@ -71,7 +71,7 @@ function App() {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [card, setCard] = useState<PrivateCard | null>(null);
   const [revealed, setRevealed] = useState(false);
-  const [hostModalOpen, setHostModalOpen] = useState(false);
+  const [dealTableOpen, setDealTableOpen] = useState(false);
   const [eliminateModalOpen, setEliminateModalOpen] = useState(false);
   const [sharePlayerCount, setSharePlayerCount] = useState(6);
   const [shareCategories, setShareCategories] = useState<Category[]>(['entertainment', 'daily']);
@@ -93,13 +93,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!hostModalOpen && !eliminateModalOpen && openShareCard === null && manageShareCard === null) return;
+    if (!dealTableOpen && !eliminateModalOpen && openShareCard === null && manageShareCard === null) return;
     const close = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setHostModalOpen(false); setEliminateModalOpen(false); setOpenShareCard(null); setManageShareCard(null);
+      setDealTableOpen(false); setEliminateModalOpen(false); setOpenShareCard(null); setManageShareCard(null);
     };
     window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close);
-  }, [hostModalOpen, eliminateModalOpen, openShareCard, manageShareCard]);
+  }, [dealTableOpen, eliminateModalOpen, openShareCard, manageShareCard]);
 
   const isHost = Boolean(playerId && state?.hostId === playerId);
   const hasCurrentCard = Boolean(card && state && card.round === state.round);
@@ -117,7 +117,7 @@ function App() {
   }
   function dealRound(payload: DealPayload) {
     void parti.action('round:deal', payload);
-    setHostModalOpen(false);
+    setDealTableOpen(false);
   }
   function dealShareCards(_payload: DealPayload) {
     const candidates = WORD_PAIRS.filter((pair) => shareCategories.includes(pair.category));
@@ -130,6 +130,7 @@ function App() {
     setOpenShareCard(null);
     setManageShareCard(null);
     setShareResult(null);
+    setDealTableOpen(false);
   }
   function rememberShareCard() {
     if (openShareCard === null) return;
@@ -156,6 +157,13 @@ function App() {
 
   const openShare = shareCards.find((item) => item.number === openShareCard);
   const managedShare = shareCards.find((item) => item.number === manageShareCard);
+  const dealTableSettings: DealSettings = appMode === 'share'
+    ? { mode: 'classic', categories: shareCategories, playerCount: sharePlayerCount, hasDealt: shareCards.length > 0 }
+    : { mode: state?.selectedMode ?? 'classic', categories: state?.selectedCategories ?? ['entertainment', 'daily'], playerCount: participantCount, hasDealt: Boolean(state?.round) };
+  const dealTableModes: DealMode[] = appMode === 'share' ? ['classic'] : ['classic', 'blank', 'custom'];
+  const dealTablePlayerRange = appMode === 'share' ? { min: 3, max: 12 } : undefined;
+  const changeDealSettings = appMode === 'share' ? changeShareDealSettings : changeRoomDealSettings;
+  const submitDeal = appMode === 'share' ? dealShareCards : dealRound;
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand-mark">卧</div>
@@ -170,7 +178,7 @@ function App() {
     {appMode === 'share' ? <section className="share-layout">
       <div className="share-toolbar panel">
         <div className="share-intro"><p className="eyebrow">PASS THE PHONE</p><h2>一台手机，也能秘密发牌</h2><p>依次点开自己的序号，记住词语后把手机交给下一位。</p></div>
-        <DealTable settings={{ mode: 'classic', categories: shareCategories, playerCount: sharePlayerCount, hasDealt: shareCards.length > 0 }} modes={['classic']} playerCountRange={{ min: 3, max: 12 }} onChange={changeShareDealSettings} onDeal={dealShareCards} />
+        <button className="host-button" onClick={() => setDealTableOpen(true)}>发牌台 <span>›</span></button>
       </div>
       <div className="share-deck panel">
         <div className="section-heading"><div><p className="eyebrow">SECRET DECK</p><h2>{shareResult ? '本轮结算' : shareCards.length ? '请选择你的序号' : '等待发牌'}</h2></div>{shareCards.length > 0 && !shareResult && <span>{shareCards.filter((item) => item.seen).length}/{shareCards.length} 已查看</span>}</div>
@@ -186,16 +194,16 @@ function App() {
         <div className="section-heading"><div><p className="eyebrow">AT THE TABLE</p><h2>在场玩家</h2></div><b>{state?.players.length ?? 0}/12</b></div>
         <ul className="roster">{state?.players.map((player, index) => <li key={player.id}><span className={`avatar avatar-${index % 5}`}>{player.name.slice(0, 1)}</span><span className="player-name">{player.name}{player.id === playerId && <small>你</small>}</span>{state.eliminatedPlayerIds.includes(player.id) ? <em>已出局</em> : player.role === 'host' ? <em>房主</em> : state.dealtPlayerIds.includes(player.id) ? <i>●</i> : null}</li>)}</ul>
         <div className="table-actions">
-          {isHost && <button className="host-button" onClick={() => setHostModalOpen(true)}>发牌台 <span>›</span></button>}
+          {isHost && <button className="host-button" onClick={() => setDealTableOpen(true)}>发牌台 <span>›</span></button>}
           {hasCurrentCard && <button className="eliminate-button" disabled={!canEliminateSelf} onClick={() => setEliminateModalOpen(true)}>{isEliminated ? '已出局' : '我被投出局了'}</button>}
         </div>
         {state?.phase === 'finished' && state.revealedWords && <div className="round-result"><small>本轮揭晓</small><strong>{state.revealedWords.civilian} <i>VS</i> {state.revealedWords.undercover || '空白牌'}</strong></div>}
       </aside>
     </section>}
 
-    {hostModalOpen && <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setHostModalOpen(false)}><section className="modal host-modal" role="dialog" aria-modal="true" aria-labelledby="host-title">
-      <div className="modal-head"><div><p className="eyebrow">DEAL TABLE</p><h2 id="host-title">发牌台</h2></div><button className="close-button" onClick={() => setHostModalOpen(false)}>×</button></div>
-      <DealTable settings={{ mode: state?.selectedMode ?? 'classic', categories: state?.selectedCategories ?? ['entertainment', 'daily'], playerCount: participantCount, hasDealt: Boolean(state?.round) }} modes={['classic', 'blank', 'custom']} notice={state?.notice} onChange={changeRoomDealSettings} onDeal={dealRound} />
+    {dealTableOpen && <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setDealTableOpen(false)}><section className="modal host-modal" role="dialog" aria-modal="true" aria-labelledby="deal-table-title">
+      <div className="modal-head"><div><p className="eyebrow">DEAL TABLE</p><h2 id="deal-table-title">发牌台</h2></div><button className="close-button" onClick={() => setDealTableOpen(false)}>×</button></div>
+      <DealTable settings={dealTableSettings} modes={dealTableModes} playerCountRange={dealTablePlayerRange} notice={appMode === 'online' ? state?.notice : null} onChange={changeDealSettings} onDeal={submitDeal} />
     </section></div>}
 
     {eliminateModalOpen && <div className="modal-backdrop"><section className="modal confirm-modal" role="dialog" aria-modal="true"><div className="modal-icon">?</div><h2>确认已经被投出局？</h2><p>确认后本轮不能撤销，你的阵营仍然保密。</p><div className="modal-actions"><button onClick={() => setEliminateModalOpen(false)}>取消</button><button className="danger" onClick={() => { setEliminateModalOpen(false); void parti.action('round:eliminateSelf'); }}>确认出局</button></div></section></div>}
