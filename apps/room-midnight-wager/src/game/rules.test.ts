@@ -69,6 +69,10 @@ describe('midnight wager rules', () => {
       event: 'private:hand',
       payload: { hand: transition.session.secret.hands[actorId] },
     });
+    const committed = transition.broadcasts.find((effect) => effect.event === 'game:action' && effect.payload.kind === 'cardsCommitted');
+    expect(committed).toMatchObject({ event: 'game:action', payload: { kind: 'cardsCommitted', actorId, count: 2 } });
+    expect(JSON.stringify(committed)).not.toContain(cardIds[0]);
+    expect(committed?.event === 'game:action' ? committed.payload.cards : undefined).toBeUndefined();
   });
 
   it('rejects forged cards and out-of-turn play without changing the session', () => {

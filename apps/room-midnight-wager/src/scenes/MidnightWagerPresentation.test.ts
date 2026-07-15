@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest';import{wagerPresentationMask}from'./MidnightWagerPresentation';
+describe('wager presentation ownership',()=>{it('subtracts committed cards while the flight owns them',()=>expect(wagerPresentationMask({id:'c',kind:'cardsCommitted',duration:500,progress:.4,count:2}).hiddenPileCount).toBe(2));it('defers lethal styling until the shot lands',()=>expect(wagerPresentationMask({id:'s',kind:'shots',duration:1000,progress:.5,shots:[{shooterId:'a',targetId:'b',lethal:true}]}).deferredLethalTargets.has('b')).toBe(true));});

@@ -4,12 +4,19 @@ import type {
   GameSession,
   MatchConfig,
   PlayerState,
+  PublicEffect,
   RandomSource,
   RouletteSetup,
   Ruleset,
   TableRank,
   Transition,
+  RoomEventPayloads,
 } from './types';
+
+function action(session: GameSession, kind: RoomEventPayloads['game:action']['kind'], payload: Omit<RoomEventPayloads['game:action'], 'actionId' | 'occurredAt' | 'kind'> = {}): PublicEffect {
+  const sequence = ++session.state.actionSequence;
+  return { event: 'game:action', payload: { actionId: `wager:${session.state.round}:${sequence}`, occurredAt: sequence, kind, ...payload } };
+}
 
 export type * from './types';
 
@@ -116,6 +123,7 @@ export function createMatch(config: MatchConfig, random: RandomSource): GameSess
   const session: GameSession = {
     state: {
       version: 1,
+      actionSequence: 0,
       phase: 'lobby',
       ruleset: config.ruleset,
       hostId: config.hostId,
@@ -243,7 +251,7 @@ function playCards(session: GameSession, command: Extract<Command, { type: 'play
           payload: { hand: next.secret.hands[command.actorId] },
         },
       ],
-      broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }],
+      broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }, action(next, 'cardsCommitted', { actorId: command.actorId, count: selected.length, label: '混沌牌' }), action(next, 'reveal', { actorId: command.actorId, cards: selected, label: '混沌牌揭示' }), action(next, 'specialResolved', { actorId: command.actorId, cards: selected, label: '混沌' })],
     };
   }
 
@@ -261,6 +269,7 @@ function playCards(session: GameSession, command: Extract<Command, { type: 'play
         event: 'game:notice',
         payload: { message: next.state.message },
       },
+      action(next, 'cardsCommitted', { actorId: command.actorId, count: selected.length, label: `暗出 ${selected.length} 张` }),
     ],
   };
 }
@@ -323,7 +332,7 @@ function callLiar(session: GameSession, command: Extract<Command, { type: 'callL
     });
     return {
       ...transition(next),
-      broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }],
+      broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }, action(next, 'reveal', { actorId: command.actorId, targetIds: [revealed.playerId], cards: revealed.cards, label: '恶魔牌揭示' }), action(next, 'specialResolved', { actorId: revealed.playerId, cards: revealed.cards, label: '恶魔' })],
     };
   }
 
@@ -347,7 +356,7 @@ function callLiar(session: GameSession, command: Extract<Command, { type: 'callL
       });
       return {
         ...transition(next),
-        broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }],
+        broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }, action(next, 'reveal', { actorId: command.actorId, targetIds: [revealed.playerId], cards: revealed.cards, label: '主宰牌揭示' }), action(next, 'specialResolved', { actorId: revealed.playerId, cards: revealed.cards, label: '主宰' })],
       };
     }
 
@@ -371,7 +380,7 @@ function callLiar(session: GameSession, command: Extract<Command, { type: 'callL
     });
     return {
       ...transition(next),
-      broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }],
+      broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }, action(next, 'reveal', { actorId: command.actorId, targetIds: [revealed.playerId], cards: revealed.cards, label: hasChaosLie ? '谎言被识破' : '质疑失败' })],
     };
   }
   const hasLie = revealed.cards.some((card) => !isInnocent(next, card));
@@ -394,7 +403,7 @@ function callLiar(session: GameSession, command: Extract<Command, { type: 'callL
   });
   return {
     ...transition(next),
-    broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }],
+    broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }, action(next, 'reveal', { actorId: command.actorId, targetIds: [revealed.playerId], cards: revealed.cards, label: hasLie ? '谎言被识破' : '质疑失败' })],
   };
 }
 
@@ -430,7 +439,7 @@ function callDevilsDeal(
   });
   return {
     ...transition(next),
-    broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }],
+    broadcasts: [{ event: 'game:reveal', payload: next.state.reveal }, action(next, 'reveal', { actorId: command.actorId, cards: revealed, label: allLies ? '四张谎言' : '恶魔交易失败' }), action(next, 'specialResolved', { actorId: command.actorId, cards: revealed, label: '恶魔交易' })],
   };
 }
 
@@ -475,7 +484,7 @@ function finishShots(session: GameSession, random: RandomSource): Transition {
     if (alive[0]) alive[0].wins += 1;
     return {
       ...transition(session),
-      broadcasts: [{ event: 'game:shots', payload: { shots: results, finished: true } }],
+      broadcasts: [{ event: 'game:shots', payload: { shots: results, finished: true } }, action(session, 'shots', { actorId: results[0]?.shooterId, targetIds: results.map((shot) => shot.targetId), shots: results, label: results.some((shot) => shot.lethal) ? '枪响' : '空枪' }), action(session, 'roundSettled', { actorId: alive[0]?.id, label: alive[0] ? `${alive[0].name} 活到了最后` : '无人幸存' })],
     };
   }
 
@@ -484,7 +493,7 @@ function finishShots(session: GameSession, random: RandomSource): Transition {
   session.state.message = results.some((shot) => shot.lethal) ? '枪声撕开了酒馆' : '只有一声空响';
   return {
     ...transition(session),
-    broadcasts: [{ event: 'game:shots', payload: { shots: results, finished: false } }],
+    broadcasts: [{ event: 'game:shots', payload: { shots: results, finished: false } }, action(session, 'shots', { actorId: results[0]?.shooterId, targetIds: results.map((shot) => shot.targetId), shots: results, label: results.some((shot) => shot.lethal) ? '枪响' : '空枪' })],
     schedules: [
       {
         name: 'resolution',

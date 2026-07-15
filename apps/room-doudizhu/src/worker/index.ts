@@ -5,6 +5,12 @@ import type { Card, GameState, PlayRecord, PlayerState } from './types';
 
 let hands: Record<string, Card[]> = {};
 let landlordCardsHidden: Card[] = [];
+let actionSequence = 0;
+
+function broadcastAction(ctx: RoomContext<GameState>, kind: string, payload: Record<string, unknown> = {}) {
+  const occurredAt = Date.now();
+  ctx.broadcast('game:action', { actionId: `doudizhu:${occurredAt}:${++actionSequence}`, occurredAt, kind, ...payload });
+}
 
 export default defineRoom<GameState>({
   meta: { name: '斗地主', minPlayers: 3, maxPlayers: 3 },
@@ -104,6 +110,7 @@ export default defineRoom<GameState>({
       }
 
       ctx.broadcast('game:notice', { message: `${ctx.state.players[player.id].name}${score === 0 ? '不叫' : `叫 ${score} 分`}` });
+      broadcastAction(ctx, 'bidPlaced', { actorId: player.id, value: score, label: score === 0 ? '不叫' : `叫 ${score} 分` });
 
       if (score === 3 || bid.turns >= 3) {
         if (!bid.highestPlayerId) {
@@ -140,7 +147,7 @@ export default defineRoom<GameState>({
       hands[player.id] = sortCards((hands[player.id] ?? []).filter((card) => !ids.includes(card.id)));
       ctx.state.handCounts[player.id] = hands[player.id].length;
       ctx.state.round.playCounts[player.id] = (ctx.state.round.playCounts[player.id] ?? 0) + 1;
-      if (isMultiplierPlay(analysis)) ctx.state.round.multiplier *= 2;
+      if (isMultiplierPlay(analysis)) { ctx.state.round.multiplier *= 2; broadcastAction(ctx, 'multiplierChanged', { actorId: player.id, value: ctx.state.round.multiplier, label: analysis.type === 'rocket' ? '火箭' : '炸弹' }); }
 
       const record: PlayRecord = {
         playerId: player.id,
@@ -151,6 +158,8 @@ export default defineRoom<GameState>({
       ctx.state.playedCards.push(record);
       ctx.state.round.passCount = 0;
       sendHand(ctx, player.id);
+      broadcastAction(ctx, 'cardsPlayed', { actorId: player.id, cards: record.cards, label: record.analysis.label, playType: record.analysis.type });
+      if (hands[player.id].length <= 2 && hands[player.id].length > 0) broadcastAction(ctx, 'lowCards', { actorId: player.id, value: hands[player.id].length, label: `只剩 ${hands[player.id].length} 张` });
 
       if (hands[player.id].length === 0) {
         settleRound(ctx, player.id);
@@ -165,11 +174,13 @@ export default defineRoom<GameState>({
       if (!ctx.state.lastPlay || ctx.state.lastPlay.playerId === player.id) return;
 
       ctx.state.playedCards.push({ playerId: player.id, pass: true });
+      broadcastAction(ctx, 'playerPassed', { actorId: player.id, label: '不出' });
       ctx.state.round.passCount += 1;
       if (ctx.state.round.passCount >= 2) {
         ctx.state.currentPlayerId = ctx.state.lastPlay.playerId;
         ctx.state.lastPlay = null;
         ctx.state.round.passCount = 0;
+        broadcastAction(ctx, 'trickCleared', { actorId: ctx.state.currentPlayerId });
         return;
       }
       ctx.state.currentPlayerId = nextPlayerId(ctx.state, player.id);
@@ -248,6 +259,7 @@ function startRound(ctx: RoomContext<GameState>) {
   };
   state.message = '开始叫地主';
   ctx.broadcast('game:notice', { message: '新一局开始，叫地主' });
+  broadcastAction(ctx, 'dealStarted', { actorId: starterId });
 }
 
 function beginPlaying(ctx: RoomContext<GameState>, landlordId: string, baseScore: number) {
@@ -266,6 +278,7 @@ function beginPlaying(ctx: RoomContext<GameState>, landlordId: string, baseScore
   state.handCounts[landlordId] = hands[landlordId].length;
   sendHand(ctx, landlordId);
   ctx.broadcast('game:notice', { message: `${state.players[landlordId].name} 成为地主` });
+  broadcastAction(ctx, 'landlordAssigned', { actorId: landlordId, cards: state.landlordCardsVisible, value: state.round.multiplier, label: '地主' });
 }
 
 function settleRound(ctx: RoomContext<GameState>, winnerId: string) {
@@ -305,6 +318,8 @@ function settleRound(ctx: RoomContext<GameState>, winnerId: string) {
     multiplier: state.round.multiplier,
   };
   state.message = '本局结束，请准备下一局';
+  if (spring) broadcastAction(ctx, 'multiplierChanged', { actorId: winnerId, value: state.round.multiplier, label: landlordWon ? '春天' : '反春' });
+  broadcastAction(ctx, 'roundSettled', { actorId: winnerId, value: state.round.multiplier, label: landlordWon ? '地主胜利' : '农民胜利' });
   ctx.broadcast('game:notice', { message: landlordWon ? '地主胜利' : '农民胜利' });
 }
 

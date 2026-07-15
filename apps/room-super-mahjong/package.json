@@ -7,7 +7,7 @@
     "dev:room": "vite build --watch --mode room-dev",
     "build:room": "vite build --mode room-build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run src/worker/rules.test.ts"
+    "test": "vitest run src/worker/rules.test.ts src/game/presentation.test.ts src/scenes/*.test.ts"
   },
   "dependencies": {
     "@parti/worker-sdk": "workspace:*",

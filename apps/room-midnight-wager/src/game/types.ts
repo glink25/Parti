@@ -63,6 +63,7 @@ export type ResolutionState = {
 
 export type GameState = {
   version: 1;
+  actionSequence: number;
   phase: GamePhase;
   ruleset: Ruleset;
   hostId: string;
@@ -121,6 +122,17 @@ export type RoomEventPayloads = {
   'game:round': { round: number; tableRank: TableRank | null };
   'game:start': { ruleset: Ruleset };
   'game:aborted': Record<string, never>;
+  'game:action': {
+    actionId: string;
+    occurredAt: number;
+    kind: 'cardsCommitted' | 'reveal' | 'shots' | 'specialResolved' | 'roundSettled';
+    actorId?: string;
+    targetIds?: string[];
+    count?: number;
+    cards?: Card[];
+    shots?: ShotResult[];
+    label?: string;
+  };
 };
 
 export type RoomActionName = keyof RoomActionPayloads;

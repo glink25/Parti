@@ -9,6 +9,8 @@ let hands: Record<number, Tile[]> = {};
 let wall: Tile[] = [];
 let reaction: SecretReaction | null = null;
 let lastDrawWasGang = false;
+let actionSequence = 0;
+let roundStartingScores = [0,0,0,0];
 
 const DEFAULT_RULES: RulesConfig = { winSource: 'both', allowChi: true, allowMultiWin: true, allowRobGang: true, allowLastTile: true, rounds: 4, baseScore: 1, maxFan: 8 };
 
@@ -107,6 +109,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) { 
 function fillBots(state: GameState) { for (let seat = 0; seat < 4; seat += 1) if (!state.seats[seat]) state.seats[seat] = makeSeat(`bot:${seat}`, `雀侠 ${seat + 1}`, seat, true); }
 
 function startRound(ctx: RoomContext<GameState>) {
+  roundStartingScores=ctx.state.seats.map(seat=>seat?.score??0);
   clearSecrets(); ctx.state.phase = 'dealing'; ctx.state.result = null; ctx.state.reaction = null; ctx.state.lastDiscard = null;
   wall = shuffle(createDeck(), () => ctx.random());
   for (const seat of occupied(ctx.state)) { hands[seat.seat] = sortTiles(wall.splice(0, 13)); seat.handCount = 13; seat.melds = []; seat.discards = []; seat.dealer = seat.seat === ctx.state.dealerSeat; seat.ready = false; }
@@ -209,13 +212,13 @@ function declareOwnGang(ctx: RoomContext<GameState>, seat: number, kindRaw: stri
 }
 function completeAddedGang(ctx: RoomContext<GameState>, seat: number, kind: TileKind) { const tile = takeKind(hands[seat]!, kind, 1)?.[0]; const meld = ctx.state.seats[seat]!.melds.find((item) => item.kind === 'peng' && item.tiles[0]?.kind === kind); if (!tile || !meld) return; meld.kind = 'gang'; meld.tiles.push(tile); applyGangScore(ctx, seat, 'added'); drawReplacement(ctx, seat, 'addedGang', kind); }
 
-function drawReplacement(ctx: RoomContext<GameState>, seat: number, kind: 'concealedGang'|'discardGang'|'addedGang', tile: TileKind, sourceSeat?: number) { lastDrawWasGang = true; drawForSeat(ctx, seat); broadcastActionFx(ctx, kind, seat, [tile], sourceSeat); }
+function drawReplacement(ctx: RoomContext<GameState>, seat: number, kind: 'concealedGang'|'discardGang'|'addedGang', tile: TileKind, sourceSeat?: number) { lastDrawWasGang = true; broadcastActionFx(ctx, kind, seat, [tile], sourceSeat); drawForSeat(ctx, seat); }
 function advanceAndDraw(ctx: RoomContext<GameState>, fromSeat: number) { drawForSeat(ctx, (fromSeat + 1) % 4); }
 function drawForSeat(ctx: RoomContext<GameState>, seat: number) {
   if (wall.length === 0) { settleDraw(ctx); return; }
   const tile = wall.shift()!; hands[seat]!.push(tile); hands[seat] = sortTiles(hands[seat]!); ctx.state.seats[seat]!.handCount = hands[seat]!.length;
   ctx.state.wallCount = wall.length; ctx.state.currentSeat = seat; ctx.state.phase = 'playing'; ctx.state.reaction = null; ctx.state.message = `${ctx.state.seats[seat]!.name} 摸牌`;
-  sendAllPrivate(ctx); scheduleBots(ctx);
+  sendAllPrivate(ctx); broadcastActionFx(ctx, 'draw', seat, []); scheduleBots(ctx);
 }
 
 function settleWins(ctx: RoomContext<GameState>, winnerSeats: number[], sourceSeat: number | null, robGang: boolean, claimedTile?: Tile) {
@@ -236,7 +239,7 @@ function settleWins(ctx: RoomContext<GameState>, winnerSeats: number[], sourceSe
   finishRound(ctx, { draw: false, winners, deltas, message: winners.map((winner) => `${ctx.state.seats[winner.seat]!.name} 胡牌`).join('、') });
 }
 function settleDraw(ctx: RoomContext<GameState>) { finishRound(ctx, { draw: true, winners: [], deltas: [0,0,0,0], message: '牌墙耗尽，本局流局' }); }
-function finishRound(ctx: RoomContext<GameState>, result: RoundResult) { result.deltas.forEach((delta, seat) => { if (ctx.state.seats[seat]) ctx.state.seats[seat]!.score += delta; }); ctx.state.result = result; ctx.state.currentSeat = null; ctx.state.reaction = null; ctx.state.phase = ctx.state.roundIndex + 1 >= ctx.state.rules.rounds ? 'matchEnd' : 'settlement'; ctx.state.message = result.message; ctx.broadcast('mahjong:settlement', result); clearRoundTimer(ctx); sendAllPrivate(ctx); }
+function finishRound(ctx: RoomContext<GameState>, result: RoundResult) { result.deltas.forEach((delta, seat) => { if (ctx.state.seats[seat]) ctx.state.seats[seat]!.score += delta; }); result.deltas=ctx.state.seats.map((seat,index)=>seat?seat.score-(roundStartingScores[index]??0):0);ctx.state.result = result; ctx.state.currentSeat = null; ctx.state.reaction = null; ctx.state.phase = ctx.state.roundIndex + 1 >= ctx.state.rules.rounds ? 'matchEnd' : 'settlement'; ctx.state.message = result.message; if (result.draw) broadcastActionFx(ctx, 'drawGame', ctx.state.dealerSeat, [], undefined, result.message); else for (const winner of result.winners) broadcastActionFx(ctx, 'win', winner.seat, [], winner.sourceSeat ?? undefined, `${ctx.state.seats[winner.seat]?.name ?? '玩家'} ${winner.sourceSeat === null ? '自摸' : '胡牌'} · ${winner.patterns.join(' · ')}`); ctx.broadcast('mahjong:settlement', result); clearRoundTimer(ctx); sendAllPrivate(ctx); }
 
 function applyGangScore(ctx: RoomContext<GameState>, winnerSeat: number, kind: 'concealed'|'added'|'discard', sourceSeat?: number) { const score = scoreGang(kind, ctx.state.rules.baseScore); if (kind === 'discard' && sourceSeat !== undefined) { ctx.state.seats[sourceSeat]!.score -= score.payments[0]!; ctx.state.seats[winnerSeat]!.score += score.winner; } else { for (let seat = 0; seat < 4; seat += 1) if (seat !== winnerSeat) ctx.state.seats[seat]!.score -= score.payments[0]!; ctx.state.seats[winnerSeat]!.score += score.winner; } }
 function takeKind(source: Tile[], kind: TileKind, count: number) { const found = source.filter((tile) => tile.kind === kind).slice(0, count); if (found.length !== count) return null; const ids = new Set(found.map((tile) => tile.id)); source.splice(0, source.length, ...source.filter((tile) => !ids.has(tile.id))); return found; }
@@ -248,7 +251,7 @@ function privateFor(state: GameState, seat: number): PrivateState { const gangs 
 function sendPrivate(ctx: RoomContext<GameState>, seat: number) { const player = ctx.state.seats[seat]; if (player && !player.bot && player.connected) ctx.send(player.id, 'mahjong:private-state', privateFor(ctx.state, seat)); }
 function sendAllPrivate(ctx: RoomContext<GameState>) { for (const seat of occupied(ctx.state)) sendPrivate(ctx, seat.seat); }
 function sendNotice(ctx: RoomContext<GameState>, seat: number, message: string) { const player = ctx.state.seats[seat]; if (player && !player.bot) ctx.send(player.id, 'mahjong:notice', { message }); }
-function broadcastActionFx(ctx: RoomContext<GameState>, kind: string, actorSeat: number, tiles: TileKind[], sourceSeat?: number) { ctx.broadcast('mahjong:action-fx', { kind, actorSeat, actorName: ctx.state.seats[actorSeat]?.name ?? '玩家', sourceSeat, tiles }); }
+function broadcastActionFx(ctx: RoomContext<GameState>, kind: string, actorSeat: number, tiles: TileKind[], sourceSeat?: number, label?: string) { const occurredAt = Date.now(); ctx.broadcast('mahjong:action-fx', { actionId: `mahjong:${occurredAt}:${++actionSequence}`, occurredAt, kind, actorSeat, actorName: ctx.state.seats[actorSeat]?.name ?? '玩家', sourceSeat, tiles, label }); }
 
 function scheduleBots(ctx: RoomContext<GameState>) { ctx.clearTimer('mahjong:bot'); ctx.setTimer('mahjong:bot', 800 + Math.floor(ctx.random() * 700), () => runBots(ctx)); }
 function clearRoundTimer(ctx: RoomContext<GameState>) { ctx.clearTimer('mahjong:bot'); }

@@ -6,7 +6,8 @@
   "scripts": {
     "dev:room": "vite build --watch --mode room-dev",
     "build:room": "vite build --mode room-build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src/worker/rules.test.ts src/scenes/*.test.ts"
   },
   "dependencies": {
     "@parti/worker-sdk": "workspace:*",
@@ -15,6 +16,7 @@
   "devDependencies": {
     "esbuild": "^0.25.0",
     "typescript": "^5.6.3",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
   }
 }

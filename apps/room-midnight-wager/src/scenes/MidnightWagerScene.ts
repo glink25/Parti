@@ -1,5 +1,7 @@
 import { mainCanvas, mainContext, mousePosScreen, mouseWasPressed, Sound } from 'littlejsengine';
 import type { Card, GameState, PlayerState, Ruleset } from '../game/types';
+import { easeInOutCubic, MidnightWagerAnimationQueue, type WagerAnimation } from './MidnightWagerAnimationQueue';
+import { wagerPresentationMask } from './MidnightWagerPresentation';
 
 const INK = '#f1e8da';
 const MUTED = '#a5988d';
@@ -79,6 +81,8 @@ export class MidnightWagerScene {
   private impactUntil = 0;
   private lastPhase = '';
   private lastRound = -1;
+  private animations = new MidnightWagerAnimationQueue();
+  private activeAnimation:(WagerAnimation&{progress:number})|null=null;
 
   private cardSound = new Sound([0.35, 0.04, 260, 0.01, 0.03, 0.08, 2, 1.8, -8]);
   private revealSound = new Sound([0.45, 0.03, 120, 0.02, 0.08, 0.18, 1, 0.7, -3]);
@@ -119,8 +123,10 @@ export class MidnightWagerScene {
           this.playSound(this.dryFireSound, 0.8);
         }
       }),
+      parti.onEvent('game:action', (payload) => this.receiveAction(payload)),
     );
     window.addEventListener('pagehide', this.destroy, { once: true });
+    document.addEventListener('visibilitychange', this.visibility);
     parti.ready();
     void parti.action('syncPrivate');
   }
@@ -131,7 +137,8 @@ export class MidnightWagerScene {
     const pointerY = mousePosScreen.y / this.pixelRatio;
     const hovered = [...this.hitRegions].reverse().find((hit) => this.contains(hit, pointerX, pointerY));
     mainCanvas.style.cursor = hovered ? 'pointer' : '';
-    if (hovered && mouseWasPressed(0)) hovered.onClick();
+    this.activeAnimation=this.animations.update(performance.now());
+    if (hovered && mouseWasPressed(0) && !this.animations.isInputBlocked()) hovered.onClick();
     if (this.flash && performance.now() >= this.flashUntil) this.flash = '';
   }
 
@@ -164,6 +171,7 @@ export class MidnightWagerScene {
       this.drawTable(width, height);
       this.drawHeader(width);
     }
+    this.drawAnimation(width, height);
     this.drawImpactFlash(width, height);
     if (this.rulesOpen) this.drawRulesOverlay(width, height);
     this.drawFlash(width, height);
@@ -172,7 +180,17 @@ export class MidnightWagerScene {
 
   private destroy = () => {
     for (const dispose of this.disposers.splice(0)) dispose();
+    document.removeEventListener('visibilitychange', this.visibility);
   };
+
+  private visibility = () => { if (document.hidden) this.animations.skipToLatest(); };
+
+  private receiveAction(payload: unknown) {
+    const event = payload as Partial<WagerAnimation> & { actionId?: string };
+    if (!event.actionId || !event.kind) return;
+    const major = event.kind === 'reveal' || event.kind === 'shots' || event.kind === 'specialResolved' || event.kind === 'roundSettled';
+    this.animations.enqueue({ ...event, id: event.actionId, kind: event.kind, duration: event.kind === 'shots' ? 1250 : major ? 1000 : 520, blocking: major || event.kind === 'cardsCommitted' } as WagerAnimation);
+  }
 
   private drawRoom(width: number, height: number) {
     const context = mainContext;
@@ -318,7 +336,7 @@ export class MidnightWagerScene {
 
     if (state.phase === 'roulette') this.drawRoulette(width, height);
     if (state.phase === 'resolution') this.drawResolution(width, height);
-    if (state.phase === 'finished') this.drawFinished(width, height);
+    if (state.phase === 'finished'&&!wagerPresentationMask(this.activeAnimation,this.animations.presentationAnimations()).hiddenFinished) this.drawFinished(width, height);
   }
 
   private drawPlayers(width: number, _height: number, tableY: number, tableWidth: number, tableHeight: number) {
@@ -353,9 +371,10 @@ export class MidnightWagerScene {
     const current = state.currentPlayerId === player.id;
     const targetable = this.canTarget(player.id);
     const selected = this.selectedTarget === player.id;
+    const visuallyAlive=player.alive||wagerPresentationMask(this.activeAnimation,this.animations.presentationAnimations()).deferredLethalTargets.has(player.id);
     mainContext.save();
-    mainContext.globalAlpha = player.alive ? 1 : 0.3;
-    if (!player.alive) {
+    mainContext.globalAlpha = visuallyAlive ? 1 : 0.3;
+    if (!visuallyAlive) {
       mainContext.translate(x, y + 12);
       mainContext.rotate(-0.92);
       mainContext.translate(-x, -y);
@@ -372,11 +391,11 @@ export class MidnightWagerScene {
     mainContext.fill();
     mainContext.stroke();
     mainContext.restore();
-    this.centerText(x, y + 35, player.name, 13, player.alive ? INK : '#776967', 700);
+    this.centerText(x, y + 35, player.name, 13, visuallyAlive ? INK : '#776967', 700);
     this.centerText(
       x,
       y + 53,
-      player.alive ? `${player.handCount} 张 · ${player.safePulls}/6${player.connected ? '' : ' · 断线'}` : '已出局',
+      visuallyAlive ? `${player.handCount} 张 · ${player.safePulls}/6${player.connected ? '' : ' · 断线'}` : '已出局',
       11,
       current ? GOLD : MUTED,
       500,
@@ -385,9 +404,10 @@ export class MidnightWagerScene {
 
   private drawCenter(width: number, tableY: number) {
     const state = this.state!;
+    const mask=wagerPresentationMask(this.activeAnimation,this.animations.presentationAnimations());
     this.centerText(width / 2, tableY - 72, state.tableRank ? `${state.tableRank} 桌` : '等待开桌', 28, '#f0c47f', 900);
     this.centerText(width / 2, tableY - 39, `第 ${state.round} 轮 · 桌面 ${state.pileCount} 张`, 12, MUTED, 500);
-    const count = Math.min(6, Math.max(1, state.pileCount));
+    const count = Math.min(6, Math.max(0, state.pileCount-mask.hiddenPileCount));
     for (let index = 0; index < count; index += 1) {
       this.drawCardBack(width / 2 - 32 + index * 3, tableY - 16 + index * 2, 64, 90);
     }
@@ -585,6 +605,7 @@ export class MidnightWagerScene {
   }
 
   private drawRevealedCards(centerX: number, y: number) {
+    if(wagerPresentationMask(this.activeAnimation,this.animations.presentationAnimations()).hiddenReveal)return;
     const cards = this.state?.reveal?.cards ?? [];
     if (!cards.length) return;
     const width = 42;
@@ -688,6 +709,39 @@ export class MidnightWagerScene {
     const boxWidth = Math.min(420, width - 32);
     this.panel(width / 2 - boxWidth / 2, Math.min(height * 0.2, 126), boxWidth, 44, '#130e10', '#8f3a40', 0.96);
     this.centerText(width / 2, Math.min(height * 0.2, 126) + 22, this.flash, 14, INK, 700);
+  }
+
+  private drawAnimation(width: number, height: number) {
+    const fx = this.activeAnimation;
+    if (!fx) return;
+    const context = mainContext, progress = fx.progress, eased = easeInOutCubic(progress), table = { x: width / 2, y: height * .48 };
+    const actor = fx.actorId ? this.state?.players[fx.actorId] : null;
+    const angle = actor ? actor.seat / Math.max(2, this.state?.seats.filter(Boolean).length ?? 2) * Math.PI * 2 + Math.PI / 2 : Math.PI / 2;
+    const origin = { x: width / 2 + Math.cos(angle) * width * .38, y: height * .5 + Math.sin(angle) * height * .32 };
+    context.save();
+    if (fx.kind === 'cardsCommitted') {
+      for (let index = 0; index < Math.max(1, fx.count ?? 1); index += 1) {
+        const stagger = Math.max(0, Math.min(1, progress * 1.4 - index * .12));
+        const x = origin.x + (table.x + index * 8 - origin.x) * easeInOutCubic(stagger), y = origin.y + (table.y + index * 5 - origin.y) * easeInOutCubic(stagger) - Math.sin(Math.PI * stagger) * 45;
+        context.save(); context.translate(x, y); context.rotate((1-stagger) * .35 + index * .04); this.panel(-25,-35,50,70,'#281417',GOLD,.98); this.centerText(0,0,'?',24,GOLD,800); context.restore();
+      }
+    } else if (fx.kind === 'reveal' || fx.kind === 'specialResolved') {
+      context.fillStyle = fx.label?.includes('谎言') || fx.label?.includes('恶魔') ? `rgba(126,18,29,${.18 * Math.sin(Math.PI*progress)})` : `rgba(199,154,84,${.1 * Math.sin(Math.PI*progress)})`;
+      context.fillRect(0,0,width,height);
+      (fx.cards ?? []).forEach((card, index) => {
+        const spread = (index - ((fx.cards?.length ?? 1)-1)/2) * 62, flip = Math.abs(Math.cos(Math.PI * Math.min(1, Math.max(0, progress * 1.5 - index * .08))));
+        context.save(); context.translate(table.x + spread, table.y - 58 - Math.sin(Math.PI*progress)*25); context.scale(Math.max(.05,flip),1); this.drawCard(-25,-36,card,50,72,false); context.restore();
+      });
+      if (fx.label) { context.globalAlpha = Math.sin(Math.PI*progress); context.shadowBlur=26; context.shadowColor=BLOOD_BRIGHT; this.centerText(width/2,height*.25,fx.label,32,fx.label.includes('失败')||fx.label.includes('谎言')?BLOOD_BRIGHT:GOLD,800); }
+    } else if (fx.kind === 'shots') {
+      const lethal = fx.shots?.some((shot)=>shot.lethal), spin = eased * Math.PI * 8;
+      context.translate(width/2,height*.37); context.rotate(spin); context.strokeStyle=lethal?BLOOD_BRIGHT:GOLD; context.lineWidth=5; context.beginPath(); context.arc(0,0,42,0,Math.PI*2); context.stroke();
+      for(let i=0;i<6;i++){context.beginPath();context.arc(Math.cos(i*Math.PI/3)*23,Math.sin(i*Math.PI/3)*23,7,0,Math.PI*2);context.stroke()}
+      context.rotate(-spin); context.globalAlpha=Math.sin(Math.PI*progress); this.centerText(0,72,lethal?'枪 响':'咔 哒',30,lethal?BLOOD_BRIGHT:GOLD,800);
+    } else if (fx.kind === 'roundSettled') {
+      context.globalAlpha=Math.sin(Math.PI*Math.min(1,progress)); const glow=context.createRadialGradient(width/2,height*.4,20,width/2,height*.4,height*.55); glow.addColorStop(0,'rgba(199,154,84,.3)'); glow.addColorStop(1,'transparent'); context.fillStyle=glow; context.fillRect(0,0,width,height); this.centerText(width/2,height*.32,fx.label??'赌局结束',36,GOLD,800);
+    }
+    context.restore();
   }
 
   private drawImpactFlash(width: number, height: number) {
