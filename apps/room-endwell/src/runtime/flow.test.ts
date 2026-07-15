@@ -3,15 +3,35 @@ import type { GameState, PartiApi } from '../game/contracts';
 import { generateStage } from '../game/roguelike';
 import { generateEquipment } from '../game/rules/equipment';
 import { initialState, player, testMonster } from '../game/rules/state';
-import { createEndwellFlow } from './flow';
+import { createEndwellFlow, createEndwellFlowWhenReady } from './flow';
 
-function apiHarness() {
+function apiHarness(initialPlayerId: string | null = 'p1') {
   const stateHandlers = new Set<(state: unknown) => void>(), eventHandlers = new Map<string, Set<(payload: unknown) => void>>();
-  const api: PartiApi = { playerId: 'p1', getState: () => null, onState(handler) { stateHandlers.add(handler); return () => stateHandlers.delete(handler); }, onEvent(event, handler) { const handlers = eventHandlers.get(event) ?? new Set(); handlers.add(handler); eventHandlers.set(event, handlers); return () => handlers.delete(handler); }, async action() { return { ok: true }; }, ready() {}, leave() {} };
-  return { api, state: (state: GameState) => { for (const handler of stateHandlers) handler(state); } };
+  let currentState: GameState | null = null;
+  const api: PartiApi = { playerId: initialPlayerId, getState: () => currentState, onState(handler) { stateHandlers.add(handler); if (currentState) handler(currentState); return () => stateHandlers.delete(handler); }, onEvent(event, handler) { const handlers = eventHandlers.get(event) ?? new Set(); handlers.add(handler); eventHandlers.set(event, handlers); return () => handlers.delete(handler); }, async action() { return { ok: true }; }, ready() {}, leave() {} };
+  return { api, identify: (playerId: string) => { api.playerId = playerId; }, state: (state: GameState) => { currentState = state; for (const handler of stateHandlers) handler(state); } };
 }
 
 describe('local-first flow', () => {
+  it('waits for the assigned client identity before creating the runtime', () => {
+    const harness = apiHarness(null), authority = initialState();
+    authority.phase = 'running';
+    authority.run.stage = generateStage(17, 0);
+    authority.players.p1 = player('p1', 'one', 0);
+    authority.players.p1.position = { ...authority.run.stage.world.spawn };
+    let flow: ReturnType<typeof createEndwellFlow> | null = null, visible: GameState | null = null;
+    const stopWaiting = createEndwellFlowWhenReady(harness.api, { state: (state) => { visible = state; }, event() {} }, (created) => { flow = created; });
+
+    expect(flow).toBeNull();
+    harness.identify('p1');
+    harness.state(structuredClone(authority));
+
+    expect(flow!.game.playerId).toBe('p1');
+    expect(visible!.players.p1).toMatchObject({ alive: true, health: { current: 100, max: 100 } });
+    stopWaiting();
+    flow!.game.dispose();
+  });
+
   it('keeps prediction internal and preserves activation and hits across stale snapshots', () => {
     const harness = apiHarness(), authority = initialState(), stage = generateStage(17, 0), caster = authority.players.p1 = player('p1', 'one', 0), monster = testMonster(0); authority.phase = 'running'; authority.run.stage = stage; caster.position = { ...stage.world.spawn }; monster.position = { x: caster.position.x + 100, y: caster.position.y }; authority.entities[monster.id] = monster;
     let visible: GameState | null = null; const flow = createEndwellFlow(harness.api, { state: (state) => { visible = state; }, event() {} }); harness.state(structuredClone(authority));

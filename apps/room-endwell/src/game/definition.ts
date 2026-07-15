@@ -136,7 +136,14 @@ export const endwellGame = defineGame<GameState>({
   meta: { name: 'Endwell', minPlayers: 1, maxPlayers: 4 }, initialState,
   lifecycle: {
     create(ctx) { ctx.state.seed = Math.floor(ctx.random() * 0x7fffffff); ctx.state.schemaVersion = 5; ctx.state.run.discoveredSpellIds ??= ['resurrect']; for (const p of Object.values(ctx.state.players)) p.selectedElements ??= []; for (const encounter of ctx.state.run.stage?.encounters ?? []) { encounter.waves ??= [encounter.monsterIds]; encounter.totalWaves ??= encounter.waves.length; encounter.currentWave ??= encounter.status === 'dormant' ? 0 : encounter.totalWaves; encounter.nextWaveAt ??= null; encounter.scaledForPlayers ??= encounter.status === 'dormant' ? null : Math.max(1, onlineLivingPlayers(ctx.state.players).length); } },
-    join(ctx, joined) { ctx.state.hostId ??= joined.id; const existing = ctx.state.players[joined.id]; if (existing) { existing.connected = true; existing.selectedElements ??= []; } else ctx.state.players[joined.id] = player(joined.id, joined.name || `巫师 ${Object.keys(ctx.state.players).length + 1}`, Object.keys(ctx.state.players).length); },
+    join(ctx, joined) {
+      ctx.state.hostId ??= joined.id;
+      const existing = ctx.state.players[joined.id];
+      if (existing) { existing.connected = true; existing.selectedElements ??= []; return; }
+      const index = Object.keys(ctx.state.players).length, joinedPlayer = player(joined.id, joined.name || `巫师 ${index + 1}`, index), stage = ctx.state.run.stage;
+      if (ctx.state.phase === 'running' && stage) { joinedPlayer.position = { x: stage.world.spawn.x + index * 54, y: stage.world.spawn.y }; joinedPlayer.positionEpoch += 1; }
+      ctx.state.players[joined.id] = joinedPlayer;
+    },
     reconnect(ctx, joined) { if (ctx.state.players[joined.id]) ctx.state.players[joined.id].connected = true; },
     leave(ctx, leaving) { if (ctx.state.players[leaving.id]) ctx.state.players[leaving.id].connected = false; if (ctx.state.hostId === leaving.id) ctx.state.hostId = Object.values(ctx.state.players).find((p) => p.connected)?.id ?? null; },
   },

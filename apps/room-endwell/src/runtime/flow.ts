@@ -15,6 +15,19 @@ type PendingPrediction =
   | { kind: 'pickup'; lootId: string; createdAt: number };
 const combatKeys = ['health', 'statuses', 'buildup', 'buffs', 'shields', 'cast', 'forceVelocity'] as const;
 
+export function createEndwellFlowWhenReady(api: PartiApi, handlers: EndwellHandlers, ready: (flow: EndwellFlow) => void): () => void {
+  let waiting = true, unsubscribe = () => {};
+  const start = () => {
+    if (!waiting || !api.playerId || api.getState() == null) return false;
+    waiting = false;
+    ready(createEndwellFlow(api, handlers));
+    return true;
+  };
+  if (start()) return () => {};
+  unsubscribe = api.onState(() => { if (start()) unsubscribe(); });
+  return () => { waiting = false; unsubscribe(); };
+}
+
 export function createEndwellFlow(api: PartiApi, handlers: EndwellHandlers): EndwellFlow {
   let runtime: GameRuntime | null = null, presentedPhase: GameState['phase'] | undefined; const synced = new Set<string>(), motions = new Map<string, RemoteMotion>(), pending = new Map<string, PendingPrediction>();
   const playerId = api.playerId ?? 'pending';

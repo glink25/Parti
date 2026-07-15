@@ -56,6 +56,21 @@ describe('delivery activation', () => {
   it('fully resets transient player and run state when restarting an ended game', () => { const test = setup(resolveSpell(['fire'])); test.state.phase = 'victory'; test.state.hostId = test.p.id; test.p.statuses.wet = { type: 'wet', endsAt: 9000, potency: 1, stacks: 1, tags: [] }; test.p.buildup.burning = 80; test.p.selectedElements = ['fire']; test.p.aim = { x: -1, y: 0 }; test.p.buffs = [{ id: 'buff', sourceId: 'test', endsAt: 9000, stacks: 1, tags: [], modifiers: [] }]; const start = endwellGame.actions['game.start']!; expect(start.validate!(test.ctx, null).ok).toBe(true); start.reduce(test.ctx, null, test.action); expect(test.state.phase).toBe('running'); expect(test.state.run.stageIndex).toBe(0); expect(test.p).toMatchObject({ statuses: {}, buildup: {}, selectedElements: [], aim: { x: 1, y: 0 }, buffs: [], shields: [], inventory: [], equipment: {} }); });
 });
 
+describe('player lifecycle', () => {
+  it('spawns a new player inside the active stage', () => {
+    const test = setup(resolveSpell(['fire'])), stage = test.state.run.stage = generateStage(17, 0);
+
+    endwellGame.lifecycle!.join!(test.ctx, { id: 'p2', name: 'two', role: 'player' });
+
+    expect(test.state.players.p2).toMatchObject({
+      alive: true,
+      health: { current: 100, max: 100 },
+      position: { x: stage.world.spawn.x + 54, y: stage.world.spawn.y },
+      positionEpoch: 1,
+    });
+  });
+});
+
 describe('cast target modes', () => {
   it('forces self-targeted spells to the caster position', () => { for (const elements of [['life'], ['shield'], ['fire', 'shield', 'fire']] as const) { const test = economySetup(), result = endwellGame.actions['cast.request']!.validate!(test.ctx, { castId: 'p1:cast:1', sequence: 1, elements: [...elements], aim: { x: 1, y: 0 }, target: { x: 9999, y: 9999 } }); expect(result).toMatchObject({ ok: true, payload: { target: test.p.position } }); } });
 });
