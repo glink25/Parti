@@ -706,7 +706,7 @@ const stateAdapter: StateAdapter = {
 };
 ```
 
-创建 runtime 时会立即把 `initialState()` snapshot 写入 adapter。若 adapter 闭包引用 runtime，需要像 Skyward 2 一样先使用可空变量，避免 runtime 尚未赋值：
+创建 runtime 时会立即把 `initialState()` snapshot 写入 adapter。若 adapter 闭包引用 runtime，需要像 Skyward 一样先使用可空变量，避免 runtime 尚未赋值：
 
 ```ts
 let runtime: GameRuntime | null = null;
@@ -1089,7 +1089,7 @@ state: {
 }
 ```
 
-Skyward 2 使用方式 B，并在客户端维护独立 `RemotePose` 插值结构。
+Skyward 使用方式 B，并在客户端维护独立 `RemotePose` 插值结构。
 
 `remoteApply: 'smooth'` 只是标签；插值仍需游戏自己实现。
 
