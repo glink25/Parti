@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { choosePair, dealCards, undercoverCount } from './game-logic';
+import { choosePair, dealCards, resolveElimination, undercoverCount, type Role } from './game-logic';
 import { CATEGORIES, WORD_PAIRS, type Category } from './words';
 import './styles.css';
 
@@ -14,7 +14,8 @@ type RoomState = {
   revealedWords: { civilian: string; undercover: string } | null; notice: string | null;
 };
 type PrivateCard = { word: string; round: number };
-type ShareCard = { number: number; word: string; seen: boolean };
+type ShareCard = { number: number; word: string; role: Role; seen: boolean; eliminated: boolean };
+type ShareResult = { civilian: string; undercover: string };
 
 const CATEGORY_LABELS: Record<Category, { icon: string; name: string; note: string }> = {
   entertainment: { icon: '✦', name: '娱乐', note: '影视 · 音乐 · 游戏' },
@@ -52,6 +53,8 @@ function App() {
   const [shareCategories, setShareCategories] = useState<Category[]>(['entertainment', 'daily']);
   const [shareCards, setShareCards] = useState<ShareCard[]>([]);
   const [openShareCard, setOpenShareCard] = useState<number | null>(null);
+  const [manageShareCard, setManageShareCard] = useState<number | null>(null);
+  const [shareResult, setShareResult] = useState<ShareResult | null>(null);
   const usedSharePairs = useRef(new Set<string>());
 
   useEffect(() => {
@@ -66,13 +69,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!hostModalOpen && !eliminateModalOpen && openShareCard === null) return;
+    if (!hostModalOpen && !eliminateModalOpen && openShareCard === null && manageShareCard === null) return;
     const close = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setHostModalOpen(false); setEliminateModalOpen(false); setOpenShareCard(null);
+      setHostModalOpen(false); setEliminateModalOpen(false); setOpenShareCard(null); setManageShareCard(null);
     };
     window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close);
-  }, [hostModalOpen, eliminateModalOpen, openShareCard]);
+  }, [hostModalOpen, eliminateModalOpen, openShareCard, manageShareCard]);
 
   const isHost = Boolean(playerId && state?.hostId === playerId);
   const hasCurrentCard = Boolean(card && state && card.round === state.round);
@@ -96,6 +99,7 @@ function App() {
       return next.length ? next : current;
     });
     setShareCards([]);
+    setShareResult(null);
   }
   function dealRound() {
     if (state?.selectedMode === 'custom') void parti.action('round:deal', { civilianWord: normalizedCivilianWord, undercoverWord: normalizedUndercoverWord });
@@ -109,8 +113,10 @@ function App() {
     usedSharePairs.current.add(pair.id);
     const ids = Array.from({ length: sharePlayerCount }, (_, index) => String(index + 1));
     const dealt = dealCards(ids, pair, Math.random);
-    setShareCards(ids.map((id) => ({ number: Number(id), word: dealt[id].word, seen: false })));
+    setShareCards(ids.map((id) => ({ number: Number(id), word: dealt[id].word, role: dealt[id].role, seen: false, eliminated: false })));
     setOpenShareCard(null);
+    setManageShareCard(null);
+    setShareResult(null);
   }
   function rememberShareCard() {
     if (openShareCard === null) return;
@@ -118,14 +124,32 @@ function App() {
     setOpenShareCard(null);
   }
 
+  function selectShareCard(item: ShareCard) {
+    if (shareResult) return;
+    if (item.seen) setManageShareCard(item.number);
+    else setOpenShareCard(item.number);
+  }
+
+  function eliminateShareCard() {
+    if (manageShareCard === null) return;
+    const nextCards = shareCards.map((item) => item.number === manageShareCard ? { ...item, eliminated: true } : item);
+    const cards = Object.fromEntries(nextCards.map((item) => [String(item.number), { role: item.role, word: item.word }]));
+    const eliminatedIds = nextCards.filter((item) => item.eliminated).map((item) => String(item.number));
+    const result = resolveElimination(cards, eliminatedIds);
+    setShareCards(nextCards);
+    setManageShareCard(null);
+    if (result.finished && result.revealedWords) setShareResult(result.revealedWords);
+  }
+
   const openShare = shareCards.find((item) => item.number === openShareCard);
+  const managedShare = shareCards.find((item) => item.number === manageShareCard);
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand-mark">卧</div>
       <div className="brand-copy"><p className="eyebrow">PARTI PARTY DECK</p><h1>谁是卧底</h1></div>
       <nav className="mode-switch" aria-label="游戏模式">
         <button className={appMode === 'online' ? 'is-active' : ''} onClick={() => setAppMode('online')}>联机模式</button>
-        <button className={appMode === 'share' ? 'is-active' : ''} onClick={() => setAppMode('share')}>单机分享</button>
+        <button className={appMode === 'share' ? 'is-active' : ''} onClick={() => setAppMode('share')}>牌盒模式</button>
       </nav>
       {appMode === 'online' && <span className="round-chip">第 {state?.round ?? 0} 轮</span>}
     </header>
@@ -133,13 +157,13 @@ function App() {
     {appMode === 'share' ? <section className="share-layout">
       <div className="share-toolbar panel">
         <div className="share-intro"><p className="eyebrow">PASS THE PHONE</p><h2>一台手机，也能秘密发牌</h2><p>依次点开自己的序号，记住词语后把手机交给下一位。</p></div>
-        <div className="player-stepper"><span>玩家人数</span><button onClick={() => { setSharePlayerCount((n) => Math.max(3, n - 1)); setShareCards([]); }} disabled={sharePlayerCount === 3}>−</button><strong>{sharePlayerCount}</strong><button onClick={() => { setSharePlayerCount((n) => Math.min(12, n + 1)); setShareCards([]); }} disabled={sharePlayerCount === 12}>＋</button></div>
+        <div className="player-stepper"><span>玩家人数</span><button onClick={() => { setSharePlayerCount((n) => Math.max(3, n - 1)); setShareCards([]); setShareResult(null); }} disabled={sharePlayerCount === 3}>−</button><strong>{sharePlayerCount}</strong><button onClick={() => { setSharePlayerCount((n) => Math.min(12, n + 1)); setShareCards([]); setShareResult(null); }} disabled={sharePlayerCount === 12}>＋</button></div>
         <CategoryButtons selected={shareCategories} onToggle={toggleShareCategory} />
         <button className="deal-button" onClick={dealShareCards}><span>{shareCards.length ? '重新洗牌并发牌' : '洗牌并发牌'}</span><small>{sharePlayerCount} 人 · {undercoverCount(sharePlayerCount)} 名卧底</small></button>
       </div>
       <div className="share-deck panel">
-        <div className="section-heading"><div><p className="eyebrow">SECRET DECK</p><h2>{shareCards.length ? '请选择你的序号' : '等待发牌'}</h2></div>{shareCards.length > 0 && <span>{shareCards.filter((item) => item.seen).length}/{shareCards.length} 已查看</span>}</div>
-        {shareCards.length ? <div className="card-grid">{shareCards.map((item) => <button key={item.number} className={`number-card ${item.seen ? 'is-seen' : ''}`} onClick={() => setOpenShareCard(item.number)}><small>{item.seen ? '已看过' : '未查看'}</small><strong>{item.number}</strong><span>{item.seen ? '✓' : '点击翻牌'}</span></button>)}</div> : <div className="empty-deck"><span>✦</span><p>选择人数与牌盒分类，然后发牌</p></div>}
+        <div className="section-heading"><div><p className="eyebrow">SECRET DECK</p><h2>{shareResult ? '本轮结算' : shareCards.length ? '请选择你的序号' : '等待发牌'}</h2></div>{shareCards.length > 0 && !shareResult && <span>{shareCards.filter((item) => item.seen).length}/{shareCards.length} 已查看</span>}</div>
+        {shareResult ? <div className="share-result"><p className="eyebrow">ALL UNDERCOVERS ELIMINATED</p><h3>所有卧底已出局</h3><div><span><small>平民牌</small><strong>{shareResult.civilian}</strong></span><i>VS</i><span><small>卧底牌</small><strong>{shareResult.undercover || '空白牌'}</strong></span></div><p>点击左侧按钮重新洗牌，开启下一轮。</p></div> : shareCards.length ? <div className="card-grid">{shareCards.map((item) => <button key={item.number} className={`number-card ${item.seen ? 'is-seen' : ''} ${item.eliminated ? 'is-eliminated' : ''}`} onClick={() => selectShareCard(item)} disabled={item.eliminated}><small>{item.eliminated ? '已出局' : item.seen ? '已看过' : '未查看'}</small><strong>{item.number}</strong><span>{item.eliminated ? '×' : item.seen ? '点击操作' : '点击翻牌'}</span></button>)}</div> : <div className="empty-deck"><span>✦</span><p>选择人数与牌盒分类，然后发牌</p></div>}
       </div>
     </section> : <section className="online-layout">
       <article className={`secret-card ${revealed ? 'is-revealed' : ''}`}>
@@ -168,6 +192,7 @@ function App() {
 
     {eliminateModalOpen && <div className="modal-backdrop"><section className="modal confirm-modal" role="dialog" aria-modal="true"><div className="modal-icon">?</div><h2>确认已经被投出局？</h2><p>确认后本轮不能撤销，你的阵营仍然保密。</p><div className="modal-actions"><button onClick={() => setEliminateModalOpen(false)}>取消</button><button className="danger" onClick={() => { setEliminateModalOpen(false); void parti.action('round:eliminateSelf'); }}>确认出局</button></div></section></div>}
     {openShare && <div className="modal-backdrop"><section className="modal share-card-modal" role="dialog" aria-modal="true" aria-labelledby="share-word"><span className="share-number">玩家 {openShare.number}</span><p>你的词语</p><strong id="share-word">{openShare.word}</strong><small>记住序号和词语，不要让别人看到</small><button className="deal-button" onClick={rememberShareCard}><span>我记住了</span></button></section></div>}
+    {managedShare && <div className="modal-backdrop"><section className="modal share-action-modal" role="dialog" aria-modal="true" aria-labelledby="share-action-title"><span className="share-number">玩家 {managedShare.number}</span><h2 id="share-action-title">这张牌怎么了？</h2><p>重新查看会再次展示秘密词语；确认出局后不能撤销。</p><div className="share-action-buttons"><button onClick={() => { setManageShareCard(null); setOpenShareCard(managedShare.number); }}>忘了，再看一次</button><button className="danger" onClick={eliminateShareCard}>被投出局了</button></div><button className="text-button" onClick={() => setManageShareCard(null)}>取消</button></section></div>}
   </main>;
 }
 
