@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import { UserRoundIcon } from 'lucide-react';
+import { CircleCheckIcon, GaugeIcon, NetworkIcon, UserRoundIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -39,10 +39,21 @@ import {
   UserNameValidationError,
   type LocalUser,
 } from '../lib/localUser';
-import { getSelectedTransportProfile, getTransportProfiles, selectTransportProfile } from '../lib/transportConfig';
+import {
+  getSelectedTransportProfile,
+  getTransportProfiles,
+  selectTransportProfile,
+  type TransportConfig,
+} from '../lib/transportConfig';
 
 const sectionCardClass =
   'gap-4 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] flex-shrink-0';
+
+function transportMessageSuffix(config: TransportConfig): 'peerjs' | 'lan' | 'supabase' {
+  if (config.adapter === 'peerjs') return 'peerjs';
+  if (config.adapter === 'lan') return 'lan';
+  return 'supabase';
+}
 
 export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (user: LocalUser) => void }) {
   const intl = useIntl();
@@ -56,6 +67,7 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
   const [clearing, setClearing] = useState(false);
   const profiles = getTransportProfiles();
   const selectedProfile = getSelectedTransportProfile();
+  const transportSuffix = transportMessageSuffix(selectedProfile.config);
 
   function setSheetOpen(next: boolean): void {
     setOpen(next);
@@ -157,7 +169,7 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
               <CardTitle className="mt-1 text-lg">{intl.formatMessage({ id: 'user.settings.transportTitle' })}</CardTitle>
               <CardDescription>{intl.formatMessage({ id: 'user.settings.transportDescription' })}</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-2">
+            <CardContent className="grid gap-3">
               <Label htmlFor="parti-user-transport">{intl.formatMessage({ id: 'user.settings.transportLabel' })}</Label>
               <Select value={selectedProfile.id} onValueChange={(value) => {
                 selectTransportProfile(value);
@@ -165,13 +177,59 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
               }}>
                 <SelectTrigger id="parti-user-transport" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {profiles.map((profile) => <SelectItem key={profile.id} value={profile.id}>{profile.name}</SelectItem>)}
+                  {profiles.map((profile) => {
+                    const suffix = transportMessageSuffix(profile.config);
+                    const friendlyLabel = intl.formatMessage({ id: `user.settings.transport.${suffix}.optionLabel` });
+                    return (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {profile.custom
+                          ? intl.formatMessage(
+                            { id: 'user.settings.transport.customOption' },
+                            { label: friendlyLabel, name: profile.name },
+                          )
+                          : friendlyLabel}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              <div className="min-w-0 rounded-xl border border-border bg-background/55 p-3.5" aria-live="polite">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="font-semibold text-foreground">
+                    {intl.formatMessage({ id: `user.settings.transport.${transportSuffix}.title` })}
+                  </span>
+                  {transportSuffix === 'peerjs' && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary-bright uppercase">
+                      {intl.formatMessage({ id: 'user.settings.transport.recommended' })}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {intl.formatMessage({ id: `user.settings.transport.${transportSuffix}.technology` })}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {intl.formatMessage({ id: `user.settings.transport.${transportSuffix}.summary` })}
+                </p>
+                <ul className="mt-3 grid gap-2 text-xs leading-relaxed text-muted-foreground">
+                  <li className="flex gap-2">
+                    <NetworkIcon className="mt-0.5 size-3.5 shrink-0 text-primary-bright" aria-hidden="true" />
+                    <span>{intl.formatMessage({ id: `user.settings.transport.${transportSuffix}.network` })}</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <GaugeIcon className="mt-0.5 size-3.5 shrink-0 text-primary-bright" aria-hidden="true" />
+                    <span>{intl.formatMessage({ id: `user.settings.transport.${transportSuffix}.latency` })}</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0 text-primary-bright" aria-hidden="true" />
+                    <span>{intl.formatMessage({ id: `user.settings.transport.${transportSuffix}.reliability` })}</span>
+                  </li>
+                </ul>
+              </div>
               <p className="text-xs text-muted-foreground">{intl.formatMessage({ id: 'user.settings.transportHint' })}</p>
               <Button type="button" variant="outline" onClick={() => setProfilesOpen(true)}>
                 {intl.formatMessage({ id: 'user.settings.profilesButton' })}
               </Button>
+              <p className="text-xs text-muted-foreground">{intl.formatMessage({ id: 'user.settings.profilesHint' })}</p>
             </CardContent>
           </Card>
 

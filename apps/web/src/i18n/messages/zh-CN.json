@@ -23,9 +23,41 @@
       "transportEyebrow": "联机",
       "transportTitle": "同步方式",
       "transportDescription": "选择下一次创建在线房间使用的连接服务。",
-      "transportLabel": "默认适配器",
+      "transportLabel": "创建房间时使用",
       "transportHint": "只影响之后创建的房间；加入房间时以邀请链接为准。",
-      "profilesButton": "自定义配置",
+      "transport": {
+        "recommended": "推荐",
+        "customOption": "{label} · {name}",
+        "peerjs": {
+          "optionLabel": "默认联机 / PeerJS",
+          "title": "默认联机",
+          "technology": "PeerJS / WebRTC",
+          "summary": "适合大多数与朋友远程联机的情况，建议优先选择。",
+          "network": "Wi-Fi 和移动数据之间也可以互相联机。",
+          "latency": "通常延迟较低，操作响应更及时。",
+          "reliability": "少数受限网络可能无法建立连接；遇到失败时可改用稳定联机。"
+        },
+        "supabase": {
+          "optionLabel": "稳定联机 / Supabase",
+          "title": "稳定联机",
+          "technology": "Supabase Realtime",
+          "summary": "适合默认联机无法连接，或参与者网络环境复杂的情况。",
+          "network": "支持不同 Wi-Fi、移动数据等各种网络环境互联。",
+          "latency": "数据需要经过实时服务转发，延迟通常更高。",
+          "reliability": "不依赖 NAT 打洞，复杂网络下连接成功率更高。"
+        },
+        "lan": {
+          "optionLabel": "局域网联机 / LocalSend",
+          "title": "局域网联机",
+          "technology": "LAN / LocalSend WebRTC",
+          "summary": "适合同一地点、连接同一 Wi-Fi 或局域网的设备。",
+          "network": "仅限同一局域网，不能跨互联网或移动网络联机。",
+          "latency": "设备直接在本地网络通信，通常延迟最低。",
+          "reliability": "不依赖外部实时服务，适合面对面一起游玩。"
+        }
+      },
+      "profilesButton": "高级配置",
+      "profilesHint": "仅供需要连接自建服务的高级用户使用。",
       "profilesTitle": "同步配置",
       "profilesDescription": "管理用于创建在线房间的 PeerJS、局域网或 Supabase 后端。内置配置为只读。",
       "profilesBuiltIn": "内置",

@@ -23,9 +23,41 @@
       "transportEyebrow": "Online",
       "transportTitle": "Sync method",
       "transportDescription": "Choose the connection service for the next online room you create.",
-      "transportLabel": "Default adapter",
+      "transportLabel": "Use when creating a room",
       "transportHint": "Only affects newly created rooms; invite links always determine how a room is joined.",
-      "profilesButton": "Custom configurations",
+      "transport": {
+        "recommended": "Recommended",
+        "customOption": "{label} · {name}",
+        "peerjs": {
+          "optionLabel": "Default connection / PeerJS",
+          "title": "Default connection",
+          "technology": "PeerJS / WebRTC",
+          "summary": "Best for most remote sessions with friends. Try this first.",
+          "network": "Works between Wi-Fi and mobile data connections.",
+          "latency": "Usually low latency for more responsive play.",
+          "reliability": "Some restricted networks may fail to connect; try Stable connection if that happens."
+        },
+        "supabase": {
+          "optionLabel": "Stable connection / Supabase",
+          "title": "Stable connection",
+          "technology": "Supabase Realtime",
+          "summary": "Use when the default cannot connect or players have complex network conditions.",
+          "network": "Works across Wi-Fi, mobile data, and other network types.",
+          "latency": "Traffic is relayed by a realtime service, so latency is usually higher.",
+          "reliability": "Does not rely on NAT traversal, improving connection success on restricted networks."
+        },
+        "lan": {
+          "optionLabel": "Local network / LocalSend",
+          "title": "Local network",
+          "technology": "LAN / LocalSend WebRTC",
+          "summary": "Best when everyone is in the same place and on the same Wi-Fi or LAN.",
+          "network": "Local network only; it cannot connect across the internet or mobile data.",
+          "latency": "Devices communicate over the local network, usually giving the lowest latency.",
+          "reliability": "Does not rely on an external realtime service and is ideal for playing together in person."
+        }
+      },
+      "profilesButton": "Advanced configurations",
+      "profilesHint": "For advanced users who need to connect to a self-hosted service.",
       "profilesTitle": "Sync configurations",
       "profilesDescription": "Manage PeerJS, LAN, or Supabase backends used for new online rooms. Built-in configurations are read-only.",
       "profilesBuiltIn": "Built in",
