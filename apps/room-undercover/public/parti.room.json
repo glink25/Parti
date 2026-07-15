@@ -1,0 +1,35 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "room-undercover",
+  "name": "谁是卧底 · 发牌房",
+  "version": "0.1.0",
+  "packageMode": "filesystem",
+  "cover": "cover.jpg",
+  "description": "只发牌、不计分的轻量谁是卧底聚会房间。",
+  "author": { "name": "Parti" },
+  "entry": {
+    "ui": "index.html",
+    "worker": "worker.js"
+  },
+  "room": {
+    "minPlayers": 3,
+    "maxPlayers": 12,
+    "allowSpectators": false
+  },
+  "sync": { "mode": "snapshot" },
+  "permissions": {
+    "network": false,
+    "storage": "session",
+    "camera": false,
+    "microphone": false,
+    "clipboard": false,
+    "sensors": []
+  },
+  "actions": {
+    "settings:setMode": { "payload": "{ mode: 'classic' | 'blank' | 'custom' }" },
+    "settings:setCategories": { "payload": "{ categories: string[] }" },
+    "round:deal": { "payload": "{ civilianWord?: string; undercoverWord?: string }" },
+    "round:eliminateSelf": {}
+  }
+}
