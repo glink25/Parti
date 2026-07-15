@@ -1,5 +1,5 @@
 import { BOSS_SPAWN_Y_MAX, BOSS_SPAWN_Y_MIN, CHUNK_HEIGHT, WORLD_WIDTH, type ActiveEffect, type AttackDefinition, type BiomeDefinition, type BossPhaseDefinition, type BossStrategy, type ContactResult, type DynamicEntityState, type EncounterStrategy, type Enemy, type EnemyKind, type EnemyStrategy, type GenerationContext, type PickupKind, type PickupStrategy, type Platform, type PlatformKind, type PlatformStrategy, type RuntimeContext, type RuntimeEffect } from '../game/contracts';
-import { Registry, contentFingerprint as fingerprint } from '../game/registry';
+import { Registry } from '../game/registry';
 import { wrapX } from '../runtime/physics';
 import { JUMP_SPEED, SPRING_JUMP_SPEED } from '../runtime/physics';
 
@@ -106,4 +106,3 @@ encounterStrategies.register({ id: 'mixed', version: 1, populate(context, route,
 export function biomeForChunk(index: number) { return biomes.values()[Math.floor(index / 10) % biomes.values().length]!; }
 export function strategyForPlatform(id: PlatformKind) { return platformStrategies.require(id); }
 export function bossForContext(c: GenerationContext) { return bossStrategies.require(weightedFromPool(c.biome.content.bosses, c.rng('boss-kind').float())); }
-export const CONTENT_FINGERPRINT = fingerprint([biomes, platformStrategies, enemyStrategies, pickupStrategies, bossStrategies, encounterStrategies], ['biome', 'platform', 'enemy', 'pickup', 'boss', 'encounter']);

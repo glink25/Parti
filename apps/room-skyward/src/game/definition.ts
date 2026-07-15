@@ -1,5 +1,5 @@
 import { accept, defineGame, reject, type FlowReducerContext } from '@parti/flow';
-import { bossStrategies, CONTENT_FINGERPRINT, pickupStrategies, platformStrategies } from '../content';
+import { bossStrategies, pickupStrategies, platformStrategies } from '../content';
 import { BOSS_ARENA_FLOOR_OFFSET, BOSS_INTERVAL, BOSS_TRIGGER_OFFSET, CHUNK_HEIGHT, SCHEMA_VERSION, WORLD_WIDTH, type ActiveEffect, type Enemy, type GameState, type PublicPlayer, type RuntimeContext, type RuntimeEffect } from './contracts';
 import { canStartBoss } from './boss';
 import { bossOrdinalForChunk, contextFor, findEntity, generateChunk, runtimeContext } from './generation';
@@ -35,7 +35,7 @@ export const skywardGame = defineGame<GameState>({
   },
 });
 
-export function initialState(): GameState { return { schemaVersion: SCHEMA_VERSION, contentFingerprint: CONTENT_FINGERPRINT, phase: 'lobby', hostId: null, seed: 0, startedAt: null, startedPlayers: [], players: {}, teamVoidY: 0, highestY: 0, completedBossCount: 0, entities: {}, boss: null, bestRun: { height: 0, bosses: 0, kills: 0, noDamageHeight: 0 }, message: '所有人准备后开始' }; }
+export function initialState(): GameState { return { schemaVersion: SCHEMA_VERSION, phase: 'lobby', hostId: null, seed: 0, startedAt: null, startedPlayers: [], players: {}, teamVoidY: 0, highestY: 0, completedBossCount: 0, entities: {}, boss: null, bestRun: { height: 0, bosses: 0, kills: 0, noDamageHeight: 0 }, message: '所有人准备后开始' }; }
 function createPlayer(id: string, name: string): PublicPlayer { return { id, name, ready: false, connected: true, alive: true, respawnAt: null, invulnerableUntil: 0, x: WORLD_WIDTH / 2, y: 120, vy: 0, cameraBottom: 0, direction: 0, positionEpoch: 0, kills: 0, deaths: 0, shots: 0, killStreak: 0, noDamageHeight: 0, tilt: false, lastHitSequence: 0, lastOutcomeSequence: 0, effects: {} }; }
 function poseFrom(player: PublicPlayer, now: number): LatestPose { return { sequence: -1, x: player.x, y: player.y, vy: player.vy, cameraBottom: player.cameraBottom, direction: player.direction, persistedAt: now }; }
 function text(value: unknown, max: number) { return typeof value === 'string' ? value.slice(0, max) : ''; }

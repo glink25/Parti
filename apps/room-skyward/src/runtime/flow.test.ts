@@ -25,7 +25,7 @@ function playerFixture(id: string, y: number, connected = true): PublicPlayer {
   return { id, name: id, ready: true, connected, alive: true, respawnAt: null, invulnerableUntil: 0, x: 450, y, vy: 0, cameraBottom: 0, direction: 0, positionEpoch: 0, kills: 0, deaths: 0, shots: 0, killStreak: 0, noDamageHeight: 0, tilt: false, lastHitSequence: 0, lastOutcomeSequence: 0, effects: {} };
 }
 function runningState(players: Record<string, PublicPlayer>): GameState {
-  return { schemaVersion: 2, contentFingerprint: '', phase: 'running', hostId: Object.keys(players)[0]!, seed: 42, startedAt: 0, startedPlayers: Object.keys(players), players, teamVoidY: 0, highestY: 0, completedBossCount: 0, entities: {}, boss: null, bestRun: { height: 0, bosses: 0, kills: 0, noDamageHeight: 0 }, message: '' };
+  return { schemaVersion: 3, phase: 'running', hostId: Object.keys(players)[0]!, seed: 42, startedAt: 0, startedPlayers: Object.keys(players), players, teamVoidY: 0, highestY: 0, completedBossCount: 0, entities: {}, boss: null, bestRun: { height: 0, bosses: 0, kills: 0, noDamageHeight: 0 }, message: '' };
 }
 function setupFlow(playerId: string, state: GameState) {
   const stateHandlers = new Set<(state: unknown) => void>(); const eventHandlers = new Map<string, (payload: unknown) => void>();

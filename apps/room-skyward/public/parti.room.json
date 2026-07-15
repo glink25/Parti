@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "id": "room-skyward-2",
   "name": "云端远征",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packageMode": "filesystem",
   "description": "跳跃，合作，疯狂！",
   "cover": "assets/skyward-2/cover.png",

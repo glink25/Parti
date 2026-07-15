@@ -38,5 +38,14 @@ describe('packaged worker', () => {
     expect(state.players.host).toMatchObject({ y: triggerY, vy: 0, effects: { rocket: { phase: 'ending', forcedEndingAt: 1000 } } });
     expect(state.teamVoidY).toBe(11 * CHUNK_HEIGHT + BOSS_ARENA_FLOOR_OFFSET);
     expect(state.players.host!.cameraBottom).toBe(state.teamVoidY);
+
+    delete state.players.host!.effects.rocket;
+    definition.actions?.playerOutcome?.(context, { player: host, actionId: 'outcome:1', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:3', type: 'playerOutcome', payload: { eventId: 'host:death:1', sequence: 1, outcome: 'death', reason: 'test' }, from: 'host', seq: 3, origin: 'local', createdAt: 3 } } });
+    expect(state).toMatchObject({ phase: 'gameover', players: { host: { alive: false, positionEpoch: 1 } } });
+
+    definition.actions?.restart?.(context, { player: host, actionId: 'restart:1', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:4', type: 'restart', payload: null, from: 'host', seq: 4, origin: 'local', createdAt: 4 } } });
+    expect(state).toMatchObject({ phase: 'lobby', players: { host: { alive: true, ready: false, positionEpoch: 1 } } });
+    definition.actions?.setReady?.(context, { player: host, actionId: 'ready:2', payload: { [PARTI_FLOW_PAYLOAD]: { id: 'host:5', type: 'setReady', payload: { ready: true }, from: 'host', seq: 5, origin: 'local', createdAt: 5 } } });
+    expect(state).toMatchObject({ phase: 'running', startedPlayers: ['host'], players: { host: { alive: true, x: 450, y: 120, positionEpoch: 2 } } });
   });
 });
