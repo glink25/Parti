@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLobbyLayout, computeTableLayout, overlaps } from './MahjongLayout';
+import { computeLobbyLayout, computeTableLayout, overlaps, selectedTileLift } from './MahjongLayout';
 
 const sizes = [
   ['desktop landscape', 1280, 720],
@@ -42,5 +42,23 @@ describe('mahjong responsive layout', () => {
   it('shows three activity lines in landscape and one in portrait', () => {
     expect(computeTableLayout(1280, 720, 14).activityLines).toBe(3);
     expect(computeTableLayout(390, 844, 14).activityLines).toBe(1);
+  });
+
+  it.each([
+    ['phone portrait', 390, 844],
+    ['short landscape', 844, 390],
+  ] as const)('moves a selected tile upward on %s', (_, width, height) => {
+    const hand = computeTableLayout(width, height, 15).hand;
+    const selectedY = hand.y - selectedTileLift(hand);
+
+    expect(selectedY).toBeLessThan(hand.y);
+  });
+
+  it.each([1, 2, 8, 14, 15, 18])('keeps selected tile lift between 0 and 16px for %i tiles', (count) => {
+    for (const [, width, height] of sizes) {
+      const lift = selectedTileLift(computeTableLayout(width, height, count).hand);
+      expect(lift).toBeGreaterThanOrEqual(0);
+      expect(lift).toBeLessThanOrEqual(16);
+    }
   });
 });

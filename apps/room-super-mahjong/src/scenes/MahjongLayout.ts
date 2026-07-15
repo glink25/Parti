@@ -91,6 +91,8 @@ export function computeTableLayout(width:number,height:number,handCount:number):
 
 export function overlaps(a:Rect,b:Rect){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
 
+export function selectedTileLift(hand:Pick<TableLayout['hand'],'y'>){return clamp(hand.y,0,16)}
+
 function grid(area:Rect,columns:number,rows:number,gap:number){
   const cellW=(area.w-gap*(columns-1))/columns;
   const cellH=(area.h-gap*(rows-1))/rows;
