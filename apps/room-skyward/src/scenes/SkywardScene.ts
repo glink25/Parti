@@ -3,9 +3,10 @@ import { biomeForChunk, CONTENT_FINGERPRINT, enemyStrategies, pickupStrategies, 
 import { isBossDefeated } from '../game/boss';
 import { CHUNK_HEIGHT, PLAYER_RADIUS, VIEW_HEIGHT, WORLD_WIDTH, type BossAttack, type Chunk, type Enemy, type GameState, type Pickup, type PickupKind, type Platform, type PublicPlayer } from '../game/contracts';
 import { contextFor, generateChunk, platformActive, platformPosition, runtimeContext } from '../game/generation';
-import { directDistance, GRAVITY, JUMP_SPEED, MOVE_SPEED, tiltDirection, wrapX } from '../runtime/physics';
+import { directDistance, GRAVITY, JUMP_SPEED, MOVE_SPEED, wrapX } from '../runtime/physics';
 import { acceptPose, advanceRemotePose, createRemotePose, type PosePacket, type RemotePose } from '../runtime/network';
 import { createSkywardFlow, type SkywardFlow } from '../runtime/flow';
+import { requestTiltPermission, TiltController } from '../runtime/tilt';
 import { drawAttackArt, drawBackground, drawBulletArt, drawEnemyArt, drawPickupArt, drawPlatformArt, drawPlayerArt, drawVoidArt } from './art';
 
 type Bullet = { id: string; x: number; y: number; vx?: number; vy: number; life: number; cosmetic: boolean; pierce?: boolean; hits?: string[] };
@@ -17,7 +18,8 @@ export class SkywardScene {
   private state: GameState | null = null;
   private local = { x: WORLD_WIDTH / 2, y: 120, vy: JUMP_SPEED, cameraBottom: 0, viewBottom: 0, alive: true };
   private chunks = new Map<number, Chunk>(); private bullets: Bullet[] = []; private remote: Record<string, RemotePose> = {};
-  private direction = 0; private keyDirection: -1 | 0 | 1 = 0; private touches = new Map<number, -1 | 1>(); private tilt = 0; private tiltEnabled = false; private tiltNeutral: number | null = null;
+  private direction = 0; private keyDirection: -1 | 0 | 1 = 0; private touches = new Map<number, -1 | 1>();
+  private tilt = new TiltController();
   private previous = performance.now(); private telemetryAt = 0; private shotAt = 0; private hitAt = 0; private groundingUntil = 0; private epoch = -1; private pendingDeath = false; private shotSequence = 0; private poseSequence = 0; private hitSequence = 0; private outcomeSequence = 0;
   private locallyConsumedBuffs = new Set<PickupKind>(); private flying = false;
   private optimisticallyDefeatedBosses = new Set<number>();
@@ -44,7 +46,7 @@ export class SkywardScene {
   update() {
     const now = performance.now(), dt = Math.min(.04, Math.max(.001, (now - this.previous) / 1000)); this.previous = now; this.pixelRatio = mainCanvas.width / Math.max(1, mainCanvas.clientWidth); this.viewport = this.computeViewport();
     if (this.state?.phase !== 'running') return; const me = this.me(); if (!me) return;
-    const touch = [...this.touches.values()].at(-1) ?? 0; this.direction = this.keyDirection || touch || (this.tiltEnabled ? this.tilt : 0); this.flow?.game.update(dt);
+    this.updateMovement(dt); this.flow?.game.update(dt);
     if (!me.alive || !this.local.alive || this.pendingDeath) return;
     if (now >= this.telemetryAt) { this.telemetryAt = now + 100; this.flow?.publishPose({ sequence: ++this.poseSequence, x: this.local.x, y: this.local.y, vy: this.local.vy, cameraBottom: this.local.cameraBottom, direction: this.direction }); }
   }
@@ -114,7 +116,10 @@ export class SkywardScene {
   private drawPlayer(x: number, y: number, color: string, name: string, direction: number) { const s = this.toScreen(x, y), r = PLAYER_RADIUS * this.viewport.scale; drawPlayerArt(mainContext, s, r, color, direction, name === 'YOU'); this.label(name, s.x, s.y - r - 13); }
   private drawAttack(a: BossAttack) { drawAttackArt(mainContext, a, this.toScreen(a.x, a.y), (a.kind === 'lightning' ? 90 : 120) * this.viewport.scale, Date.now() < a.activeAt, this.viewport); }
   private drawHud(width: number, height: number) { if (!this.state) return; const me = this.me(), boss = this.activeBoss(); this.text(`高度 ${Math.max(0, Math.floor(this.local.y))}  Boss ${this.state.completedBossCount}`, 18, 22, 16, '#fff'); if (me) { const buffs = Object.values(me.effects).filter((effect) => effect && (effect.endsAt == null || effect.endsAt > Date.now())).map((effect) => pickupStrategies.require(effect!.id).hud(effect!, Date.now())).join(' · '); this.text(buffs || '无增益', 18, 46, 13, '#b9d7ff'); } if (boss) { const ratio = boss.hp / boss.maxHp; mainContext.fillStyle = '#2a2335'; mainContext.fillRect(width / 2 - 150, 24, 300, 18); mainContext.fillStyle = '#ff5577'; mainContext.fillRect(width / 2 - 150, 24, 300 * ratio, 18); }
-    const size = 64, x = width - size - 18, y = height - size - 18; mainContext.fillStyle = 'rgba(255,255,255,.18)'; mainContext.fillRect(x, y, size, size); this.text('FIRE', x + size / 2, y + size / 2, 13, '#fff', 'center'); this.hits.push({ x, y, w: size, h: size, action: () => this.shoot() }); }
+    const fireSize = 64, fireX = width - fireSize - 18, fireY = height - fireSize - 18; this.drawFireControl(fireX, fireY, fireSize);
+    const tiltSize = 48; this.drawTiltControl(width - tiltSize - 18, Math.max(18, this.viewport.y + 12), tiltSize); }
+  private drawFireControl(x: number, y: number, size: number) { const c = mainContext, cx = x + size / 2, cy = y + size / 2; c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.arc(cx, cy, size / 2, 0, Math.PI * 2); c.fill(); c.save(); c.translate(cx, cy); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, -17); c.lineTo(8, -5); c.lineTo(6, 9); c.lineTo(-6, 9); c.lineTo(-8, -5); c.closePath(); c.fill(); c.fillStyle = '#ffb35c'; c.beginPath(); c.moveTo(-4, 12); c.lineTo(0, 21); c.lineTo(4, 12); c.closePath(); c.fill(); c.restore(); this.hits.push({ x, y, w: size, h: size, action: () => this.shoot() }); }
+  private drawTiltControl(x: number, y: number, size: number) { const c = mainContext, cx = x + size / 2, cy = y + size / 2; c.fillStyle = this.tilt.enabled ? 'rgba(44,154,118,.9)' : 'rgba(255,255,255,.18)'; c.beginPath(); c.arc(cx, cy, size / 2, 0, Math.PI * 2); c.fill(); c.save(); c.translate(cx, cy); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.strokeRect(-7, -12, 14, 24); c.beginPath(); c.moveTo(-12, -5); c.lineTo(-17, 0); c.lineTo(-12, 5); c.moveTo(12, -5); c.lineTo(17, 0); c.lineTo(12, 5); c.stroke(); if (!this.tilt.enabled) { c.strokeStyle = '#ff6b78'; c.lineWidth = 3; c.beginPath(); c.moveTo(-14, 14); c.lineTo(14, -14); c.stroke(); } c.restore(); this.hits.push({ x, y, w: size, h: size, action: () => void this.toggleTilt() }); }
   private drawLobby(w: number, h: number) { const me = this.me(); this.overlay(w, h, 'SKYWARD 2', '穿过云海 · 一路向上'); const x = w / 2 - 100, y = h / 2 + 70; mainContext.fillStyle = me?.ready ? '#486878' : '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text(me?.ready ? '等待其他玩家' : '准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => this.flow?.setReady(!me?.ready) }); }
   private drawGameOver(w: number, h: number) { this.overlay(w, h, '远征结束', `最高 ${Math.floor(this.state?.highestY ?? 0)}`); if (this.state?.hostId === parti.playerId) { const x = w / 2 - 100, y = h / 2 + 65; mainContext.fillStyle = '#2c9a76'; mainContext.fillRect(x, y, 200, 52); this.text('返回准备', w / 2, y + 26, 18, '#fff', 'center'); this.hits.push({ x, y, w: 200, h: 52, action: () => this.flow?.restart() }); } }
   private overlay(w: number, h: number, title: string, sub: string) { mainContext.fillStyle = 'rgba(4,8,16,.82)'; mainContext.fillRect(0, 0, w, h); this.text(title, w / 2, h / 2 - 42, 30, '#fff', 'center'); this.text(sub, w / 2, h / 2 + 4, 15, '#a9c7e8', 'center'); }
@@ -126,7 +131,20 @@ export class SkywardScene {
   private me() { return this.state && parti.playerId ? this.state.players[parti.playerId] ?? null : null; } private playerName(id: string) { return this.state?.players[id]?.name ?? '队友'; } private notify(value: string) { this.flash = value; this.flashUntil = performance.now() + 1600; }
   private pointerDown = (e: PointerEvent) => { const rect = mainCanvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top; const hit = this.hits.find((h) => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h); if (hit) { hit.action(); return; } mainCanvas.setPointerCapture(e.pointerId); this.touches.set(e.pointerId, x < this.viewport.x + this.viewport.w / 2 ? -1 : 1); };
   private pointerUp = (e: PointerEvent) => { this.touches.delete(e.pointerId); };
-  private key = (e: KeyboardEvent) => { if (e.code === 'Space' && e.type === 'keydown' && !e.repeat) { this.shoot(); e.preventDefault(); return; } const down = e.type === 'keydown'; if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keyDirection = down ? -1 : this.keyDirection === -1 ? 0 : this.keyDirection; if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keyDirection = down ? 1 : this.keyDirection === 1 ? 0 : this.keyDirection; if (e.code === 'KeyT' && down && !e.repeat) { this.tiltEnabled = !this.tiltEnabled; this.tiltNeutral = null; this.flow?.enableTilt(this.tiltEnabled); } };
-  private orientation(data: { beta: number | null; gamma: number | null; screenAngle: number }) { if (!this.tiltEnabled) return; const raw = data.screenAngle === 90 ? -(data.beta ?? 0) : data.screenAngle === 270 ? data.beta ?? 0 : data.gamma ?? 0; this.tiltNeutral ??= raw; this.tilt = tiltDirection(raw - this.tiltNeutral); }
+  private key = (e: KeyboardEvent) => { if (e.code === 'Space' && e.type === 'keydown' && !e.repeat) { this.shoot(); e.preventDefault(); return; } const down = e.type === 'keydown'; if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keyDirection = down ? -1 : this.keyDirection === -1 ? 0 : this.keyDirection; if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keyDirection = down ? 1 : this.keyDirection === 1 ? 0 : this.keyDirection; if (e.code === 'KeyT' && down && !e.repeat) void this.toggleTilt(); };
+  private updateMovement(dt: number) {
+    const touch = [...this.touches.values()].at(-1) ?? 0, direct = this.keyDirection || touch;
+    this.direction = this.tilt.update(dt, direct);
+  }
+  private orientation(data: { beta: number | null; gamma: number | null; screenAngle: number }) {
+    this.tilt.receive(data);
+  }
+  private async toggleTilt() {
+    if (this.tilt.enabled) { this.tilt.disable(); this.flow?.enableTilt(false); return; }
+    if (!parti.orientation) { this.notify('当前环境不支持重力感应'); return; }
+    const status = await requestTiltPermission(parti.orientation);
+    if (status !== 'active' && status !== 'no-data') { this.notify('无法启用重力感应'); return; }
+    this.tilt.enable(); this.flow?.enableTilt(true);
+  }
   private destroy = () => { this.flow?.game.dispose(); this.flow = null; for (const d of this.disposers.splice(0)) d(); mainCanvas.removeEventListener('pointerdown', this.pointerDown); mainCanvas.removeEventListener('pointerup', this.pointerUp); mainCanvas.removeEventListener('pointercancel', this.pointerUp); window.removeEventListener('keydown', this.key); window.removeEventListener('keyup', this.key); };
 }
