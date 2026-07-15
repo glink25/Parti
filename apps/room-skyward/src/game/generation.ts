@@ -22,9 +22,9 @@ function generateRoute(context: GenerationContext, entryX: number, exitX: number
     let next: Platform | null = null;
     for (let attempt = 0; attempt < 12 && !next; attempt += 1) {
       const sparsity = context.difficultyAxes.sparsity;
-      const bigLeap = attempt === 0 && rng.float() < .15;
-      const min = bigLeap ? 245 : 130 + Math.round(sparsity * 40);
-      const max = bigLeap ? 285 : 215 + Math.round(sparsity * 70);
+      const bigLeap = attempt === 0 && rng.float() < .18;
+      const min = bigLeap ? 350 : 235 + Math.round(sparsity * 25);
+      const max = bigLeap ? 395 : 325 + Math.round(sparsity * 45);
       const remaining = base + CHUNK_HEIGHT - 70 - previous.y;
       const rise = Math.min(rng.int(min, max), remaining);
       const pull = (exitX - previous.x) * Math.min(.35, rise / Math.max(1, remaining));
@@ -63,27 +63,46 @@ function occupationOverlaps(a: OccupationBox, b: OccupationBox): boolean {
 }
 function generateOptional(context: GenerationContext, route: Platform[], recipe: ChunkRecipe) {
   const rng = context.rng('optional'), result: Platform[] = [];
-  const count = Math.min(5, 2 + Math.floor(context.difficulty / 3));
   const occupation: OccupationBox[] = route.map(occupationBox);
-  for (let i = 0; i < count; i += 1) {
-    const anchor = route[rng.int(1, Math.max(1, route.length - 2))]!;
-    let item: Platform | null = null, bridges: Platform[] = [];
-    for (let attempt = 0; attempt < 12 && !item; attempt += 1) {
-      const base = platform(`${context.chunkIndex}:optional:${i}`, anchor.x + (rng.float() < .5 ? -1 : 1) * rng.int(170, 280), anchor.y + rng.int(-20, 100), rng.int(115, 180), true);
-      const pool = context.biome.content.platforms.filter((x) => recipe !== 'mechanism' || x.id === 'trigger' || x.id === 'spring');
-      const id = weightedFromPool(pool.length ? pool : context.biome.content.platforms, context.rng(`platform-kind:${i}`).float());
-      const candidate = platformStrategies.require(id).generate({ ...base, rewardMultiplier: recipe === 'danger' ? 1.75 : 1 }, context, i);
-      const trigger = candidate.config?.trigger;
-      const candidateBridges = trigger ? trigger.outputs.map((outputId, n) => ({ id: outputId, kind: 'bridge' as const, x: wrapX(candidate.x + 190 + n * 145), y: candidate.y + 100 + n * 55, width: 170, optional: true, rewardMultiplier: candidate.rewardMultiplier })) : [];
-      const candidateBoxes = [occupationBox(candidate), ...candidateBridges.map(occupationBox)];
-      if (candidateBoxes.some((box) => occupation.some((existing) => occupationOverlaps(box, existing)))) continue;
-      item = candidate;
-      bridges = candidateBridges;
+  const branchCount = Math.min(3, Math.max(2, route.length - 3));
+  for (let branch = 0; branch < branchCount; branch += 1) {
+    const anchorIndex = Math.min(route.length - 3, 1 + Math.floor(branch * Math.max(1, route.length - 3) / branchCount));
+    const anchor = route[anchorIndex]!, rejoin = route[Math.min(route.length - 1, anchorIndex + 2)]!;
+    let previous = anchor, complete = true;
+    const branchItems: Platform[] = [], branchOccupation: OccupationBox[] = [];
+    const side = rng.float() < .5 ? -1 : 1;
+    for (let node = 0; node < 2; node += 1) {
+      let item: Platform | null = null, bridges: Platform[] = [];
+      for (let attempt = 0; attempt < 16 && !item; attempt += 1) {
+        const t = (node + 1) / 3;
+        const centerX = anchor.x + (rejoin.x - anchor.x) * t;
+        const centerY = anchor.y + (rejoin.y - anchor.y) * t;
+        const offset = side * (150 + Math.sin(t * Math.PI) * rng.int(45, 120));
+        const base = platform(`${context.chunkIndex}:optional:${branch}:${node}`, centerX + offset + rng.int(-35, 35), centerY + rng.int(-20, 20), rng.int(125, 185), true);
+        const safePool = context.biome.content.platforms.filter((x) => x.id !== 'fragile');
+        const pool = safePool.filter((x) => recipe !== 'mechanism' || x.id === 'trigger' || x.id === 'spring');
+        const id = weightedFromPool(pool.length ? pool : safePool, context.rng(`platform-kind:${branch}:${node}`).float());
+        const candidate = platformStrategies.require(id).generate({ ...base, rewardMultiplier: recipe === 'danger' ? 1.75 : 1 }, context, branch * 2 + node);
+        const trigger = candidate.config?.trigger;
+        const candidateBridges = trigger ? trigger.outputs.map((outputId, n) => ({ id: outputId, kind: 'bridge' as const, x: wrapX(candidate.x + 190 + n * 145), y: candidate.y + 100 + n * 55, width: 170, optional: true, rewardMultiplier: candidate.rewardMultiplier })) : [];
+        const candidateBoxes = [occupationBox(candidate), ...candidateBridges.map(occupationBox)];
+        if (!canReachPlatform(previous, candidate) || node === 1 && !canReachPlatform(candidate, rejoin)) continue;
+        if (candidateBoxes.some((box) => [...occupation, ...branchOccupation].some((existing) => occupationOverlaps(box, existing)))) continue;
+        item = candidate; bridges = candidateBridges;
+      }
+      if (!item) { complete = false; break; }
+      branchItems.push(item, ...bridges); previous = item; branchOccupation.push(occupationBox(item), ...bridges.map(occupationBox));
     }
-    if (!item) continue;
-    result.push(item);
-    occupation.push(occupationBox(item));
-    for (const bridge of bridges) { result.push(bridge); occupation.push(occupationBox(bridge)); }
+    if (complete) { result.push(...branchItems); occupation.push(...branchOccupation); }
+  }
+  for (let trapIndex = 0; trapIndex < 2; trapIndex += 1) {
+    const trapAnchor = route[Math.min(route.length - 2, 1 + trapIndex + rng.int(0, Math.max(0, route.length - 4)))]!;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const trap = platformStrategies.require('fragile').generate(platform(`${context.chunkIndex}:trap:${trapIndex}`, trapAnchor.x + (rng.float() < .5 ? -1 : 1) * rng.int(180, 260), trapAnchor.y + rng.int(70, 150), rng.int(120, 165), true), context, 99 + trapIndex);
+      const box = occupationBox(trap);
+      if (occupation.some((existing) => occupationOverlaps(box, existing))) continue;
+      result.push(trap); occupation.push(box); break;
+    }
   }
   return result;
 }
@@ -91,5 +110,5 @@ function generateOptional(context: GenerationContext, route: Platform[], recipe:
 export function generateChunk(seed: number, index: number, players: number): Chunk { const context = contextFor(seed, index, players), recipe = recipeFor(context), entryX = boundaryX(seed, index), exitX = boundaryX(seed, index + 1); if (recipe === 'boss') { const strategy = bossForContext(context), platforms = strategy.arenaPlatforms(context), boss = strategy.create(context, 0, null); return { index, biomeId: context.biome.id, baseY: index * CHUNK_HEIGHT, difficulty: context.difficulty, difficultyAxes: context.difficultyAxes, recipe, boss: true, entryX, exitX, route: platforms.map((p) => p.id), platforms, enemies: [boss], pickups: [] }; } const route = generateRoute(context, entryX, exitX), optional = generateOptional(context, route, recipe), encounter = recipe === 'boss-buffer' ? { enemies: [], pickups: [] } : encounterStrategies.require('mixed').populate(context, route, optional); return { index, biomeId: context.biome.id, baseY: index * CHUNK_HEIGHT, difficulty: context.difficulty, difficultyAxes: context.difficultyAxes, recipe, boss: false, entryX, exitX, route: route.map((p) => p.id), platforms: [...route, ...optional], ...encounter }; }
 export function findEntity(seed: number, players: number, id: string) { const index = Number(id.split(':')[0]); if (!Number.isInteger(index) || index < 0) return null; const chunk = generateChunk(seed, index, players); return chunk.platforms.find((x) => x.id === id) ?? chunk.enemies.find((x) => x.id === id) ?? chunk.pickups.find((x) => x.id === id) ?? null; }
 export function transitionedState(platform: Platform, state: DynamicEntityState | undefined, context: RuntimeContext) { return platformStrategies.require(platform.kind).transition(platform, context, state); }
-export function platformActive(platform: Platform, state: Record<string, DynamicEntityState>, context: RuntimeContext, bossDefeated: boolean) { if (platform.kind === 'boss-exit') return bossDefeated; const current = transitionedState(platform, state[platform.id], context); if (platform.kind === 'bridge') return current?.kind === 'platform' && current.phase === 'active' && (current.until == null || current.until > context.now); return current?.kind !== 'platform' || current.phase === 'active' || current.phase === 'warning'; }
+export function platformActive(platform: Platform, state: Record<string, DynamicEntityState>, context: RuntimeContext, bossDefeated: boolean) { if (platform.kind === 'boss-exit') return bossDefeated; const current = transitionedState(platform, state[platform.id], context); if (platform.kind === 'bridge') return current?.kind === 'platform' && current.phase === 'active' && (current.until == null || current.until > context.now); return current?.kind !== 'platform' || current.phase === 'active' || current.phase === 'warning' || current.phase === 'breaking'; }
 export function platformPosition(platform: Platform, context: RuntimeContext) { const m = platform.config?.movement; if (!m) return { x: platform.x, y: platform.y }; const elapsed = Math.max(0, context.now - context.startedAt - (m.delayMs ?? 0)); if (!elapsed) return { x: platform.x, y: platform.y }; const travel = Math.max(1, m.periodMs - (m.pauseMs ?? 0) * 2), within = elapsed % m.periodMs; const normalized = within < (m.pauseMs ?? 0) ? 0 : within > travel + (m.pauseMs ?? 0) ? 1 : (within - (m.pauseMs ?? 0)) / travel; const offset = Math.sin(normalized * Math.PI * 2 + m.phase * Math.PI * 2) * m.range; if (m.axis === 'y') return { x: platform.x, y: platform.y + offset }; if (m.axis === 'path' && m.path?.length === 2) return { x: platform.x + (m.path[1]!.x - m.path[0]!.x) * ((Math.sin(normalized * Math.PI * 2 + m.phase * Math.PI * 2) + 1) / 2), y: platform.y + (m.path[1]!.y - m.path[0]!.y) * ((Math.sin(normalized * Math.PI * 2 + m.phase * Math.PI * 2) + 1) / 2) }; return { x: Math.max(0, Math.min(WORLD_WIDTH, platform.x + offset)), y: platform.y }; }

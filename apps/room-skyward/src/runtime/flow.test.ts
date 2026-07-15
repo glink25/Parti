@@ -72,4 +72,5 @@ describe('boss encounter sync', () => {
     flow.publishPose(poseAbove(1));
     expect(getState().boss).not.toBeNull();
   });
+
 });

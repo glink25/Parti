@@ -1,7 +1,7 @@
 import type { AttackDefinition, EnemyKind, PickupKind, PlatformKind } from '../game/contracts';
 
 export type ScreenPoint = { x: number; y: number };
-export type PlatformArt = { kind: PlatformKind; color: string; warning: boolean; spikeRange?: [number, number] };
+export type PlatformArt = { kind: PlatformKind; color: string; warning: boolean; breaking?: boolean; changedAt?: number; spikeRange?: [number, number] };
 
 const backgrounds = Object.fromEntries(['aurora', 'garden', 'storm'].map((id) => {
   const image = new Image(); image.src = `/assets/skyward-2/backgrounds/${id}.jpg`; return [id, image];
@@ -22,11 +22,19 @@ export function drawBackground(c: CanvasRenderingContext2D, biome: string, nextB
 function drawAtlasCell(c:CanvasRenderingContext2D,image:HTMLImageElement,index:number,s:ScreenPoint,size:number,flip=false){if(!image.complete||!image.naturalWidth)return false;const cell=image.naturalWidth/3,row=Math.floor(index/3),col=index%3;c.save();c.translate(s.x,s.y);if(flip)c.scale(-1,1);c.drawImage(image,col*cell,row*cell,cell,cell,-size/2,-size/2,size,size);c.restore();return true;}
 
 export function drawPlatformArt(c: CanvasRenderingContext2D, s: ScreenPoint, w: number, h: number, art: PlatformArt, scale: number) {
+  if (art.kind === 'fragile') {
+    const elapsed = art.breaking ? Math.max(0, Date.now() - (art.changedAt ?? Date.now())) / 1000 : 0;
+    const fall = elapsed * elapsed * 520 * scale, split = elapsed * 45 * scale, angle = elapsed * 1.8;
+    c.save(); c.strokeStyle = ink; c.lineWidth = Math.max(2, 3 * scale); c.fillStyle = art.color;
+    for (const side of [-1, 1]) { c.save(); c.translate(s.x + side * (w * .25 + split), s.y + fall + (art.breaking ? Math.sin(elapsed * 18 + side) * 4 * scale : Math.sin(performance.now() * .012 + side) * 2 * scale)); c.rotate(side * angle); path(c, [[-w*.24,-h/2],[w*.2,-h/2],[w*.24,h/2],[-w*.2,h/2],[side*w*.05,0]]); c.fill(); c.stroke(); c.restore(); }
+    if (art.breaking) { c.fillStyle = '#e7d9c8'; for (let i=0;i<6;i++) { const t=elapsed*(.7+i*.08); c.fillRect(s.x+(i-2.5)*9*scale+(i%2?1:-1)*t*45*scale,s.y+t*t*360*scale,3*scale,3*scale); } }
+    c.restore(); return;
+  }
   c.save(); const y = s.y - h / 2, warn = art.warning ? '#ffe784' : art.color; c.lineJoin = 'round'; c.lineWidth = Math.max(2, 3 * scale); c.strokeStyle = ink;
   c.fillStyle = warn; path(c, [[s.x-w/2,y],[s.x+w/2,y],[s.x+w/2-8*scale,y+h],[s.x-w/2+8*scale,y+h]]); c.fill(); c.stroke();
   c.globalAlpha = .38; c.fillStyle = '#fff'; c.fillRect(s.x-w/2+7*scale,y+3*scale,Math.max(0,w-14*scale),3*scale); c.globalAlpha = 1;
   if (art.kind === 'moving') { c.strokeStyle='#d9fbff'; c.beginPath(); c.moveTo(s.x-15*scale,s.y); c.lineTo(s.x+15*scale,s.y); c.stroke(); path(c,[[s.x-18*scale,s.y],[s.x-10*scale,s.y-6*scale],[s.x-10*scale,s.y+6*scale]]); c.fillStyle='#d9fbff'; c.fill(); path(c,[[s.x+18*scale,s.y],[s.x+10*scale,s.y-6*scale],[s.x+10*scale,s.y+6*scale]]); c.fill(); }
-  if (art.kind === 'fragile' || art.kind === 'recovering') { c.strokeStyle='#553c55'; c.beginPath(); c.moveTo(s.x-8*scale,y); c.lineTo(s.x+2*scale,y+8*scale); c.lineTo(s.x+14*scale,y+2*scale); c.stroke(); }
+  if (art.kind === 'recovering') { c.strokeStyle='#553c55'; c.beginPath(); c.moveTo(s.x-8*scale,y); c.lineTo(s.x+2*scale,y+8*scale); c.lineTo(s.x+14*scale,y+2*scale); c.stroke(); }
   if (art.kind === 'trigger') { circle(c,s.x,s.y,7*scale); c.fillStyle='#eafff7'; c.fill(); c.stroke(); }
   if (art.kind === 'spring') { c.strokeStyle='#fff4a8'; c.beginPath(); for(let i=-2;i<=2;i++) c.lineTo(s.x+i*8*scale,s.y+(i%2?6:-6)*scale); c.stroke(); }
   if (art.kind === 'boss-exit') { glow(c,'#ffd35a',12*scale); c.strokeStyle='#fff2a8'; c.strokeRect(s.x-w*.25,y-7*scale,w*.5,5*scale); }
@@ -58,7 +66,7 @@ const pickupGlyph: Record<PickupKind,string>={shield:'◇',rapid:'»',power:'✦
 const pickupColor: Record<PickupKind,string>={shield:'#7eeeff',rapid:'#ffd463',power:'#ff7f79',spread:'#cda0ff',pierce:'#a7f5b3',rocket:'#ff9b62',propeller:'#75d8ff','super-jump':'#f6ef76','slow-fall':'#b6d4ff'};
 export function drawPickupArt(c:CanvasRenderingContext2D,kind:PickupKind,s:ScreenPoint,r:number){const index:Record<PickupKind,number>={shield:0,rapid:1,power:2,spread:3,pierce:4,rocket:5,propeller:6,'super-jump':7,'slow-fall':8};c.save();glow(c,pickupColor[kind],r);circle(c,s.x,s.y,r*.82);c.fillStyle='rgba(255,255,255,.13)';c.fill();c.restore();if(drawAtlasCell(c,pickupAtlas,index[kind],s,r*2.75))return;c.save();glow(c,pickupColor[kind],r);c.fillStyle=pickupColor[kind];c.strokeStyle=ink;c.lineWidth=3;circle(c,s.x,s.y,r);c.fill();c.stroke();c.shadowBlur=0;c.fillStyle='#13213a';c.font=`bold ${r*1.15}px system-ui`;c.textAlign='center';c.textBaseline='middle';c.fillText(pickupGlyph[kind],s.x,s.y+1);c.restore();}
 
-export function drawBulletArt(c:CanvasRenderingContext2D,s:ScreenPoint,remote:boolean){c.save();const color=remote?'#76b7ff':'#fff2a8';glow(c,color,14);c.fillStyle=color;circle(c,s.x,s.y,5);c.fill();c.fillRect(s.x-2,s.y,4,16);c.restore();}
+export function drawBulletArt(c:CanvasRenderingContext2D,s:ScreenPoint,remote:boolean,effect: { power?: boolean; pierce?: boolean; spread?: boolean } = {}){c.save();const color=remote?'#76b7ff':effect.power?'#ff8b62':effect.pierce?'#9ff5b4':effect.spread?'#d4a2ff':'#fff2a8',radius=effect.power?8:5;glow(c,color,effect.power?22:14);c.fillStyle=color;circle(c,s.x,s.y,radius);c.fill();c.globalAlpha=.55;c.fillRect(s.x-(effect.pierce?2:3),s.y, effect.pierce?4:6,effect.pierce?28:16);c.restore();}
 
 export function drawAttackArt(c:CanvasRenderingContext2D,a:{kind:AttackDefinition['kind'];direction?:AttackDefinition['direction']},s:ScreenPoint,r:number,warning:boolean,viewport:{x:number;y:number;w:number;h:number}){c.save();const color=warning?'#ffe56c':'#ff5074';c.strokeStyle=color;c.fillStyle=color;c.lineWidth=warning?3:8;glow(c,color,18);c.setLineDash(warning?[10,8]:[]);
   if(a.kind==='laser'){c.beginPath();if(a.direction==='left'||a.direction==='right'){c.moveTo(viewport.x,s.y);c.lineTo(viewport.x+viewport.w,s.y)}else{c.moveTo(s.x,viewport.y);c.lineTo(s.x,viewport.y+viewport.h)}c.stroke();}

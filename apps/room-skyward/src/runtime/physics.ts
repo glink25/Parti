@@ -1,10 +1,40 @@
 import { PLAYER_RADIUS, WORLD_WIDTH, type MovementDefinition, type Platform } from '../game/contracts';
 export const GRAVITY = -1750;
-export const JUMP_SPEED = 1080;
+export const JUMP_SPEED = 1320;
+export const SPRING_JUMP_SPEED = 1650;
+export const SUPER_JUMP_SPEED = 1580;
 export const MOVE_SPEED = 420;
 export const TILT_DEAD_ZONE = 4;
 export const TILT_FULL_SPEED_ANGLE = 12;
-export const MAX_ROUTE_RISE = 285;
+export const MAX_ROUTE_RISE = 400;
+export const NORMAL_CAMERA_ANCHOR = .4;
+export const BOSS_CAMERA_ANCHOR = .32;
+export function damp(current: number, target: number, sharpness: number, dt: number) { return current + (target - current) * (1 - Math.exp(-Math.max(0, sharpness) * Math.max(0, dt))); }
+
+export type FlightKind = 'rocket' | 'propeller';
+export type FlightPhase = 'accelerating' | 'cruising' | 'decelerating' | 'finished';
+export const FLIGHT_PROFILES = {
+  rocket: { accelerationMs: 1000, cruiseMs: 3500, decelerationMs: 1000, maxSpeed: 860 },
+  propeller: { accelerationMs: 1200, cruiseMs: 4100, decelerationMs: 1200, maxSpeed: 620 },
+} as const;
+export function flightSample(kind: FlightKind, elapsedMs: number, forcedEndingAt?: number) {
+  const profile = FLIGHT_PROFILES[kind];
+  const naturalDecelerationAt = profile.accelerationMs + profile.cruiseMs;
+  const decelerationAt = forcedEndingAt == null ? naturalDecelerationAt : Math.min(naturalDecelerationAt, forcedEndingAt);
+  const elapsed = Math.max(0, elapsedMs);
+  if (elapsed >= decelerationAt + profile.decelerationMs) return { phase: 'finished' as FlightPhase, speed: 0, progress: 1 };
+  if (elapsed >= decelerationAt) {
+    const progress = (elapsed - decelerationAt) / profile.decelerationMs;
+    const accelerationProgress = Math.min(1, Math.max(0, decelerationAt / profile.accelerationMs));
+    const speedAtDeceleration = profile.maxSpeed * (1 - (1 - accelerationProgress) ** 2);
+    return { phase: 'decelerating' as FlightPhase, speed: speedAtDeceleration * (1 - progress) ** 2, progress };
+  }
+  if (elapsed < profile.accelerationMs) {
+    const progress = elapsed / profile.accelerationMs;
+    return { phase: 'accelerating' as FlightPhase, speed: profile.maxSpeed * (1 - (1 - progress) ** 2), progress };
+  }
+  return { phase: 'cruising' as FlightPhase, speed: profile.maxSpeed, progress: (elapsed - profile.accelerationMs) / Math.max(1, decelerationAt - profile.accelerationMs) };
+}
 export function wrapX(x: number) { return (x % WORLD_WIDTH + WORLD_WIDTH) % WORLD_WIDTH; }
 export function wrappedDistance(a: number, b: number) { const d = Math.abs(a - b); return Math.min(d, WORLD_WIDTH - d); }
 export function canReachPlatform(from: Platform, to: Platform) {

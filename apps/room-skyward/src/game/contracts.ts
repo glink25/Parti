@@ -1,12 +1,13 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const WORLD_WIDTH = 900;
 export const VIEW_HEIGHT = 1600;
 export const CHUNK_HEIGHT = 1600;
 export const PLAYER_RADIUS = 32;
 export const BOSS_INTERVAL = 10;
 export const BOSS_TRIGGER_OFFSET = 700;
-export const BOSS_SPAWN_Y_MIN = 1300;
-export const BOSS_SPAWN_Y_MAX = 1450;
+export const BOSS_ARENA_FLOOR_OFFSET = 120;
+export const BOSS_SPAWN_Y_MIN = 1580;
+export const BOSS_SPAWN_Y_MAX = 1620;
 
 export type Random = { float(): number; int(min: number, max: number): number; pick<T>(items: readonly T[]): T };
 export type PlatformKind = 'normal' | 'moving' | 'fragile' | 'recovering' | 'spikes' | 'trigger' | 'bridge' | 'spring' | 'boss-exit';
@@ -57,7 +58,7 @@ export type RuntimeEffect =
   | { kind: 'stat'; stat: 'kills' | 'noDamageHeight'; amount: number }
   | { kind: 'message'; text: string };
 export type ContactResult = { bounceVelocity?: number; damageReason?: string; effects: RuntimeEffect[] };
-export type RenderDescription = { color: string; label: string; warning?: boolean; hidden?: boolean; spikeRange?: [number, number] };
+export type RenderDescription = { color: string; label: string; warning?: boolean; hidden?: boolean; breaking?: boolean; changedAt?: number; spikeRange?: [number, number] };
 
 export type PlatformStrategy = { id: PlatformKind; version: number; safe: boolean; weight: number; generate(platform: Platform, context: GenerationContext, index: number): Platform; contact(platform: Platform, context: RuntimeContext, state?: DynamicEntityState): ContactResult; transition(platform: Platform, context: RuntimeContext, state?: DynamicEntityState): DynamicEntityState | null; render(platform: Platform, context: RuntimeContext, state?: DynamicEntityState): RenderDescription };
 export type EnemyStrategy = { id: EnemyKind; version: number; weight: number; boss?: boolean; create(context: GenerationContext, index: number, anchor: Platform | null): Enemy; position(enemy: Enemy, context: RuntimeContext): { x: number; y: number }; contact(enemy: Enemy, context: RuntimeContext): ContactResult; hit(enemy: Enemy, damage: number, stomp: boolean): RuntimeEffect[]; attack(enemy: Enemy, context: RuntimeContext, sequence: number): AttackDefinition | null; death(enemy: Enemy, context: RuntimeContext): RuntimeEffect[] };
@@ -66,8 +67,8 @@ export type BossPhaseDefinition = { id: string; minHpRatio: number; warningScale
 export type BossStrategy = EnemyStrategy & { boss: true; phases: BossPhaseDefinition[]; arenaPlatforms(context: GenerationContext): Platform[]; selectAttack(enemy: Enemy, context: RuntimeContext, phase: BossPhaseDefinition, sequence: number, target?: { x: number; y: number }): BossAttack; summons(enemy: Enemy, context: RuntimeContext, sequence: number): Enemy[]; victory(enemy: Enemy): RuntimeEffect[] };
 export type EncounterStrategy = { id: string; version: number; populate(context: GenerationContext, route: Platform[], optional: Platform[]): { enemies: Enemy[]; pickups: Pickup[] } };
 
-export type ActiveEffect = { id: EffectId; startedAt: number; endsAt: number | null; stacks: number; sourceId: string; phase?: 'starting' | 'active' | 'ending' | 'grounding' };
-export type PlatformEntityState = { kind: 'platform'; phase: 'warning' | 'hidden' | 'restoring' | 'active'; changedAt: number; until: number | null };
+export type ActiveEffect = { id: EffectId; startedAt: number; endsAt: number | null; stacks: number; sourceId: string; phase?: 'starting' | 'active' | 'ending' | 'grounding'; forcedEndingAt?: number };
+export type PlatformEntityState = { kind: 'platform'; phase: 'breaking' | 'warning' | 'hidden' | 'restoring' | 'active'; changedAt: number; until: number | null };
 export type TriggerEntityState = { kind: 'trigger'; count: number; activatedAt: number; until: number | null };
 export type EnemyEntityState = { kind: 'enemy'; hp: number; defeated: boolean; changedAt: number };
 export type HazardState = { kind: 'hazard'; hazardKind: AttackDefinition['kind']; x: number; y: number; radius: number; activeAt: number; endsAt: number; platformId?: string; direction?: AttackDefinition['direction'] };
