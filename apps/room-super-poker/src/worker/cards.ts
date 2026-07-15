@@ -1,0 +1,7 @@
+import type { Card, Suit } from '../game/types';
+export const SUITS: Exclude<Suit,'joker'>[] = ['spades','hearts','clubs','diamonds'];
+const LABELS:Record<number,string>={1:'A',2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A',15:'2',16:'小王',17:'大王'};
+export function createDeck(options:{jokers?:boolean;copies?:number;aceHigh?:boolean}={}):Card[]{const result:Card[]=[];const copies=options.copies??1;for(let copy=0;copy<copies;copy+=1)for(const suit of SUITS)for(let raw=1;raw<=13;raw+=1){const rank=options.aceHigh?(raw===1?14:raw===2?15:raw):raw;result.push({id:`${copy}:${suit}:${raw}`,suit,rank,label:LABELS[rank]})}if(options.jokers)for(let copy=0;copy<copies;copy+=1){result.push({id:`${copy}:joker:16`,suit:'joker',rank:16,label:LABELS[16]});result.push({id:`${copy}:joker:17`,suit:'joker',rank:17,label:LABELS[17]})}return result}
+export function shuffle<T>(items:T[],random:()=>number):T[]{const result=[...items];for(let i=result.length-1;i>0;i-=1){const j=Math.floor(random()*(i+1));[result[i],result[j]]=[result[j]!,result[i]!]}return result}
+export function sortCards(cards:Card[]):Card[]{return [...cards].sort((a,b)=>b.rank-a.rank||a.suit.localeCompare(b.suit)||a.id.localeCompare(b.id))}
+export function takeCards(hand:Card[],ids:string[]):Card[]|null{if(new Set(ids).size!==ids.length)return null;const picked:Card[]=[];for(const id of ids){const card=hand.find(item=>item.id===id);if(!card)return null;picked.push(card)}return picked}
