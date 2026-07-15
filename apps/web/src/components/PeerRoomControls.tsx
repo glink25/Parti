@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIcon, CircleIcon, CopyIcon, QrCodeIcon, WandSparklesIcon } from 'lucide-react';
+import { ActivityIcon, CircleIcon, CopyIcon, QrCodeIcon, RefreshCwIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
 import type { HostRoomSettings } from '@/lib/roomSettings';
@@ -117,6 +117,36 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
   );
 }
 
+function RefreshRoomControl() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+        <RefreshCwIcon data-icon="inline-start" />
+        <FormattedMessage id="peer.settings.refresh" />
+      </Button>
+      <span className="text-[10px] text-muted-foreground">
+        <FormattedMessage id="peer.settings.refreshHint" />
+      </span>
+    </div>
+  );
+}
+
+function RefreshRoomCard() {
+  return (
+    <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
+      <CardHeader>
+        <span className="text-[9px] font-extrabold tracking-[0.14em] text-primary-bright uppercase">
+          <FormattedMessage id="peer.settings.eyebrow" />
+        </span>
+        <CardTitle className="text-lg"><FormattedMessage id="peer.settings.refresh" /></CardTitle>
+      </CardHeader>
+      <CardContent>
+        <RefreshRoomControl />
+      </CardContent>
+    </Card>
+  );
+}
+
 function SettingsCard({ props }: { props: RoomControlsProps }) {
   const intl = useIntl();
   const { settings, passwordDraft, lobbyStatus, lobbyError, publicToggleBusy, replayBusy, replayError, onPasswordDraftChange, onApplySettings, onTogglePublic, onToggleReplay } = props;
@@ -182,6 +212,7 @@ function SettingsCard({ props }: { props: RoomControlsProps }) {
           {formatLobbyStatus(intl, lobbyStatus)}
           {lobbyError ? ` · ${lobbyError}` : ''}
         </span>
+        <RefreshRoomControl />
       </CardContent>
     </Card>
   );
@@ -192,7 +223,7 @@ function ControlsContent({ props, showSettings = true, showAdmissionStatus = tru
     <>
       <InviteCard props={props} showAdmissionStatus={showAdmissionStatus} />
       {props.sensorPermission && <SensorPermissionCard control={props.sensorPermission} />}
-      {showSettings && <SettingsCard props={props} />}
+      {showSettings ? <SettingsCard props={props} /> : <RefreshRoomCard />}
     </>
   );
 }

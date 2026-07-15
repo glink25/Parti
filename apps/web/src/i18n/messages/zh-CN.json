@@ -258,6 +258,8 @@
       "replayOn": "录制中",
       "replayOff": "已关闭",
       "replayLoading": "处理中…",
+      "refresh": "刷新房间",
+      "refreshHint": "页面卡死时可刷新恢复",
       "sheetTitle": "房间设置",
       "sheetDescription": "邀请朋友加入，或调整标题、密码和公开状态。"
     },

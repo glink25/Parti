@@ -258,6 +258,8 @@
       "replayOn": "Recording",
       "replayOff": "Off",
       "replayLoading": "Working…",
+      "refresh": "Refresh room",
+      "refreshHint": "Reload if the room freezes",
       "sheetTitle": "Room settings",
       "sheetDescription": "Invite friends or adjust title, password, and visibility."
     },
