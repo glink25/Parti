@@ -1,5 +1,6 @@
 import type { BossState, EncounterState, EntityState, MapCorridor, MapRoom, MerchantState, ObjectiveState, PlayerState, RoomTemplateKind, SpellSpec, StageBlueprint, TerrainState, ThemeId, Vec2 } from './contracts';
 import { createCatalyst, generateEquipment } from './rules/equipment';
+import { terrainOverlaps } from './rules/terrainGeometry';
 
 export const GENERATION_VERSION = 1;
 export const WORLD_WIDTH = 7800;
@@ -78,7 +79,7 @@ export function monsterEntity(id: string, definitionId: string, roomId: string, 
 function roomDistances(rooms: MapRoom[], start: string) { const result = new Map<string, number>([[start, 0]]), queue = [start]; while (queue.length) { const id = queue.shift()!, room = rooms.find((candidate) => candidate.id === id); if (!room) continue; for (const next of room.connections) if (!result.has(next)) { result.set(next, result.get(room.id)! + 1); queue.push(next); } } return result; }
 function center(room: MapRoom): Vec2 { return { x: room.position.x + room.width / 2, y: room.position.y + room.height / 2 }; }
 function contains(position: Vec2, width: number, height: number, point: Vec2, inset: number) { return point.x >= position.x + inset && point.x <= position.x + width - inset && point.y >= position.y + inset && point.y <= position.y + height - inset; }
-function terrainBlocks(terrain: TerrainState, point: Vec2, radius: number) { if (terrain.width && terrain.height) return Math.abs(point.x - terrain.position.x) <= terrain.width / 2 + radius && Math.abs(point.y - terrain.position.y) <= terrain.height / 2 + radius; return Math.hypot(point.x - terrain.position.x, point.y - terrain.position.y) <= terrain.radius + radius; }
+const terrainBlocks = terrainOverlaps;
 function edgeKey(a: string, b: string) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
 function shuffle<T>(values: T[], random: () => number) { for (let i = values.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [values[i], values[j]] = [values[j]!, values[i]!]; } return values; }
 function fingerprint(value: unknown) { return hashText(JSON.stringify(value)).toString(16).padStart(8, '0'); }

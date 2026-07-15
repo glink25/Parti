@@ -53,6 +53,7 @@ describe('delivery activation', () => {
     endwellGame.actions['internal.castActivate']!.reduce(blackHole.ctx, { playerId: 'p1', castId: 'p1:cast:1' }, blackHole.action);
     expect(blackHole.state.entities['p1:cast:1:summon:0']).toMatchObject({ archetype: 'black-hole', radius: 340, source: { tickMs: 500 } });
   });
+  it('fully resets transient player and run state when restarting an ended game', () => { const test = setup(resolveSpell(['fire'])); test.state.phase = 'victory'; test.state.hostId = test.p.id; test.p.statuses.wet = { type: 'wet', endsAt: 9000, potency: 1, stacks: 1, tags: [] }; test.p.buildup.burning = 80; test.p.selectedElements = ['fire']; test.p.aim = { x: -1, y: 0 }; test.p.buffs = [{ id: 'buff', sourceId: 'test', endsAt: 9000, stacks: 1, tags: [], modifiers: [] }]; const start = endwellGame.actions['game.start']!; expect(start.validate!(test.ctx, null).ok).toBe(true); start.reduce(test.ctx, null, test.action); expect(test.state.phase).toBe('running'); expect(test.state.run.stageIndex).toBe(0); expect(test.p).toMatchObject({ statuses: {}, buildup: {}, selectedElements: [], aim: { x: 1, y: 0 }, buffs: [], shields: [], inventory: [], equipment: {} }); });
 });
 
 describe('cast target modes', () => {

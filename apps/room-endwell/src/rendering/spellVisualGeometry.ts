@@ -1,9 +1,10 @@
 import type { Element, Vec2 } from '../game/contracts';
 
 export type SprayParticle = Vec2 & { angle: number; progress: number; size: number; alpha: number };
+export function primaryVisualElement(elements: readonly Element[]): Element { return [...new Set(elements)].find((element) => !['rock', 'shield', 'life'].includes(element)) ?? elements[0] ?? 'rock'; }
 
 export function visualElementLayers(elements: readonly Element[]) {
-  const unique = [...new Set(elements)], primary = unique.find((element) => !['rock', 'shield', 'life'].includes(element)) ?? unique[0] ?? 'rock';
+  const unique = [...new Set(elements)], primary = primaryVisualElement(elements);
   return { primary, accents: unique.filter((element) => element !== primary).slice(0, 3) };
 }
 
