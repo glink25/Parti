@@ -46,7 +46,7 @@ export class SkywardScene {
   update() {
     const now = performance.now(), dt = Math.min(.04, Math.max(.001, (now - this.previous) / 1000)); this.previous = now; this.pixelRatio = mainCanvas.width / Math.max(1, mainCanvas.clientWidth); this.viewport = this.computeViewport();
     if (this.state?.phase !== 'running') return; const me = this.me(); if (!me) return;
-    this.updateMovement(dt); this.flow?.game.update(dt);
+    this.updateMovement(); this.flow?.game.update(dt);
     if (!me.alive || !this.local.alive || this.pendingDeath) return;
     if (now >= this.telemetryAt) { this.telemetryAt = now + 100; this.flow?.publishPose({ sequence: ++this.poseSequence, x: this.local.x, y: this.local.y, vy: this.local.vy, cameraBottom: this.local.cameraBottom, direction: this.direction }); }
   }
@@ -132,9 +132,9 @@ export class SkywardScene {
   private pointerDown = (e: PointerEvent) => { const rect = mainCanvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top; const hit = this.hits.find((h) => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h); if (hit) { hit.action(); return; } mainCanvas.setPointerCapture(e.pointerId); this.touches.set(e.pointerId, x < this.viewport.x + this.viewport.w / 2 ? -1 : 1); };
   private pointerUp = (e: PointerEvent) => { this.touches.delete(e.pointerId); };
   private key = (e: KeyboardEvent) => { if (e.code === 'Space' && e.type === 'keydown' && !e.repeat) { this.shoot(); e.preventDefault(); return; } const down = e.type === 'keydown'; if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keyDirection = down ? -1 : this.keyDirection === -1 ? 0 : this.keyDirection; if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keyDirection = down ? 1 : this.keyDirection === 1 ? 0 : this.keyDirection; if (e.code === 'KeyT' && down && !e.repeat) void this.toggleTilt(); };
-  private updateMovement(dt: number) {
+  private updateMovement() {
     const touch = [...this.touches.values()].at(-1) ?? 0, direct = this.keyDirection || touch;
-    this.direction = this.tilt.update(dt, direct);
+    this.direction = this.tilt.update(direct);
   }
   private orientation(data: { beta: number | null; gamma: number | null; screenAngle: number }) {
     this.tilt.receive(data);
