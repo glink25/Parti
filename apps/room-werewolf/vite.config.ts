@@ -1,17 +1,63 @@
-import { defineConfig } from 'vite';
+import { readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { build } from 'esbuild';
-import { copyFile, mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { build as esbuild } from 'esbuild';
+import { defineConfig, type Plugin } from 'vite';
 
-export default defineConfig({
-  plugins: [react(), {
-    name: 'build-room-worker',
-    async closeBundle() {
-      await build({ entryPoints: [resolve('src/worker.ts')], outfile: resolve('dist/worker.js'), bundle: true, format: 'esm', platform: 'browser', external: ['@parti/worker-sdk'] });
-      await mkdir(resolve('dist'), { recursive: true });
-      await copyFile(resolve('public/parti.room.json'), resolve('dist/parti.room.json'));
+const appDir = path.dirname(fileURLToPath(import.meta.url));
+
+function workerBundle(outDir: string): Plugin {
+  const workerFiles = [
+    path.resolve(appDir, 'src/worker.ts'),
+    path.resolve(appDir, 'src/game-logic.ts'),
+  ];
+
+  return {
+    name: 'parti-worker-bundle',
+    buildStart() {
+      for (const file of workerFiles) this.addWatchFile(file);
     },
-  }],
-  build: { outDir: 'dist', emptyOutDir: true },
+    async closeBundle() {
+      const outfile = path.join(outDir, 'worker.js');
+      await esbuild({
+        entryPoints: [workerFiles[0]],
+        outfile,
+        bundle: true,
+        format: 'esm',
+        target: 'es2022',
+        sourcemap: true,
+        external: ['@parti/worker-sdk'],
+      });
+      const source = readFileSync(outfile, 'utf8');
+      writeFileSync(
+        outfile,
+        source.replace(
+          /export\s*\{\s*([A-Za-z_$][\w$]*)\s+as\s+default\s*\};/,
+          'export default $1;',
+        ),
+      );
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const dev = process.env.PARTI_ROOM_DEV_OUT_DIR;
+  const prod = process.env.PARTI_ROOM_BUILD_OUT_DIR;
+  if (mode === 'room-dev' && !dev) throw new Error('PARTI_ROOM_DEV_OUT_DIR is required');
+  if (mode === 'room-build' && !prod) throw new Error('PARTI_ROOM_BUILD_OUT_DIR is required');
+  const outDir = mode === 'room-dev'
+    ? dev!
+    : mode === 'room-build'
+      ? prod!
+      : path.resolve(appDir, 'dist/package');
+
+  return {
+    plugins: [react(), workerBundle(outDir)],
+    build: {
+      outDir,
+      emptyOutDir: true,
+      assetsInlineLimit: 0,
+    },
+  };
 });
