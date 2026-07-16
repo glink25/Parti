@@ -133,7 +133,7 @@ function AppLayout() {
                   <span>GitHub</span>
                 </a>
               </Button>
-              <UserSettings user={user} onChange={setUser} />
+              {isLobbyRoute && <UserSettings user={user} onChange={setUser} />}
             </div>
           </div>
         </header>
