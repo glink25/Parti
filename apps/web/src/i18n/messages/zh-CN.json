@@ -152,7 +152,7 @@
   },
   "editor": {
     "backToLobby": "← 返回大厅",
-    "backToTemplates": "← 返回选择模板",
+    "backToTemplates": "返回选择模板",
     "title": "创建联机房间",
     "description": "选择一个模板开始创作，完成后立即邀请朋友加入。",
     "aiCreateAria": "使用 AI 创建房间",

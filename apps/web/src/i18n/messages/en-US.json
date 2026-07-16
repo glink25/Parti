@@ -152,7 +152,7 @@
   },
   "editor": {
     "backToLobby": "← Back to lobby",
-    "backToTemplates": "← Back to templates",
+    "backToTemplates": "Back to templates",
     "title": "Create online room",
     "description": "Pick a template to start building, then invite friends when you're ready.",
     "aiCreateAria": "Create room with AI",

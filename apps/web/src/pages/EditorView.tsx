@@ -223,17 +223,17 @@ export function EditorView() {
       const created = !dirty && loadedTemplateId !== 'blank'
         ? await createRoomSnapshot({ sourceId: loadedTemplateId, target })
         : await (async () => {
-            const input = await buildEditorInput();
-            if (!input) return null;
-            return createRoomSnapshot({
-              input,
-              target,
-              source: {
-                type: 'editor',
-                ...(loadedTemplateId !== 'blank' ? { basedOn: loadedTemplateId } : {}),
-              },
-            });
-          })();
+          const input = await buildEditorInput();
+          if (!input) return null;
+          return createRoomSnapshot({
+            input,
+            target,
+            source: {
+              type: 'editor',
+              ...(loadedTemplateId !== 'blank' ? { basedOn: loadedTemplateId } : {}),
+            },
+          });
+        })();
       if (!created) return;
       const { roomId } = created;
       window.location.hash = target === 'local' ? `#/local/${roomId}` : `#/online/host/${roomId}`;
@@ -393,184 +393,184 @@ export function EditorView() {
               <p className="mt-1 text-sm text-muted-foreground"><FormattedMessage id="editor.library.emptyDescription" /></p>
             </div>
           ) : (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
-            {normalizedCategory === 'all' && (
-              <div
-                className={cn(
-                  'flex min-h-full flex-col gap-3 rounded-[18px] border border-dashed border-border-strong bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]',
-                  isBlank && 'border-solid border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <SparklesIcon className="size-4 text-primary-bright" aria-hidden="true" />
-                  <b className="text-sm md:text-base"><FormattedMessage id="editor.newRoom.title" /></b>
-                </div>
-                <button
-                  type="button"
-                  className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
-                  disabled={importing}
-                  onClick={() => chooseTemplate(blankTemplate)}
-                >
-                  <SparklesIcon /><FormattedMessage id="editor.newRoom.blank" />
-                </button>
-                <Button asChild variant="outline" className={cn(startCardBtn, 'h-auto')}>
-                  <label>
-                    <FileArchiveIcon />
-                    {importing ? intl.formatMessage({ id: 'editor.newRoom.importing' }) : intl.formatMessage({ id: 'editor.newRoom.importZip' })}
-                    <input className="hidden" type="file" accept=".zip" disabled={importing} onChange={onZipSelected} />
-                  </label>
-                </Button>
-                <form onSubmit={onGithubSubmit} className="relative">
-                  <Link2Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <input
-                    className={cn(startCardBtn, 'justify-start pr-9 pl-9 font-medium')}
-                    type="url"
-                    inputMode="url"
-                    placeholder={intl.formatMessage({ id: 'editor.newRoom.githubPlaceholder' })}
-                    value={githubUrl}
-                    disabled={importing}
-                    onChange={(event) => setGithubUrl(event.target.value)}
-                  />
-                  {githubUrl.trim() && (
-                    <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label={intl.formatMessage({ id: 'editor.newRoom.githubImportAria' })}>
-                      <ArrowRightIcon className="size-4" />
-                    </button>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
+              {normalizedCategory === 'all' && (
+                <div
+                  className={cn(
+                    'flex min-h-full flex-col gap-3 rounded-[18px] border border-dashed border-border-strong bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]',
+                    isBlank && 'border-solid border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
                   )}
-                </form>
-              </div>
-            )}
-            {visibleTemplates.map((template) => {
-              const selected = selectedTemplateId === template.id;
-              const loadState = templateLoadState(templateLoadStates, template.id);
-              const templateReady = loadState.status === 'ready' && loadedTemplateId === template.id;
-              return (
-                <div className="relative" key={template.id}>
+                >
+                  <div className="flex items-center gap-2">
+                    <SparklesIcon className="size-4 text-primary-bright" aria-hidden="true" />
+                    <b className="text-sm md:text-base"><FormattedMessage id="editor.newRoom.title" /></b>
+                  </div>
                   <button
                     type="button"
-                    className={cn(
-                      'relative flex w-full cursor-pointer flex-col items-stretch overflow-hidden rounded-[18px] border border-border bg-surface text-left text-foreground shadow-[0_10px_28px_rgba(91,72,15,0.07)] transition-[transform,box-shadow,border-color] duration-150 hover:not-disabled:-translate-y-[3px] hover:not-disabled:border-border-strong hover:not-disabled:shadow-[0_20px_46px_rgba(91,72,15,0.16)]',
-                      selected && 'border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
-                    )}
-                    onClick={() => chooseTemplate(template)}
+                    className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
+                    disabled={importing}
+                    onClick={() => chooseTemplate(blankTemplate)}
                   >
-                    <span
-                      className="relative block aspect-[16/10] w-full bg-[linear-gradient(135deg,rgba(155,113,0,0.22),rgba(139,92,246,0.18)_55%,rgba(81,219,147,0.2))] bg-cover bg-center"
-                      aria-hidden="true"
-                      style={template.cover ? { backgroundImage: `url(${template.cover})` } : undefined}
+                    <SparklesIcon /><FormattedMessage id="editor.newRoom.blank" />
+                  </button>
+                  <Button asChild variant="outline" className={cn(startCardBtn, 'h-auto')}>
+                    <label>
+                      <FileArchiveIcon />
+                      {importing ? intl.formatMessage({ id: 'editor.newRoom.importing' }) : intl.formatMessage({ id: 'editor.newRoom.importZip' })}
+                      <input className="hidden" type="file" accept=".zip" disabled={importing} onChange={onZipSelected} />
+                    </label>
+                  </Button>
+                  <form onSubmit={onGithubSubmit} className="relative">
+                    <Link2Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                    <input
+                      className={cn(startCardBtn, 'justify-start pr-9 pl-9 font-medium')}
+                      type="url"
+                      inputMode="url"
+                      placeholder={intl.formatMessage({ id: 'editor.newRoom.githubPlaceholder' })}
+                      value={githubUrl}
+                      disabled={importing}
+                      onChange={(event) => setGithubUrl(event.target.value)}
+                    />
+                    {githubUrl.trim() && (
+                      <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label={intl.formatMessage({ id: 'editor.newRoom.githubImportAria' })}>
+                        <ArrowRightIcon className="size-4" />
+                      </button>
+                    )}
+                  </form>
+                </div>
+              )}
+              {visibleTemplates.map((template) => {
+                const selected = selectedTemplateId === template.id;
+                const loadState = templateLoadState(templateLoadStates, template.id);
+                const templateReady = loadState.status === 'ready' && loadedTemplateId === template.id;
+                return (
+                  <div className="relative" key={template.id}>
+                    <button
+                      type="button"
+                      className={cn(
+                        'relative flex w-full cursor-pointer flex-col items-stretch overflow-hidden rounded-[18px] border border-border bg-surface text-left text-foreground shadow-[0_10px_28px_rgba(91,72,15,0.07)] transition-[transform,box-shadow,border-color] duration-150 hover:not-disabled:-translate-y-[3px] hover:not-disabled:border-border-strong hover:not-disabled:shadow-[0_20px_46px_rgba(91,72,15,0.16)]',
+                        selected && 'border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
+                      )}
+                      onClick={() => chooseTemplate(template)}
                     >
-                      {loadState.status === 'loading' && (
-                        <span className="absolute inset-0 z-[1] flex flex-col justify-end bg-black/45">
-                          <span className="px-3 py-2.5 text-[11px] font-semibold text-white">
-                            <FormattedMessage id="editor.template.loading" values={{ progress: loadState.progress }} />
+                      <span
+                        className="relative block aspect-[16/10] w-full bg-[linear-gradient(135deg,rgba(155,113,0,0.22),rgba(139,92,246,0.18)_55%,rgba(81,219,147,0.2))] bg-cover bg-center"
+                        aria-hidden="true"
+                        style={template.cover ? { backgroundImage: `url(${template.cover})` } : undefined}
+                      >
+                        {loadState.status === 'loading' && (
+                          <span className="absolute inset-0 z-[1] flex flex-col justify-end bg-black/45">
+                            <span className="px-3 py-2.5 text-[11px] font-semibold text-white">
+                              <FormattedMessage id="editor.template.loading" values={{ progress: loadState.progress }} />
+                            </span>
+                            <span className="h-1 w-full bg-white/20">
+                              <span
+                                className="block h-full bg-primary-bright transition-[width] duration-150"
+                                style={{ width: `${loadState.progress}%` }}
+                              />
+                            </span>
                           </span>
-                          <span className="h-1 w-full bg-white/20">
-                            <span
-                              className="block h-full bg-primary-bright transition-[width] duration-150"
-                              style={{ width: `${loadState.progress}%` }}
-                            />
-                          </span>
+                        )}
+                      </span>
+                      <span className="flex flex-col gap-2 px-[13px] pt-3 pb-3.5 md:px-5 md:pt-[18px] md:pb-5">
+                        <b className="text-sm md:text-base">{template.name}</b>
+                        <small className="text-xs font-medium leading-[1.55] text-muted-foreground">
+                          {templateDescription(intl, template)}
+                        </small>
+                      </span>
+                      {selected && loadState.status !== 'error' && (
+                        <span className="absolute top-3 right-3 rounded-full bg-success/15 px-2.5 py-[3px] text-[10px] font-bold text-success">
+                          <FormattedMessage id="editor.template.selected" />
                         </span>
                       )}
-                    </span>
-                    <span className="flex flex-col gap-2 px-[13px] pt-3 pb-3.5 md:px-5 md:pt-[18px] md:pb-5">
-                      <b className="text-sm md:text-base">{template.name}</b>
-                      <small className="text-xs font-medium leading-[1.55] text-muted-foreground">
-                        {templateDescription(intl, template)}
-                      </small>
-                    </span>
-                    {selected && loadState.status !== 'error' && (
-                      <span className="absolute top-3 right-3 rounded-full bg-success/15 px-2.5 py-[3px] text-[10px] font-bold text-success">
-                        <FormattedMessage id="editor.template.selected" />
-                      </span>
+                      {loadState.status === 'error' && (
+                        <span className="absolute top-3 right-3 rounded-full bg-destructive/15 px-2.5 py-[3px] text-[10px] font-bold text-destructive">
+                          <FormattedMessage id="editor.template.loadFailed" />
+                        </span>
+                      )}
+                    </button>
+                    {selected && templateReady && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-2.5 left-2.5 z-[2] h-auto gap-[3px] px-2 py-[3px] text-[11px] [&_svg]:size-3 bg-background/60"
+                        onClick={() => setShowEditor(true)}
+                      >
+                        <PencilIcon data-icon="inline-start" /><FormattedMessage id="editor.template.continueEdit" />
+                      </Button>
                     )}
-                    {loadState.status === 'error' && (
-                      <span className="absolute top-3 right-3 rounded-full bg-destructive/15 px-2.5 py-[3px] text-[10px] font-bold text-destructive">
-                        <FormattedMessage id="editor.template.loadFailed" />
-                      </span>
+                    {template.removable && (
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="absolute top-2.5 right-2.5 z-[2] text-muted-foreground hover:text-destructive"
+                        disabled={importing || loadState.status === 'loading'}
+                        aria-label={intl.formatMessage({ id: 'editor.template.deleteAria' }, { name: template.name })}
+                        onClick={() => void onDeleteTemplate(template)}
+                      >
+                        <Trash2Icon />
+                      </Button>
                     )}
-                  </button>
-                  {selected && templateReady && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2.5 left-2.5 z-[2] h-auto gap-[3px] px-2 py-[3px] text-[11px] [&_svg]:size-3"
-                      onClick={() => setShowEditor(true)}
-                    >
-                      <PencilIcon data-icon="inline-start" /><FormattedMessage id="editor.template.continueEdit" />
-                    </Button>
-                  )}
-                  {template.removable && (
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="absolute top-2.5 right-2.5 z-[2] text-muted-foreground hover:text-destructive"
-                      disabled={importing || loadState.status === 'loading'}
-                      aria-label={intl.formatMessage({ id: 'editor.template.deleteAria' }, { name: template.name })}
-                      onClick={() => void onDeleteTemplate(template)}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </section>
       )}
 
       {showEditor && (
-      <section className="mb-[42px]">
-        <button type="button" className="mb-[18px] inline-flex w-max cursor-pointer items-center gap-1 border-0 bg-transparent text-[13px] text-muted-foreground transition-colors hover:text-foreground" onClick={() => setShowEditor(false)}>
-          <ArrowLeftIcon data-icon="inline-start" /><FormattedMessage id="editor.backToTemplates" />
-        </button>
-        {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
-        <div className="overflow-hidden rounded-[17px] border border-border bg-[#0c0f18] shadow-[0_18px_55px_rgba(0,0,0,0.25)]">
-          <Tabs value={activeFile} onValueChange={(value) => setActiveFile(value as EditorFile)}>
-          <TabsList className="flex h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-surface p-0" aria-label={intl.formatMessage({ id: 'editor.files.ariaLabel' })}>
-            {(['manifest', 'html', 'worker'] as EditorFile[]).map((file) => {
-              const label = file === 'manifest' ? 'parti.room.json' : file === 'html' ? 'index.html' : 'room.worker.js';
-              return <TabsTrigger value={file} className="h-11 flex-none rounded-none border-r border-border px-4 font-mono text-xs data-active:bg-[#0c0f18] data-active:text-white" key={file}>{label}</TabsTrigger>;
-            })}
-          </TabsList>
-          </Tabs>
-          <label className="block">
-            <span className="sr-only">{fileLabel}</span>
-            <Textarea className="min-h-[480px] resize-y rounded-none border-0 bg-[#0c0f18] p-5 font-mono text-[13px] leading-relaxed text-[#d9deeb] focus-visible:ring-0" value={fileValue} onChange={(event) => updateActiveFile(event.target.value)} rows={22} spellCheck={false} />
-          </label>
-        </div>
-
-        <Card className="mt-3 flex flex-col items-start gap-4 rounded-[14px] border-border bg-surface px-[18px] py-[17px] sm:flex-row sm:items-center">
-          <div className="flex-1">
-            <b className="text-[13px]"><FormattedMessage id="editor.files.extraTitle" /></b>
-            <p className="mt-1 text-[11px] text-muted-foreground"><FormattedMessage id="editor.files.extraDescription" /></p>
-          </div>
-          <Button asChild variant="outline">
-            <label>
-              <FilePlusIcon data-icon="inline-start" /><FormattedMessage id="editor.files.addFile" />
-              <input className="hidden" type="file" multiple onChange={onUpload} />
+        <section className="mb-[42px]">
+          <button type="button" className="mb-[18px] inline-flex w-max cursor-pointer items-center gap-1 border-0 bg-transparent text-[13px] text-muted-foreground transition-colors hover:text-foreground" onClick={() => setShowEditor(false)}>
+            <ArrowLeftIcon data-icon="inline-start" /><FormattedMessage id="editor.backToTemplates" />
+          </button>
+          {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
+          <div className="overflow-hidden rounded-[17px] border border-border bg-[#0c0f18] shadow-[0_18px_55px_rgba(0,0,0,0.25)]">
+            <Tabs value={activeFile} onValueChange={(value) => setActiveFile(value as EditorFile)}>
+              <TabsList className="flex h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-surface p-0" aria-label={intl.formatMessage({ id: 'editor.files.ariaLabel' })}>
+                {(['manifest', 'html', 'worker'] as EditorFile[]).map((file) => {
+                  const label = file === 'manifest' ? 'parti.room.json' : file === 'html' ? 'index.html' : 'room.worker.js';
+                  return <TabsTrigger value={file} className="h-11 flex-none rounded-none border-r border-border px-4 font-mono text-xs data-active:bg-[#0c0f18] data-active:text-white" key={file}>{label}</TabsTrigger>;
+                })}
+              </TabsList>
+            </Tabs>
+            <label className="block">
+              <span className="sr-only">{fileLabel}</span>
+              <Textarea className="min-h-[480px] resize-y rounded-none border-0 bg-[#0c0f18] p-5 font-mono text-[13px] leading-relaxed text-[#d9deeb] focus-visible:ring-0" value={fileValue} onChange={(event) => updateActiveFile(event.target.value)} rows={22} spellCheck={false} />
             </label>
-          </Button>
-          {Object.keys(extraFiles).length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {Object.keys(extraFiles).map((name) => (
-                <span key={name} className="flex items-center gap-1 rounded-[7px] bg-surface-3 px-[7px] py-1 text-[10px] text-muted-foreground">
-                  {name}
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    type="button"
-                    aria-label={intl.formatMessage({ id: 'editor.files.removeAria' }, { name })}
-                    onClick={() => { setExtraFiles((previous) => { const next = { ...previous }; delete next[name]; return next; }); setDirty(true); }}
-                  >
-                    <XIcon />
-                  </Button>
-                </span>
-              ))}
+          </div>
+
+          <Card className="mt-3 flex flex-col items-start gap-4 rounded-[14px] border-border bg-surface px-[18px] py-[17px] sm:flex-row sm:items-center">
+            <div className="flex-1">
+              <b className="text-[13px]"><FormattedMessage id="editor.files.extraTitle" /></b>
+              <p className="mt-1 text-[11px] text-muted-foreground"><FormattedMessage id="editor.files.extraDescription" /></p>
             </div>
-          )}
-        </Card>
-      </section>
+            <Button asChild variant="outline">
+              <label>
+                <FilePlusIcon data-icon="inline-start" /><FormattedMessage id="editor.files.addFile" />
+                <input className="hidden" type="file" multiple onChange={onUpload} />
+              </label>
+            </Button>
+            {Object.keys(extraFiles).length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {Object.keys(extraFiles).map((name) => (
+                  <span key={name} className="flex items-center gap-1 rounded-[7px] bg-surface-3 px-[7px] py-1 text-[10px] text-muted-foreground">
+                    {name}
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      type="button"
+                      aria-label={intl.formatMessage({ id: 'editor.files.removeAria' }, { name })}
+                      onClick={() => { setExtraFiles((previous) => { const next = { ...previous }; delete next[name]; return next; }); setDirty(true); }}
+                    >
+                      <XIcon />
+                    </Button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+        </section>
       )}
 
       <EditorActionDock canCreate={goCreate} busy={busy} selectionReady={selectionReady} onEdit={() => setShowEditor(true)} onCreate={(target) => void onCreate(target)} />
