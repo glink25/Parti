@@ -1,0 +1,41 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "room-guess-draw",
+  "name": "你画我猜",
+  "version": "0.2.0",
+  "packageMode": "filesystem",
+  "description": "2–8 人经典抢答或同时进行画作猜词接力。",
+  "author": { "name": "Parti" },
+  "cover": "cover.jpg",
+  "entry": {
+    "ui": "index.html",
+    "worker": "worker.js"
+  },
+  "room": {
+    "minPlayers": 2,
+    "maxPlayers": 8,
+    "allowSpectators": false
+  },
+  "sync": { "mode": "snapshot" },
+  "permissions": {
+    "network": false,
+    "storage": "session",
+    "camera": false,
+    "microphone": false,
+    "clipboard": false,
+    "sensors": []
+  },
+  "actions": {
+    "selectMode": { "payload": "{ mode: 'classic' | 'relay' }" },
+    "toggleReady": {},
+    "chooseCategory": { "payload": "{ categoryId: string }" },
+    "submitGuess": { "payload": "{ text: string }" },
+    "submitStroke": { "payload": "{ canvasRevision, taskId?, updateSeq, complete, stroke }" },
+    "clearCanvas": { "payload": "{ canvasRevision, taskId? }" },
+    "relaySubmitDrawing": {},
+    "advanceReveal": {},
+    "replayRevealDrawing": {},
+    "sendReaction": { "payload": "{ emoji: string }" }
+  }
+}

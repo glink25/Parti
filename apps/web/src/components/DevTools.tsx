@@ -33,7 +33,6 @@ export function DevTools({
   const [action, setAction] = useState('increment');
   const [payload, setPayload] = useState('{}');
   const logBuf = useRef<MessageLogEntry[]>([]);
-
   useEffect(() => {
     const offs = [
       host.playersChanged.on((p) => setPlayers([...p])),
@@ -46,6 +45,8 @@ export function DevTools({
         setLogs((prev) => [...prev, args.map(String).join(' ')].slice(-100)),
       ),
       host.errors.on((e) => setErrors((prev) => [...prev, e].slice(-50))),
+      // host.errors.on(e => console.error(e)),
+      // host.logs.on(e => console.error(e)),
     ];
     return () => offs.forEach((off) => off());
   }, [host]);
