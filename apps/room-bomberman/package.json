@@ -1,24 +1,19 @@
 {
-  "name": "@parti/room-undercover",
+  "name": "@parti/room-bomberman",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
     "dev:room": "vite build --watch --mode room-dev",
     "build:room": "vite build --mode room-build",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@parti/worker-sdk": "workspace:*",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "littlejsengine": "1.18.15"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.25.0",
     "typescript": "^5.6.3",
     "vite": "^6.0.5",

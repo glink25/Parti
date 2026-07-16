@@ -1,0 +1,88 @@
+/* Combat UI is deliberately pinned to the safe-area corners, leaving the arena clear. */
+canvas { pointer-events: none; }
+
+.hud .corner-info {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.hud .timer {
+  position: static;
+  transform: none;
+  min-width: 76px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.hud .timer strong { font-size: 18px; }
+
+.hud .scores {
+  top: 0;
+  right: 0;
+  left: auto;
+  display: grid;
+  gap: 3px;
+}
+
+.hud .scores span {
+  min-width: 104px;
+  justify-content: space-between;
+  padding: 4px 7px;
+  background: #0b1322d9;
+}
+
+.hud .scores span:not(.self) b { color: #aab5c7; }
+.hud .scores b { max-width: 58px; overflow: hidden; text-overflow: ellipsis; }
+
+.hud .stats {
+  position: static;
+  transform: none;
+  gap: 3px;
+}
+
+.hud .stats span { padding: 5px 7px; font-size: 11px; }
+.powerup-guide { pointer-events: auto; position: relative; font-size: 10px; }
+.powerup-guide summary { width: max-content; padding: 4px 7px; border-radius: 6px; background: #0b1322d9; color: #9ec9df; cursor: pointer; list-style: none; }
+.powerup-guide summary::-webkit-details-marker { display: none; }
+.powerup-guide > div { position: absolute; top: 26px; left: 0; display: grid; grid-template-columns: auto auto; gap: 5px 10px; width: 190px; padding: 9px; border: 1px solid #ffffff20; border-radius: 8px; background: #081321f2; box-shadow: 0 8px 24px #000a; }
+.powerup-guide span { color: #fff; font-weight: 700; }
+.powerup-guide small { color: #9aa9bd; white-space: nowrap; }
+.pickup-toast {
+  position: absolute;
+  top: 76px;
+  left: 0;
+  max-width: min(280px, 62vw);
+  padding: 7px 10px;
+  border: 1px solid #7ddcff55;
+  border-radius: 8px;
+  background: #081321e8;
+  color: #eaf8ff;
+  font-size: 12px;
+  box-shadow: 0 5px 18px #0008;
+}
+.pickup-toast[hidden] { display: none; }
+.touch-controls[hidden], .remote[hidden], .result[hidden] { display: none !important; }
+.joystick.active { border-color: #7ddcff99; }
+
+/* Keep the primary action anchored while optional item actions appear beside it. */
+.action-buttons {
+  width: 82px;
+  height: 82px;
+  display: block;
+}
+.action-buttons button {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+.action-buttons button.remote { right: 94px; }
+
+@media (pointer: coarse), (max-width: 760px) {
+  .hud .corner-info { top: -54px; }
+  .hud .scores { top: -54px; bottom: auto; grid-template-columns: repeat(2, auto); }
+  .pickup-toast { top: 18px; }
+}

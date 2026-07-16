@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["vite/client", "vitest/globals"],
+    "noEmit": true
+  },
+  "include": ["src", "vite.config.ts"]
+}

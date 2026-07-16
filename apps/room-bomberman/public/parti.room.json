@@ -1,0 +1,28 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "room-bomberman",
+  "name": "爆破派对",
+  "version": "0.1.0",
+  "packageMode": "filesystem",
+  "cover": "assets/room-cover.jpg",
+  "description": "1–4 人原创复古像素炸弹竞技场，支持机器人、多人准备和触屏操作。",
+  "author": { "name": "Parti" },
+  "tags": ["party", "action"],
+  "entry": { "ui": "index.html", "worker": "worker.js" },
+  "room": { "minPlayers": 1, "maxPlayers": 4, "allowSpectators": false },
+  "sync": { "mode": "snapshot" },
+  "permissions": { "network": false, "storage": "session", "camera": false, "microphone": false, "clipboard": false, "sensors": [] },
+  "actions": {
+    "lobby:set-ready": { "payload": "{ ready: boolean }" },
+    "lobby:set-map": { "payload": "{ mapId: string }" },
+    "lobby:add-bot": { "payload": "{ difficulty: 'easy'|'normal'|'hard' }" },
+    "lobby:remove-bot": { "payload": "{ botId: string }" },
+    "lobby:set-bot-difficulty": { "payload": "{ botId: string, difficulty: string }" },
+    "game:start": {},
+    "player:move": { "payload": "{ dx: -1|0|1, dy: -1|0|1 }" },
+    "player:place-bomb": {},
+    "player:detonate": {},
+    "game:return-to-lobby": {}
+  }
+}

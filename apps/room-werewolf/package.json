@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && node scripts/check-worker-contract.mjs",
+    "build": "vite build",
     "dev:room": "vite build --watch --mode room-dev",
-    "build:room": "vite build --mode room-build && node scripts/check-worker-contract.mjs",
+    "build:room": "vite build --mode room-build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

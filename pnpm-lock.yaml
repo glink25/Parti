@@ -15,6 +15,28 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.0.1)(lightningcss@1.32.0)
 
+  apps/room-bomberman:
+    dependencies:
+      '@parti/worker-sdk':
+        specifier: workspace:*
+        version: link:../../packages/worker-sdk
+      littlejsengine:
+        specifier: 1.18.15
+        version: 1.18.15
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.5
+        version: 6.4.3(@types/node@26.0.1)(jiti@2.7.0)(lightningcss@1.32.0)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@26.0.1)(lightningcss@1.32.0)
+
   apps/room-doudizhu:
     dependencies:
       '@parti/worker-sdk':
