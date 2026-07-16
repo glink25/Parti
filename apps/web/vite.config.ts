@@ -88,6 +88,33 @@ function gaSnippetPlugin(): Plugin {
   };
 }
 
+function webVendorChunk(id: string): string | undefined {
+  if (!id.includes('/node_modules/')) return undefined;
+  if (
+    id.includes('/node_modules/react/') ||
+    id.includes('/node_modules/react-dom/') ||
+    id.includes('/node_modules/scheduler/')
+  ) {
+    return 'react-vendor';
+  }
+  if (
+    id.includes('/node_modules/radix-ui/') ||
+    id.includes('/node_modules/@radix-ui/') ||
+    id.includes('/node_modules/@floating-ui/') ||
+    id.includes('/node_modules/react-remove-scroll')
+  ) {
+    return 'ui-vendor';
+  }
+  if (
+    id.includes('/node_modules/react-intl/') ||
+    id.includes('/node_modules/@formatjs/') ||
+    id.includes('/node_modules/intl-messageformat/')
+  ) {
+    return 'i18n-vendor';
+  }
+  return undefined;
+}
+
 export default defineConfig({
   plugins: [roomRegistryPlugin(), gaSnippetPlugin(), react(), tailwindcss()],
   server: {
@@ -107,5 +134,12 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: webVendorChunk,
+      },
+    },
   },
 });

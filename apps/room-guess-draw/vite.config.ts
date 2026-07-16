@@ -29,11 +29,39 @@ function workerBundle(outDir: string): Plugin {
   };
 }
 
+function roomVendorChunk(id: string): string | undefined {
+  if (!id.includes('/node_modules/')) return undefined;
+  if (
+    id.includes('/node_modules/react/') ||
+    id.includes('/node_modules/react-dom/') ||
+    id.includes('/node_modules/scheduler/')
+  ) {
+    return 'react-vendor';
+  }
+  if (
+    id.includes('/node_modules/konva/') ||
+    id.includes('/node_modules/react-konva/') ||
+    id.includes('/node_modules/react-reconciler/') ||
+    id.includes('/node_modules/its-fine/')
+  ) {
+    return 'canvas-vendor';
+  }
+  return undefined;
+}
+
 export default defineConfig(({ mode }) => {
   const dev = process.env.PARTI_ROOM_DEV_OUT_DIR;
   const prod = process.env.PARTI_ROOM_BUILD_OUT_DIR;
   if (mode === 'room-dev' && !dev) throw new Error('PARTI_ROOM_DEV_OUT_DIR is required');
   if (mode === 'room-build' && !prod) throw new Error('PARTI_ROOM_BUILD_OUT_DIR is required');
   const outDir = mode === 'room-dev' ? dev! : mode === 'room-build' ? prod! : path.resolve(appDir, 'dist/package');
-  return { plugins: [react(), workerBundle(outDir)], build: { outDir, emptyOutDir: true, assetsInlineLimit: 0 } };
+  return {
+    plugins: [react(), workerBundle(outDir)],
+    build: {
+      outDir,
+      emptyOutDir: true,
+      assetsInlineLimit: 0,
+      rollupOptions: { output: { manualChunks: roomVendorChunk } },
+    },
+  };
 });

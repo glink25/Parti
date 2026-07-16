@@ -1,4 +1,5 @@
 import type { Category } from './categories';
+import { EXTRA_WORD_PAIRS } from './word-bank-extra';
 
 export type WordPair = { id: string; category: Category; civilian: string; undercover: string };
 
@@ -118,4 +119,5 @@ export const WORD_PAIRS: WordPair[] = [
     ['网恋', '异地恋'], ['闪婚', '隐婚'], ['对象', '暗恋对象'], ['安全感', '占有欲'], ['心有灵犀', '一见钟情'],
     ['欲擒故纵', '若即若离'], ['甜言蜜语', '土味情话'], ['浪漫', '激情'], ['独处', '二人世界'], ['枕边话', '悄悄话'],
   ]),
+  ...EXTRA_WORD_PAIRS,
 ];

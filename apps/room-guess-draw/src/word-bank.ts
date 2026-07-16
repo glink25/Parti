@@ -1,3 +1,5 @@
+import { EXTRA_WORD_BANK } from './word-bank-extra';
+
 export const CATEGORY_DEFS = [
   { id: 'daily', name: '日常生活', icon: '☀️', description: '熟悉的物品与场景' },
   { id: 'animals', name: '动物世界', icon: '🐾', description: '天上、地上和水里' },
@@ -42,6 +44,7 @@ export const WORD_BANK = {
     { id: 'daily-shopping-cart', word: '购物车', hints: ['商店里常见', '有篮筐和轮子供顾客推动'] },
     { id: 'daily-doorbell', word: '按门铃', hints: ['到别人家门口时可能做', '用手指按下门边按钮'] },
     { id: 'daily-taking-photo', word: '拍照', hints: ['记录眼前画面', '举起相机或手机按下快门'] },
+    ...EXTRA_WORD_BANK.daily,
   ],
   animals: [
     { id: 'animal-elephant', word: '大象', hints: ['生活在陆地上的大型动物', '有很长的鼻子'] },
@@ -74,6 +77,7 @@ export const WORD_BANK = {
     { id: 'animal-butterfly', word: '蝴蝶', hints: ['常在花丛出现', '有两对色彩漂亮的翅膀'] },
     { id: 'animal-ant', word: '蚂蚁搬家', hints: ['许多小动物共同行动', '排成长队搬运食物'] },
     { id: 'animal-cat-fishing', word: '小猫钓鱼', hints: ['动物进行人类活动', '猫拿着鱼竿坐在水边'] },
+    ...EXTRA_WORD_BANK.animals,
   ],
   imagination: [
     { id: 'idea-daydream', word: '白日梦', hints: ['一种走神的状态', '醒着的时候展开幻想'] },
@@ -106,6 +110,7 @@ export const WORD_BANK = {
     { id: 'idea-frozen-time', word: '时间静止', hints: ['科幻能力', '钟表和周围动作全部停住'] },
     { id: 'idea-shadow-run', word: '影子逃跑', hints: ['不寻常的现象', '地上的黑影离开主人奔跑'] },
     { id: 'idea-mouse-giant', word: '巨型老鼠', hints: ['尺寸颠倒的场景', '老鼠比旁边的房子还大'] },
+    ...EXTRA_WORD_BANK.imagination,
   ],
   food: [
     { id: 'food-hotpot', word: '火锅', hints: ['大家常围坐着吃', '食材放进滚烫汤底'] },
@@ -138,6 +143,7 @@ export const WORD_BANK = {
     { id: 'food-bento', word: '盒饭', hints: ['方便携带的一餐', '格子餐盒里装着饭和菜'] },
     { id: 'food-steamed-fish', word: '清蒸鱼', hints: ['一道完整鱼形的菜', '盘子里有鱼、葱丝和热气'] },
     { id: 'food-toast', word: '烤面包', hints: ['早餐常见动作', '面包片从机器里弹出来'] },
+    ...EXTRA_WORD_BANK.food,
   ],
   sports: [
     { id: 'sport-football', word: '踢足球', hints: ['在草地球场进行', '用脚把球送进球门'] },
@@ -170,6 +176,7 @@ export const WORD_BANK = {
     { id: 'sport-rowing', word: '划船', hints: ['在水面进行', '坐在船上用桨推动前进'] },
     { id: 'sport-parachute', word: '跳伞', hints: ['从很高处开始', '背后张开巨大伞面缓慢下降'] },
     { id: 'sport-medal', word: '领奖牌', hints: ['比赛结束后的场景', '站在领奖台让人挂上奖牌'] },
+    ...EXTRA_WORD_BANK.sports,
   ],
   places: [
     { id: 'place-airport', word: '机场', hints: ['旅行时可能经过', '飞机在长跑道上起降'] },
@@ -202,6 +209,7 @@ export const WORD_BANK = {
     { id: 'place-volcano', word: '火山', hints: ['一种特殊山体', '山顶喷出岩浆和烟雾'] },
     { id: 'place-space-station', word: '空间站', hints: ['位于地球之外', '大型舱体带着太阳能板绕行'] },
     { id: 'place-treehouse', word: '树屋', hints: ['建在特殊位置的小屋', '房子架在粗大树枝之间'] },
+    ...EXTRA_WORD_BANK.places,
   ],
   jobs: [
     { id: 'job-doctor', word: '医生', hints: ['帮助生病的人', '常穿白大褂并使用听诊器'] },
@@ -234,6 +242,7 @@ export const WORD_BANK = {
     { id: 'job-train-driver', word: '火车司机', hints: ['驾驶大型交通工具', '坐在车头控制列车前进'] },
     { id: 'job-gardener', word: '园丁', hints: ['照料植物的人', '拿水壶和剪刀修整花园'] },
     { id: 'job-courier', word: '外卖员', hints: ['在城市街道穿行', '骑车带着餐箱送食物'] },
+    ...EXTRA_WORD_BANK.jobs,
   ],
   culture: [
     { id: 'culture-new-year', word: '贴春联', hints: ['新年习俗', '把红色对联贴在大门两边'] },
@@ -266,5 +275,6 @@ export const WORD_BANK = {
     { id: 'culture-crow-water', word: '乌鸦喝水', hints: ['熟悉的寓言故事', '鸟向瓶里放石子让水升高'] },
     { id: 'culture-snow-coal', word: '雪中送炭', hints: ['比喻及时给予帮助', '大雪天把一筐木炭送给别人'] },
     { id: 'culture-book-sleep', word: '废寝忘食', hints: ['形容非常专注', '趴在书桌读书忘记吃饭睡觉'] },
+    ...EXTRA_WORD_BANK.culture,
   ],
 };
