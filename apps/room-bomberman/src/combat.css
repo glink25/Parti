@@ -1,38 +1,51 @@
 /* Combat UI is deliberately pinned to the safe-area corners, leaving the arena clear. */
 canvas { pointer-events: none; }
 
+.hud {
+  position: fixed;
+  inset: 0;
+}
+
 .hud .corner-info {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
   display: grid;
   justify-items: start;
   gap: 4px;
 }
 
 .hud .timer {
-  position: static;
-  transform: none;
-  min-width: 76px;
-  padding: 6px 10px;
-  border-radius: 10px;
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 50vw;
+  transform: translateX(-50%);
+  min-width: 190px;
+  max-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 32px);
+  padding: 7px 18px 8px;
+  border-radius: 0 0 14px 14px;
 }
 
-.hud .timer strong { font-size: 18px; }
+.hud .timer strong { font-size: 26px; line-height: 1.05; }
+.hud .timer span { display: block; margin-top: 2px; color: #b6c4d7; font-size: 10px; white-space: nowrap; }
+.hud .timer.overtime span { color: #ffd7b0; }
 
 .hud .scores {
-  top: 0;
-  right: 0;
+  top: calc(68px + env(safe-area-inset-top, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
   left: auto;
   display: grid;
+  grid-template-columns: 1fr;
   gap: 3px;
 }
 
 .hud .scores span {
-  min-width: 104px;
+  min-width: 96px;
   justify-content: space-between;
-  padding: 4px 7px;
-  background: #0b1322d9;
+  padding: 3px 6px;
+  border-left-width: 2px;
+  background: #08132180;
+  box-shadow: none;
 }
 
 .hud .scores span:not(.self) b { color: #aab5c7; }
@@ -53,8 +66,8 @@ canvas { pointer-events: none; }
 .powerup-guide small { color: #9aa9bd; white-space: nowrap; }
 .pickup-toast {
   position: absolute;
-  top: 76px;
-  left: 0;
+  top: calc(76px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
   max-width: min(280px, 62vw);
   padding: 7px 10px;
   border: 1px solid #7ddcff55;
@@ -67,6 +80,7 @@ canvas { pointer-events: none; }
 .pickup-toast[hidden] { display: none; }
 .touch-controls[hidden], .remote[hidden], .result[hidden] { display: none !important; }
 .joystick.active { border-color: #7ddcff99; }
+.map-preview { aspect-ratio: 19 / 15; font-size: 6px; letter-spacing: 1px; }
 
 /* Keep the primary action anchored while optional item actions appear beside it. */
 .action-buttons {
@@ -82,7 +96,5 @@ canvas { pointer-events: none; }
 .action-buttons button.remote { right: 94px; }
 
 @media (pointer: coarse), (max-width: 760px) {
-  .hud .corner-info { top: -54px; }
-  .hud .scores { top: -54px; bottom: auto; grid-template-columns: repeat(2, auto); }
-  .pickup-toast { top: 18px; }
+  .hud .scores { bottom: auto; }
 }

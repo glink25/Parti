@@ -41,12 +41,12 @@ function createLobbyShell(){
   combatShell=undefined;
   app.replaceChildren();
   const panel=document.createElement('main');panel.className='lobby panel';
-  panel.innerHTML=`<header class="lobby-hero"><div><div class="brand"><span class="brand-mark">✹</span><div><p>PARTI ARENA</p><h1>爆破派对</h1></div></div><p class="lead">放置炸弹，炸开捷径，在三分钟内抢下最高分。</p></div></header>
+  panel.innerHTML=`<header class="lobby-hero"><div><div class="brand"><span class="brand-mark">✹</span><div><p>PARTI ARENA</p><h1>爆破派对</h1></div></div><p class="lead">击杀 +1，四分钟内最高分获胜；平分进入加时决胜。</p></div></header>
   <section><div class="section-title"><h2>参战席位</h2><span class="seat-count">0/4</span></div><div class="roster"></div></section>
   <section class="map-select"><div class="section-title"><h2>竞技场</h2><span>8 张地图</span></div><div class="maps"></div></section>
   <footer class="lobby-actions"><button class="ready-button">准备迎战</button><button class="start-button">开始比赛</button></footer>`;
   const maps=panel.querySelector('.maps')!;
-  MAPS.forEach(map=>{const button=document.createElement('button');button.dataset.mapId=map.id;button.className=`map-card theme-${map.theme}`;button.innerHTML=`<span class="map-preview">${map.rows.slice(1,10).map(r=>`<i>${r.slice(1,12).replaceAll('#','■').replaceAll('+','▪').replaceAll('.','·')}</i>`).join('')}</span><strong>${map.name}</strong><small>${map.theme==='garden'?'苔庭':map.theme==='frost'?'冰境':map.theme==='volcano'?'熔岩':'霓虹'}</small>`;button.onclick=()=>action('lobby:set-map',{mapId:map.id});maps.append(button);});
+  MAPS.forEach(map=>{const button=document.createElement('button');button.dataset.mapId=map.id;button.className=`map-card theme-${map.theme}`;button.innerHTML=`<span class="map-preview">${map.rows.map(r=>`<i>${r.replaceAll('#','■').replaceAll('+','▪').replaceAll('.','·')}</i>`).join('')}</span><strong>${map.name}</strong><small>${map.theme==='garden'?'苔庭':map.theme==='frost'?'冰境':map.theme==='volcano'?'熔岩':'霓虹'}</small>`;button.onclick=()=>action('lobby:set-map',{mapId:map.id});maps.append(button);});
   const ready=panel.querySelector<HTMLButtonElement>('.ready-button')!;ready.onclick=()=>{const player=me();if(player)action('lobby:set-ready',{ready:!player.ready})};
   panel.querySelector<HTMLButtonElement>('.start-button')!.onclick=()=>action('game:start');
   app.append(panel);lobbyShell=panel;
@@ -72,7 +72,7 @@ function updateLobbyShell(){
 
 function createCombatShell(){
   lobbyShell=undefined;
-  const fragment=document.createRange().createContextualFragment(`<div class="hud"><div class="corner-info"><div class="timer"><small>剩余</small><strong>3:00</strong></div><div class="stats"></div><details class="powerup-guide"><summary>道具说明</summary><div><span>🔥 火力</span><small>爆炸范围 +1</small><span>💣 扩容</span><small>同时放置 +1</small><span>⚡ 加速</span><small>提高移动速度</small><span>👢 踢弹</span><small>推动前方炸弹</small><span>📡 遥控</span><small>主动引爆炸弹</small></div></details></div><div class="pickup-toast" hidden></div><div class="scores"></div><div class="result panel" hidden></div></div><div class="touch-controls"><div class="joystick" aria-label="移动摇杆"><i></i></div><div class="action-buttons"><button class="bomb" aria-label="放置炸弹">💣<small>放置</small></button><button class="remote" aria-label="遥控引爆">⚡<small>引爆</small></button></div></div>`);
+  const fragment=document.createRange().createContextualFragment(`<div class="hud"><div class="timer"><small>剩余</small><strong>4:00</strong><span>击杀 +1 · 最高分获胜</span></div><div class="corner-info"><div class="stats"></div><details class="powerup-guide"><summary>道具说明</summary><div><span>🔥 火力</span><small>爆炸范围 +1</small><span>💣 扩容</span><small>同时放置 +1</small><span>⚡ 加速</span><small>提高移动速度</small><span>👢 踢弹</span><small>推动前方炸弹</small><span>📡 遥控</span><small>主动引爆炸弹</small></div></details></div><div class="pickup-toast" hidden></div><div class="scores"></div><div class="result panel" hidden></div></div><div class="touch-controls"><div class="joystick" aria-label="移动摇杆"><i></i></div><div class="action-buttons"><button class="bomb" aria-label="放置炸弹">💣<small>放置</small></button><button class="remote" aria-label="遥控引爆">⚡<small>引爆</small></button></div></div>`);
   app.replaceChildren(fragment);
   combatShell=app.firstElementChild as HTMLElement;
   const controls=app.querySelector<HTMLElement>('.touch-controls')!;
@@ -83,7 +83,7 @@ function createCombatShell(){
 
 function updateCombatShell(){
   const ranking=Object.values(state!.players).filter(p=>!p.waiting).sort((a,b)=>b.score-a.score);
-  const timer=app.querySelector<HTMLElement>('.timer')!;timer.classList.toggle('overtime',state!.phase==='overtime');timer.innerHTML=`<small>${state!.phase==='overtime'?'加时':'剩余'}</small><strong>${Math.floor(timeLeft()/60)}:${String(timeLeft()%60).padStart(2,'0')}</strong>`;
+  const timer=app.querySelector<HTMLElement>('.timer')!;timer.classList.toggle('overtime',state!.phase==='overtime');timer.innerHTML=`<small>${state!.phase==='overtime'?'加时决胜':'剩余时间'}</small><strong>${Math.floor(timeLeft()/60)}:${String(timeLeft()%60).padStart(2,'0')}</strong><span>${state!.phase==='overtime'?'领先者下一次击杀即获胜':'击杀 +1 · 最高分获胜'}</span>`;
   app.querySelector<HTMLElement>('.scores')!.innerHTML=ranking.map((p,i)=>`<span class="${p.id===parti.playerId?'self':''}" style="--player:${colors[p.color]}"><i>${i+1}</i><b>${p.name}</b><strong>${p.score}</strong></span>`).join('');
   const player=me();app.querySelector<HTMLElement>('.stats')!.innerHTML=player?`<span title="火力">🔥${player.flame}</span><span title="炸弹容量">💣${player.capacity}</span><span title="速度">⚡${player.speed}</span>${player.kick?'<span title="踢弹">👢</span>':''}${player.remote?'<span title="遥控">📡</span>':''}`:'';
   const controls=app.querySelector<HTMLElement>('.touch-controls')!;controls.hidden=!player||player.waiting||!['playing','overtime'].includes(state!.phase);controls.querySelector<HTMLElement>('.remote')!.hidden=!player?.remote;
@@ -106,9 +106,9 @@ addEventListener('keydown',e=>{const key=e.key.toLowerCase();if(['arrowleft','ar
 
 function gameRender(){
   if(!state||state.phase==='lobby'||!mainContext||!mainCanvas)return;
-  const ctx=mainContext,canvas=mainCanvas,map=getMap(state.mapId),palette=themeColors[map.theme];const tile=Math.floor(Math.min(canvas.width/13,canvas.height/11)),ox=(canvas.width-tile*13)/2,oy=(canvas.height-tile*11)/2;
+  const ctx=mainContext,canvas=mainCanvas,map=getMap(state.mapId),palette=themeColors[map.theme],mapHeight=map.rows.length,mapWidth=map.rows[0].length;const tile=Math.floor(Math.min(canvas.width/mapWidth,canvas.height/mapHeight)),ox=(canvas.width-tile*mapWidth)/2,oy=(canvas.height-tile*mapHeight)/2;
   ctx.imageSmoothingEnabled=false;ctx.fillStyle=palette[0];ctx.fillRect(0,0,canvas.width,canvas.height);
-  for(let y=0;y<11;y++)for(let x=0;x<13;x++){const value=map.rows[y][x],destroyed=state.destroyed.includes(`${x},${y}`);drawTile(ctx,ox+x*tile,oy+y*tile,tile,value,destroyed,palette);}
+  for(let y=0;y<mapHeight;y++)for(let x=0;x<mapWidth;x++){const value=map.rows[y][x],destroyed=state.destroyed.includes(`${x},${y}`);drawTile(ctx,ox+x*tile,oy+y*tile,tile,value,destroyed,palette);}
   const animation=performance.now(),dt=Math.min(50,animation-lastFrameAt);lastFrameAt=animation;
   for(const item of state.powerups)drawPowerup(ctx,ox+(item.x+.5)*tile,oy+(item.y+.5)*tile,tile,item.type,animation);
   const bombIds=new Set(state.bombs.map(bomb=>bomb.id));for(const id of visualBombPositions.keys())if(!bombIds.has(id))visualBombPositions.delete(id);

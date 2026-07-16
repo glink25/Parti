@@ -1,20 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { MAPS } from './maps';
-import { applyPowerup, BASE_CAPACITY, BASE_FLAME, BASE_SPEED, blastCells, bombFuseFor, canBombMoveTo, canMove, deterministicDropRoll, leaders, MAX_CAPACITY, MAX_FLAME, MAX_SPEED, moveDelayFor, NORMAL_BOMB_FUSE_MS, playerSpawn, powerupDropForRoll, REMOTE_BOMB_FUSE_MS, removePowerupsInCells, resetPlayerAbilities, validateMaps } from './rules';
+import { MAP_HEIGHT, MAP_WIDTH, MAPS } from './maps';
+import { applyPowerup, BASE_CAPACITY, BASE_FLAME, BASE_SPEED, blastCells, bombFuseFor, canBombMoveTo, canMove, deterministicDropRoll, leaders, MATCH_MS, MAX_CAPACITY, MAX_FLAME, MAX_SPEED, moveDelayFor, movePlayer, NORMAL_BOMB_FUSE_MS, playerSpawn, powerupDropForRoll, REMOTE_BOMB_FUSE_MS, removePowerupsInCells, resetPlayerAbilities, validateMaps } from './rules';
 import type { GameState, PlayerState } from './types';
 
 const player=(id:string,x=1,y=1):PlayerState=>({id,name:id,bot:false,ready:true,connected:true,waiting:false,x,y,input:{dx:0,dy:0},alive:true,score:0,deaths:0,flame:BASE_FLAME,capacity:BASE_CAPACITY,speed:BASE_SPEED,kick:false,remote:false,respawnAt:0,invulnerableUntil:0,nextMoveAt:0,color:0,spawnIndex:0});
-const state=():GameState=>({schema:'bomberman-v1',phase:'playing',hostId:'p1',mapId:MAPS[0].id,players:{p1:player('p1'),p2:player('p2',11,9)},bombs:[],flames:[],powerups:[],destroyed:[],startedAt:0,endsAt:0,overtimeEndsAt:0,overtimeLeaders:[],winners:[],tick:0});
+const state=():GameState=>({schema:'bomberman-v1',phase:'playing',hostId:'p1',mapId:MAPS[0].id,players:{p1:player('p1'),p2:player('p2',17,13)},bombs:[],flames:[],powerups:[],destroyed:[],startedAt:0,endsAt:0,overtimeEndsAt:0,overtimeLeaders:[],winners:[],tick:0});
 
 describe('arena maps',()=>{
-  it('ships eight valid maps with four safe spawns',()=>{expect(MAPS).toHaveLength(8);expect(validateMaps()).toBe(true);expect(MAPS.every(map=>map.spawns.length===4)).toBe(true)});
-  it('always returns the player fixed spawn, even when it is dangerous',()=>{const game=state(),p=game.players.p2;p.spawnIndex=3;game.bombs.push({id:'b',ownerId:'p1',x:11,y:9,flame:2,explodeAt:0,remote:false,motion:{dx:0,dy:0},nextMoveAt:0});expect(playerSpawn(game,p)).toEqual({x:11,y:9})});
+  it('ships eight valid 19 by 15 maps with four safe spawns',()=>{expect(MAPS).toHaveLength(8);expect(validateMaps()).toBe(true);expect(MAPS.every(map=>map.rows.length===MAP_HEIGHT&&map.rows.every(row=>row.length===MAP_WIDTH)&&map.spawns.length===4)).toBe(true)});
+  it('always returns the player fixed spawn, even when it is dangerous',()=>{const game=state(),p=game.players.p2;p.spawnIndex=3;game.bombs.push({id:'b',ownerId:'p1',x:17,y:13,flame:2,explodeAt:0,remote:false,motion:{dx:0,dy:0},nextMoveAt:0});expect(playerSpawn(game,p)).toEqual({x:17,y:13})});
 });
 
 describe('pure game rules',()=>{
-  it('stops a blast at solid walls and destructible bricks',()=>{const game=state();const cells=blastCells(game,{id:'b',ownerId:'p1',x:1,y:1,flame:6,explodeAt:0,remote:false,motion:{dx:0,dy:0},nextMoveAt:0});expect(cells).toContainEqual({x:1,y:2});expect(cells).not.toContainEqual({x:1,y:3})});
+  it('stops a blast after reaching a destructible brick',()=>{const game=state();const cells=blastCells(game,{id:'b',ownerId:'p1',x:1,y:1,flame:6,explodeAt:0,remote:false,motion:{dx:0,dy:0},nextMoveAt:0});expect(cells).toContainEqual({x:1,y:3});expect(cells).not.toContainEqual({x:1,y:4})});
   it('blocks walls and active bombs',()=>{const game=state();expect(canMove(game,game.players.p1,0,1)).toBe(false);game.bombs.push({id:'b',ownerId:'p2',x:2,y:1,flame:2,explodeAt:0,remote:false,motion:{dx:0,dy:0},nextMoveAt:0});expect(canMove(game,game.players.p1,2,1)).toBe(false)});
   it('lets kicked bombs cross floor but stops them at walls, bricks, and other bombs',()=>{const game=state(),bomb={id:'moving',ownerId:'p1',x:1,y:1,flame:1,explodeAt:9999,remote:false,motion:{dx:1 as const,dy:0 as const},nextMoveAt:0};game.bombs.push(bomb);expect(canBombMoveTo(game,bomb,2,1)).toBe(true);expect(canBombMoveTo(game,bomb,0,1)).toBe(false);expect(canBombMoveTo(game,bomb,4,1)).toBe(false);game.bombs.push({...bomb,id:'blocker',x:2,y:1});expect(canBombMoveTo(game,bomb,2,1)).toBe(false)});
+  it('treats bombs as solid for humans and bots across repeated movement',()=>{for(const mover of [gamePlayer(false),gamePlayer(true)]){const game=state();game.players.p1=mover;game.bombs.push(bombAt(2,1));expect(movePlayer(game,mover,{dx:1,dy:0},100)).toBe(false);expect(movePlayer(game,mover,{dx:1,dy:0},150)).toBe(false);expect(mover).toMatchObject({x:1,y:1})}});
+  it('lets a player leave a newly placed bomb but never step back onto it',()=>{const game=state(),p=game.players.p1;game.bombs.push(bombAt(1,1));expect(movePlayer(game,p,{dx:1,dy:0},100)).toBe(true);expect(movePlayer(game,p,{dx:-1,dy:0},150)).toBe(false);expect(p).toMatchObject({x:2,y:1})});
+  it('pushes a bomb only when kick is active and the destination is clear',()=>{const game=state(),p=game.players.p1,bomb=bombAt(2,1);game.destroyed.push('3,1');game.bombs.push(bomb);expect(movePlayer(game,p,{dx:1,dy:0},100)).toBe(false);p.kick=true;expect(movePlayer(game,p,{dx:1,dy:0},200)).toBe(true);expect(p).toMatchObject({x:2,y:1});expect(bomb).toMatchObject({x:3,y:1,motion:{dx:1,dy:0}})});
+  it('does not push a bomb into a wall, brick, or another bomb',()=>{for(const blocker of ['wall','brick','bomb'] as const){const game=state(),p=game.players.p1,bomb=bombAt(2,1);p.kick=true;game.bombs.push(bomb);if(blocker==='wall'){p.x=16;p.y=1;bomb.x=17;}else if(blocker==='bomb'){game.destroyed.push('3,1');game.bombs.push({...bombAt(3,1),id:'blocker'});}expect(movePlayer(game,p,{dx:1,dy:0},100)).toBe(false);expect(p).toMatchObject({x:blocker==='wall'?16:1,y:1})}});
   it('applies and caps all five powerups',()=>{const p=player('p');for(let i=0;i<10;i++){applyPowerup(p,'flame');applyPowerup(p,'capacity');applyPowerup(p,'speed')}applyPowerup(p,'kick');applyPowerup(p,'remote');expect(p).toMatchObject({flame:MAX_FLAME,capacity:MAX_CAPACITY,speed:MAX_SPEED,kick:true,remote:true})});
   it('fully resets abilities without resetting score',()=>{const p=player('p');Object.assign(p,{flame:4,capacity:3,speed:3,kick:true,remote:true,score:7});resetPlayerAbilities(p);expect(p).toMatchObject({flame:1,capacity:1,speed:1,kick:false,remote:false,score:7})});
   it('uses distinct normal and remote fuse limits',()=>{expect(bombFuseFor(false)).toBe(NORMAL_BOMB_FUSE_MS);expect(bombFuseFor(true)).toBe(REMOTE_BOMB_FUSE_MS);expect(REMOTE_BOMB_FUSE_MS).toBe(5000)});
@@ -23,4 +27,8 @@ describe('pure game rules',()=>{
   it('removes exposed items before a newly revealed item is appended',()=>{const cells=[{x:2,y:3}],existing=[{id:'old',type:'speed' as const,x:2,y:3},{id:'safe',type:'flame' as const,x:4,y:3}];const survivors=removePowerupsInCells(existing,cells);expect([...survivors,{id:'new',type:'remote' as const,x:2,y:3}].map(item=>item.id)).toEqual(['safe','new'])});
   it('returns every tied score leader',()=>{const game=state();game.players.p1.score=4;game.players.p2.score=4;expect(leaders(game)).toEqual(['p1','p2'])});
   it('paces bots slower than humans and caps speed upgrades',()=>{const human=player('human'),bot={...player('bot'),bot:true,difficulty:'normal' as const};expect(moveDelayFor(bot)).toBeGreaterThan(moveDelayFor(human));bot.speed=4;expect(moveDelayFor(bot)).toBe(265)});
+  it('runs the main score match for four minutes',()=>{expect(MATCH_MS).toBe(240_000)});
 });
+
+function gamePlayer(bot:boolean){return {...player('p1'),bot,difficulty:bot?'normal' as const:undefined}}
+function bombAt(x:number,y:number){return{id:`bomb-${x}-${y}`,ownerId:'p2',x,y,flame:1,explodeAt:9999,remote:false,motion:{dx:0 as const,dy:0 as const},nextMoveAt:0}}

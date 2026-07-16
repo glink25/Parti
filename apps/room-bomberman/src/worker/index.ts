@@ -1,6 +1,6 @@
 import { defineRoom } from '@parti/worker-sdk';
 import { MAPS, cellKey, getMap } from '../game/maps';
-import { applyPowerup, BASE_CAPACITY, BASE_FLAME, BASE_SPEED, blastCells, bombFuseFor, canBombMoveTo, canMove, chooseBotDirection, deterministicDropRoll, INVULNERABLE_MS, KICKED_BOMB_STEP_MS, leaders, MATCH_MS, moveDelayFor, OVERTIME_MS, playerSpawn, powerupDropForRoll, removePowerupsInCells, resetPlayerAbilities, RESPAWN_MS } from '../game/rules';
+import { applyPowerup, BASE_CAPACITY, BASE_FLAME, BASE_SPEED, blastCells, bombFuseFor, canBombMoveTo, chooseBotDirection, deterministicDropRoll, INVULNERABLE_MS, KICKED_BOMB_STEP_MS, leaders, MATCH_MS, moveDelayFor, movePlayer, OVERTIME_MS, playerSpawn, powerupDropForRoll, removePowerupsInCells, resetPlayerAbilities, RESPAWN_MS } from '../game/rules';
 import type { Difficulty, GameState, PlayerState } from '../game/types';
 
 const TICK_MS = 50;
@@ -72,9 +72,7 @@ function tick(ctx:any) {
     }
     const moveDelay=moveDelayFor(player);
     if(now>=player.nextMoveAt&&(player.input.dx||player.input.dy)){
-      const nx=player.x+player.input.dx, ny=player.y+player.input.dy;
-      if(canMove(state,player,nx,ny)){player.x=nx;player.y=ny;player.nextMoveAt=now+moveDelay;}
-      else if(player.kick){const bomb=state.bombs.find(b=>b.x===nx&&b.y===ny);const bx=nx+player.input.dx,by=ny+player.input.dy;if(bomb&&canBombMoveTo(state,bomb,bx,by)){bomb.x=bx;bomb.y=by;bomb.motion={...player.input};bomb.nextMoveAt=now+KICKED_BOMB_STEP_MS;player.x=nx;player.y=ny;player.nextMoveAt=now+moveDelay;}}
+      if(movePlayer(state,player,player.input,now))player.nextMoveAt=now+moveDelay;
     }
     const item=state.powerups.find(i=>i.x===player.x&&i.y===player.y);if(item){applyPowerup(player,item.type);state.powerups=state.powerups.filter(i=>i.id!==item.id);}
     for(const flame of state.flames) if(flame.cells.some(c=>c.x===player.x&&c.y===player.y)) eliminate(state,player,flame.ownerId,now);

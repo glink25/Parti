@@ -1,7 +1,7 @@
-import { cellKey, getMap, isSolid } from './maps';
-import type { BombState, GameState, PlayerState, PowerupState, PowerupType } from './types';
+import { cellKey, getMap, isSolid, MAP_HEIGHT, MAP_WIDTH } from './maps';
+import type { BombState, Direction, GameState, PlayerState, PowerupState, PowerupType } from './types';
 
-export const MATCH_MS = 180_000;
+export const MATCH_MS = 240_000;
 export const OVERTIME_MS = 30_000;
 export const RESPAWN_MS = 2_000;
 export const INVULNERABLE_MS = 2_000;
@@ -34,6 +34,16 @@ export function canMove(state: GameState, player: PlayerState, x: number, y: num
 
 export function canBombMoveTo(state: GameState, bomb: BombState, x: number, y: number) {
   return !isSolid(getMap(state.mapId),x,y,state.destroyed) && !state.bombs.some(other=>other.id!==bomb.id&&other.x===x&&other.y===y);
+}
+
+export function movePlayer(state:GameState,player:PlayerState,direction:Direction,now:number) {
+  const x=player.x+direction.dx,y=player.y+direction.dy;
+  if(canMove(state,player,x,y)){player.x=x;player.y=y;return true;}
+  if(!player.kick)return false;
+  const bomb=state.bombs.find(candidate=>candidate.x===x&&candidate.y===y);
+  if(!bomb||!canBombMoveTo(state,bomb,x+direction.dx,y+direction.dy))return false;
+  bomb.x+=direction.dx;bomb.y+=direction.dy;bomb.motion={...direction};bomb.nextMoveAt=now+KICKED_BOMB_STEP_MS;
+  player.x=x;player.y=y;return true;
 }
 
 export function blastCells(state: GameState, bomb: BombState) {
@@ -107,6 +117,9 @@ export function chooseBotDirection(state: GameState, bot: PlayerState) {
 
 export function validateMaps() {
   return ['garden-cross','garden-court','frost-bridge','frost-vault','volcano-core','volcano-rift','neon-grid','neon-loop'].every(id=>{
-    const map=getMap(id); return map.rows.length===11 && map.rows.every(r=>r.length===13) && map.spawns.every(s=>!isSolid(map,s.x,s.y,[]));
+    const map=getMap(id);
+    const validBoundary=map.rows[0]?.split('').every(tile=>tile==='#')&&map.rows[MAP_HEIGHT-1]?.split('').every(tile=>tile==='#')&&map.rows.every(row=>row[0]==='#'&&row[MAP_WIDTH-1]==='#');
+    const safeSpawn=(spawn:{x:number;y:number})=>!isSolid(map,spawn.x,spawn.y,[])&&[[1,0],[-1,0],[0,1],[0,-1]].filter(([dx,dy])=>!isSolid(map,spawn.x+dx,spawn.y+dy,[])).length>=2;
+    return map.rows.length===MAP_HEIGHT&&map.rows.every(r=>r.length===MAP_WIDTH)&&validBoundary&&map.spawns.length===4&&map.spawns.every(safeSpawn);
   });
 }
