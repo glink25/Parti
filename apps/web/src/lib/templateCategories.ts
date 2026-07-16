@@ -28,22 +28,37 @@ export function buildTemplateCategories(
 ): TemplateCategory[] {
   const tags = new Set(templates.flatMap((template) => template.tags));
   const knownIndex = new Map<string, number>(KNOWN_TAG_ORDER.map((tag, index) => [tag, index]));
-  const sortedTags = [...tags].sort((a, b) => {
-    const ai = knownIndex.get(a);
-    const bi = knownIndex.get(b);
-    if (ai !== undefined || bi !== undefined) return (ai ?? Number.MAX_SAFE_INTEGER) - (bi ?? Number.MAX_SAFE_INTEGER);
-    return displayTag(a).localeCompare(displayTag(b));
-  });
-  return [
-    { id: 'all', count: templates.length },
-    { id: 'imported', count: templates.filter((template) => template.imported).length },
-    { id: 'simple', count: templates.filter((template) => SIMPLE_TEMPLATE_IDS.has(template.id)).length },
-    ...sortedTags.map((tagId) => ({
+
+  const allCategory: TemplateCategory = { id: 'all', count: templates.length };
+  const importedCategory: TemplateCategory = {
+    id: 'imported',
+    count: templates.filter((template) => template.imported).length,
+  };
+  const simpleCategory: TemplateCategory = {
+    id: 'simple',
+    count: templates.filter((template) => SIMPLE_TEMPLATE_IDS.has(template.id)).length,
+  };
+
+  const tagCategories = [...tags]
+    .map((tagId) => ({
       id: `tag:${tagId}` as const,
       tagId,
       count: templates.filter((template) => template.tags.includes(tagId)).length,
-    })),
-  ];
+    }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      const ai = knownIndex.get(a.tagId!);
+      const bi = knownIndex.get(b.tagId!);
+      if (ai !== undefined || bi !== undefined) {
+        return (ai ?? Number.MAX_SAFE_INTEGER) - (bi ?? Number.MAX_SAFE_INTEGER);
+      }
+      return displayTag(a.tagId!).localeCompare(displayTag(b.tagId!));
+    });
+
+  if (importedCategory.count > 0) {
+    return [allCategory, importedCategory, ...tagCategories, simpleCategory];
+  }
+  return [allCategory, ...tagCategories, importedCategory, simpleCategory];
 }
 
 export function normalizeTemplateCategory(categoryId: TemplateCategoryId, categories: TemplateCategory[]) {

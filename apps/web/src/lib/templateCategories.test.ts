@@ -28,10 +28,18 @@ describe('template categories', () => {
       .toEqual(['builtin-party']);
   });
 
-  it('orders known tags before unknown localized labels', () => {
+  it('orders tabs: all first, imported after all when non-zero, simple last, tags by count', () => {
     const categories = buildTemplateCategories(templates, (tag) => tag === 'custom-tag' ? 'AAA' : tag);
     expect(categories.map(({ id }) => id)).toEqual([
-      'all', 'imported', 'simple', 'tag:party', 'tag:turn-based', 'tag:custom-tag',
+      'all', 'imported', 'tag:party', 'tag:custom-tag', 'tag:turn-based', 'simple',
+    ]);
+  });
+
+  it('moves imported to end zone when count is zero', () => {
+    const noImported = templates.filter((template) => !template.imported);
+    const categories = buildTemplateCategories(noImported, (tag) => tag);
+    expect(categories.map(({ id }) => id)).toEqual([
+      'all', 'tag:party', 'tag:turn-based', 'tag:custom-tag', 'imported', 'simple',
     ]);
   });
 

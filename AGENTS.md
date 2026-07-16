@@ -43,3 +43,6 @@ The rules in this section apply whenever an agent creates, modifies, debugs, or 
 - Develop against the documented protocol. Assume the Parti implementation already satisfies that protocol and is transparent to game-room developers.
 - Reading underlying implementation is allowed only when there is concrete evidence of a lower-level protocol/runtime bug and inspecting it is necessary to diagnose that bug. State that reason before expanding the investigation.
 - If the public documentation is insufficient, ask the user for the missing contract detail or for permission to inspect a specific implementation area instead of exploring the repository broadly.
+
+## 7. Make sure room:dev command work
+- When start a new room project, make sure room build options can be implemented into apps/web's dev & build command
