@@ -20,7 +20,6 @@ function ReplayList() {
   if (!records) return <Loading />;
   return (
     <div className="mx-auto w-[min(1100px,100%)]">
-      <a className="mb-6 block w-max text-sm text-muted-foreground hover:text-foreground" href="#/"><FormattedMessage id="replays.back" /></a>
       <h1 className="text-4xl font-extrabold tracking-tight"><FormattedMessage id="replays.title" /></h1>
       <p className="mt-2 text-muted-foreground"><FormattedMessage id="replays.description" /></p>
       {records.length === 0 ? (

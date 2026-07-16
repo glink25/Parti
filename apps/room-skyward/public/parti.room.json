@@ -6,6 +6,7 @@
   "version": "0.2.0",
   "packageMode": "filesystem",
   "description": "跳跃，合作，疯狂！",
+  "tags": ["action", "co-op"],
   "cover": "assets/skyward-2/cover.png",
   "_template_order": 101,
   "author": { "name": "Parti" },

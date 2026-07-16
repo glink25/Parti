@@ -1,6 +1,6 @@
 {
   "partiVersion":"0.1.0","protocolVersion":1,"id":"room-super-mahjong","name":"超级麻将","version":"0.1.0","packageMode":"filesystem",
-  "description":"1–4位真人、机器人补位的霓虹国潮四人红中麻将。自定义胡法、吃牌、一炮多响和计分规则。","cover":"cover.svg","author":{"name":"Parti"},"_template_order":100,
+  "description":"1–4位真人、机器人补位的霓虹国潮四人红中麻将。自定义胡法、吃牌、一炮多响和计分规则。","tags":["tabletop","turn-based"],"cover":"cover.svg","author":{"name":"Parti"},"_template_order":100,
   "entry":{"ui":"index.html","worker":"worker.js"},"room":{"minPlayers":1,"maxPlayers":4,"allowSpectators":false},"sync":{"mode":"snapshot"},
   "permissions":{"network":false,"storage":"session","camera":false,"microphone":false,"clipboard":false},
   "actions":{"configureRules":{"payload":"Partial<RulesConfig>"},"setReady":{"payload":"{ ready: boolean }"},"startMatch":{},"discard":{"payload":"{ tileId: string }"},"passReaction":{},"chi":{"payload":"{ tileIds: string[] }"},"peng":{},"gang":{"payload":"{ kind?: TileKind }"},"declareWin":{},"syncPrivate":{},"nextRound":{},"restartMatch":{}}

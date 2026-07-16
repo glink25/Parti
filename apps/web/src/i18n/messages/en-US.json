@@ -4,6 +4,7 @@
     "header": {
       "tagline": "Create and play together with friends",
       "backToLobby": "Back to Parti lobby",
+      "back": "Back to lobby",
       "github": "View Parti source on GitHub"
     }
   },
@@ -155,6 +156,24 @@
     "title": "Create online room",
     "description": "Pick a template to start building, then invite friends when you're ready.",
     "aiCreateAria": "Create room with AI",
+    "library": {
+      "emptyTitle": "No templates in this category",
+      "emptyDescription": "Try another category or import a room above."
+    },
+    "categories": {
+      "ariaLabel": "Room template categories",
+      "all": "All",
+      "imported": "Imported",
+      "simple": "Simple templates",
+      "tags": {
+        "tabletop": "Tabletop",
+        "party": "Party",
+        "role-playing": "Role-playing",
+        "action": "Action",
+        "turn-based": "Turn-based",
+        "co-op": "Co-op"
+      }
+    },
     "newRoom": {
       "title": "New room",
       "blank": "Start from blank template",

@@ -30,3 +30,15 @@ describe('manifest sensor permissions', () => {
     })).toThrow(/permissions\.sensors/);
   });
 });
+
+describe('manifest tags', () => {
+  it('accepts unique non-empty tag ids', () => {
+    expect(validateManifest({ ...baseManifest, tags: ['party', 'turn-based'] }).tags)
+      .toEqual(['party', 'turn-based']);
+  });
+
+  it.each(['party', ['party', ''], ['party', 'party']])(
+    'rejects invalid tags declaration %j',
+    (tags) => expect(() => validateManifest({ ...baseManifest, tags })).toThrow(/manifest\.tags/),
+  );
+});

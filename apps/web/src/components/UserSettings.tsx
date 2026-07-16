@@ -92,11 +92,11 @@ export function UserSettings({ user, onChange }: { user: LocalUser; onChange: (u
       <SheetTrigger asChild>
         <Button
           variant="ghost"
-          className="ml-auto max-w-[210px] gap-2 px-2.5 text-muted-foreground hover:text-foreground"
+          className="max-w-[150px] gap-2 px-2 text-muted-foreground hover:text-foreground sm:max-w-[210px] sm:px-2.5"
           aria-label={intl.formatMessage({ id: 'user.settings.ariaLabel' }, { name: user.name })}
         >
           <UserRoundIcon />
-          <span className="truncate sm:inline">{user.name}</span>
+          <span className="hidden truncate sm:inline">{user.name}</span>
         </Button>
       </SheetTrigger>
       <SheetContent

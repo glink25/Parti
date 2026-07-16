@@ -13,6 +13,8 @@ export interface RoomManifest {
   version: string;
   packageMode: PackageMode;
   description?: string;
+  /** 编辑器分类标签；使用稳定 tagId，展示名称由宿主决定。 */
+  tags?: string[];
   /** 模板封面图，相对房间目录的路径（如 "cover.png"）或绝对 URL；缺省时 UI 回退渐变占位 */
   cover?: string;
   author?: { name?: string };
@@ -70,6 +72,17 @@ export function validateManifest(input: unknown): RoomManifest {
     throw new ManifestError('manifest.entry 必须包含 ui 与 worker');
   }
   const permissions = m.permissions as Record<string, unknown> | undefined;
+  if (m.tags !== undefined) {
+    if (!Array.isArray(m.tags)) throw new ManifestError('manifest.tags 必须是数组');
+    const seenTags = new Set<string>();
+    for (const tag of m.tags) {
+      if (typeof tag !== 'string' || tag.trim().length === 0) {
+        throw new ManifestError('manifest.tags 只能包含非空字符串');
+      }
+      if (seenTags.has(tag)) throw new ManifestError(`manifest.tags 包含重复项: ${tag}`);
+      seenTags.add(tag);
+    }
+  }
   if (permissions?.sensors !== undefined) {
     if (!Array.isArray(permissions.sensors)) {
       throw new ManifestError('manifest.permissions.sensors 必须是数组');

@@ -6,6 +6,7 @@
   "version": "0.2.0",
   "packageMode": "filesystem",
   "description": "2–8 人经典抢答或同时进行画作猜词接力。",
+  "tags": ["party", "turn-based"],
   "author": { "name": "Parti" },
   "cover": "cover.jpg",
   "entry": {

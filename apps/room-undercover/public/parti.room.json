@@ -7,6 +7,7 @@
   "packageMode": "filesystem",
   "cover": "cover.jpg",
   "description": "只发牌、不计分的轻量谁是卧底聚会房间。",
+  "tags": ["party", "role-playing"],
   "author": { "name": "Parti" },
   "entry": {
     "ui": "index.html",

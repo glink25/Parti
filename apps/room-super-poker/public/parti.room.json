@@ -1,6 +1,6 @@
 {
   "partiVersion":"0.1.0","protocolVersion":1,"id":"room-super-poker","name":"超级扑克","version":"0.1.0","packageMode":"filesystem",
-  "description":"1–8位真人与AI同桌，在斗地主、干瞪眼和变色龙之间自由切换。","cover":"cover.svg","author":{"name":"Parti"},"_template_order":110,
+  "description":"1–8位真人与AI同桌，在斗地主、干瞪眼和变色龙之间自由切换。","tags":["tabletop","turn-based"],"cover":"cover.svg","author":{"name":"Parti"},"_template_order":110,
   "entry":{"ui":"index.html","worker":"worker.js"},"room":{"minPlayers":1,"maxPlayers":8,"allowSpectators":false},"sync":{"mode":"snapshot"},
   "permissions":{"network":false,"storage":"session","camera":false,"microphone":false,"clipboard":false},
   "actions":{"selectVariant":{"payload":"{ variantId: VariantId }"},"addBot":{"payload":"{ seat: number }"},"removeBot":{"payload":"{ seat: number }"},"setReady":{"payload":"{ ready: boolean }"},"startGame":{},"playCards":{"payload":"{ cardIds: string[], choice?: { suit?: Suit, rank?: number, score?: number } }"},"pass":{},"drawCard":{},"syncPrivate":{},"returnToLobby":{}}

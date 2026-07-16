@@ -435,9 +435,6 @@ function PeerHostSession({
     <div className={fullscreen ? 'h-[100dvh] w-[100dvw] overflow-hidden bg-black' : 'mx-auto w-[min(1240px,100%)]'}>
       {!fullscreen && <div className="mb-6 flex items-end justify-between gap-6 max-md:flex-col max-md:items-start max-md:gap-3.5">
         <div>
-          <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">
-            <FormattedMessage id="peer.host.exit" />
-          </a>
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">YOUR ROOM</span>
           <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">{settings.title.trim() || pkg.manifest.name}</h1>
         </div>

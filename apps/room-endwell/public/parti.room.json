@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "packageMode": "filesystem",
   "description": "多人元素组合 Roguelike 的核心战斗垂直切片",
+  "tags": ["role-playing", "action", "co-op"],
   "cover": "cover.jpg",
   "author": { "name": "Parti" },
   "entry": { "ui": "index.html", "worker": "worker.js" },

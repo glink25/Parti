@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "packageMode": "filesystem",
   "description": "由游戏上帝自动主持的完整狼人杀，亦支持单机牌盒发牌与验牌。",
+  "tags": ["party", "role-playing", "turn-based"],
   "cover": "assets/cover.jpg",
   "author": { "name": "Parti" },
   "entry": { "ui": "index.html", "worker": "worker.js" },

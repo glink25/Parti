@@ -6,6 +6,7 @@
   "version": "0.1.0",
   "packageMode": "filesystem",
   "description": "2–4 人原创惊悚诈唬牌局：经典、恶魔与混沌三种规则，谎言败露后亲手扣动扳机。",
+  "tags": ["tabletop", "turn-based"],
   "cover": "cover.jpg",
   "author": { "name": "Parti" },
   "_template_order": 95,

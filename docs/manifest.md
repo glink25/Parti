@@ -20,6 +20,7 @@ Runtime 加载房间时会先校验它（校验失败抛 `ManifestError`）。
 | `entry.client` | `string` | | 可选的额外客户端脚本。 |
 | `entry.style` | `string` | | 可选的样式表。 |
 | `description` | `string` | | 房间描述。 |
+| `tags` | `string[]` | | 编辑器分类 tagId；必须为非空、无重复字符串。未知 tagId 由界面原样显示。 |
 | `author` | `{ name?: string }` | | 作者信息。 |
 | `room.minPlayers` | `number` | | 最少玩家数。 |
 | `room.maxPlayers` | `number` | | 最多玩家数，由 Host Runtime 强制执行，包含房主。 |
@@ -42,6 +43,7 @@ Runtime 加载房间时会先校验它（校验失败抛 `ManifestError`）。
 - `protocolVersion` 必须是**数字**。
 - `entry` 必须同时包含字符串类型的 `ui` 与 `worker`。
 - `permissions.sensors` 必须是无重复项的数组，且只能包含 `accelerometer`、`gyroscope`、`magnetometer`。
+- `tags` 如存在，必须是由非空字符串组成的无重复数组。
 
 其余字段不校验，但建议如实声明。
 

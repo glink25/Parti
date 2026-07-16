@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
+import { useIntl } from 'react-intl';
+import { ArrowLeftIcon } from 'lucide-react';
 import { GithubIcon } from '@/components/icons/GithubIcon';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
@@ -102,42 +103,45 @@ function AppLayout() {
   return (
     <div>
       {!isPlayerRoute && !fullscreen && (
-        <header className="sticky top-0 z-30 flex h-[62px] items-center gap-4 border-b border-border bg-card/85 px-[18px] backdrop-blur-lg md:h-[72px] md:px-[max(1.5rem,calc((100vw-1240px)/2))]">
-          <a
-            className="inline-flex items-center gap-2.5 rounded-md text-xl font-extrabold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-            href="#/"
-            aria-label={intl.formatMessage({ id: 'app.header.backToLobby' })}
-          >
-            <Logo />
-            <span>Parti</span>
-          </a>
-          <span className="hidden text-[13px] text-muted-foreground md:inline">
-            <FormattedMessage id="app.header.tagline" />
-          </span>
-          <a
-              href="https://github.com/glink25/Parti"
-              target="_blank"
-              rel="noopener noreferrer"
-              className='size-4'
-              aria-label={intl.formatMessage({ id: 'app.header.github' })}
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-card/90 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 w-full max-w-[1320px] items-center gap-2 px-3 sm:gap-4 sm:px-6">
+            <a
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg text-lg font-extrabold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              href="#/"
+              aria-label={intl.formatMessage({ id: 'app.header.backToLobby' })}
             >
-              <GithubIcon />
+              <Logo />
+              <span>Parti</span>
             </a>
-          {isLobbyRoute && <UserSettings user={user} onChange={setUser} />}
-          <Button
-            asChild
-            variant="ghost"
-            size="icon-sm"
-            className={`${isLobbyRoute ? '' : 'ml-auto'} shrink-0 text-muted-foreground hover:text-foreground`}
-          >
-          </Button>
+            {!isLobbyRoute && (
+              <Button asChild variant="ghost" size="sm" className="ml-1 gap-1.5 text-muted-foreground sm:ml-4">
+                <a href="#/">
+                  <ArrowLeftIcon data-icon="inline-start" />
+                  {intl.formatMessage({ id: 'app.header.back' })}
+                </a>
+              </Button>
+            )}
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <Button asChild variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground">
+                <a
+                  href="https://github.com/glink25/Parti"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={intl.formatMessage({ id: 'app.header.github' })}
+                >
+                  <GithubIcon />
+                </a>
+              </Button>
+              <UserSettings user={user} onChange={setUser} />
+            </div>
+          </div>
         </header>
       )}
       <main
         className={
           isPlayerRoute || fullscreen
             ? 'min-h-[100dvh]'
-            : 'min-h-[calc(100vh-62px)] px-4 pt-7 pb-12 md:min-h-[calc(100vh-72px)] md:px-6 md:pt-12 md:pb-[72px]'
+            : 'min-h-[calc(100vh-64px)] px-4 pt-7 pb-12 md:px-6 md:pt-10 md:pb-16'
         }
       >
         <Suspense fallback={null}>{view}</Suspense>

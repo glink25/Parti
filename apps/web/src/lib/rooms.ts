@@ -10,6 +10,7 @@ export interface RoomEntry {
   baseUrl: string;
   cover?: string;
   files: string[];
+  tags: string[];
   templateOrder?: number;
   defaultOrderIndex: number;
 }
@@ -34,6 +35,7 @@ export const ROOMS: RoomEntry[] = registry.map(({ dir, manifest, files, defaultO
     baseUrl,
     cover: resolveCover(baseUrl, manifest.cover),
     files,
+    tags: manifest.tags ?? [],
     templateOrder: readTemplateOrder(manifest),
     defaultOrderIndex,
   };
@@ -80,6 +82,8 @@ export interface TemplateListEntry {
   usageCount: number;
   templateOrder?: number;
   defaultOrderIndex?: number;
+  tags: string[];
+  imported: boolean;
 }
 
 /** 使用次数相同时的内置模板默认排序；自定义模板混排时回退 name 比较。 */
@@ -105,11 +109,15 @@ export async function listPackageSources(): Promise<TemplateListEntry[]> {
       id: room.id, name: room.name, description: room.description, cover: room.cover,
       removable: false, usageCount: usage[room.id] ?? 0,
       templateOrder: room.templateOrder, defaultOrderIndex: room.defaultOrderIndex,
+      tags: room.tags,
+      imported: false,
     })),
     ...custom.map((item) => ({
       id: item.id, name: item.name, description: item.description,
       ...(item.descriptionFallback ? { descriptionFallback: item.descriptionFallback } : {}),
       removable: true, usageCount: usage[item.id] ?? 0,
+      tags: item.tags,
+      imported: item.imported,
     })),
   ].sort((a, b) => b.usageCount - a.usageCount || compareTemplateDefaultOrder(a, b));
 }

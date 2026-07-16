@@ -6,7 +6,6 @@ import { ROOM_FRAME_GRID_AREAS, RoomFrame, type RoomFrameGridKey } from '../comp
 import { DevTools } from '../components/DevTools';
 import { LocalRoomSession } from '../lib/LocalRoomSession';
 import { loadRoomSnapshot } from '../lib/customRooms';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
 interface Seat {
@@ -77,7 +76,6 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
     return (
       <Card className="mx-auto max-w-lg p-6 text-destructive">
         {intl.formatMessage({ id: 'local.loadFailed' }, { error })}
-        <Button asChild variant="outline"><a href="#/"><FormattedMessage id="local.backToLobby" /></a></Button>
       </Card>
     );
   }
@@ -91,7 +89,6 @@ export function LocalRoomView({ roomId }: { roomId: string }) {
         <h2 className="text-2xl font-semibold">
           {intl.formatMessage({ id: 'local.title' }, { name: loaded.pkg.manifest.name })}
         </h2>
-        <Button asChild variant="outline"><a href="#/"><FormattedMessage id="editor.backToLobby" /></a></Button>
       </div>
       <div
         className="mb-4 grid w-full grid-cols-10 grid-rows-12 gap-2"

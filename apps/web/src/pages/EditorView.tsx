@@ -36,6 +36,12 @@ import {
 } from '@/components/editor/editorDefaults';
 import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs';
 import { EditorActionDock } from '@/components/editor/EditorActionDock';
+import {
+  buildTemplateCategories,
+  normalizeTemplateCategory,
+  templatesInCategory,
+  type TemplateCategoryId,
+} from '@/lib/templateCategories';
 
 function formatError(intl: ReturnType<typeof useIntl>, reason: unknown): string {
   return formatResolveError(intl, reason);
@@ -62,6 +68,7 @@ export function EditorView() {
   const [extraFiles, setExtraFiles] = useState<Record<string, Uint8Array>>({});
   const [activeFile, setActiveFile] = useState<EditorFile>('manifest');
   const [templates, setTemplates] = useState<TemplateListEntry[]>([]);
+  const [activeCategory, setActiveCategory] = useState<TemplateCategoryId>('all');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('blank');
   const [loadedTemplateId, setLoadedTemplateId] = useState<string>('blank');
   const [templateLoadStates, setTemplateLoadStates] = useState<Record<string, TemplateLoadState>>({});
@@ -319,13 +326,27 @@ export function EditorView() {
   const startCardBtn =
     'flex w-full items-center justify-center gap-2 rounded-[11px] border border-border bg-surface px-3 py-2.5 text-[13px] font-semibold text-foreground transition-colors hover:not-disabled:border-border-strong hover:not-disabled:bg-surface-2 disabled:cursor-default disabled:opacity-60 [&_svg]:size-4';
 
+  const tagLabel = (tagId: string) => {
+    const known = new Set(['tabletop', 'party', 'role-playing', 'action', 'turn-based', 'co-op']);
+    return known.has(tagId) ? intl.formatMessage({ id: `editor.categories.tags.${tagId}` }) : tagId;
+  };
+  const categories = buildTemplateCategories(templates, tagLabel);
+  const normalizedCategory = normalizeTemplateCategory(activeCategory, categories);
+  const visibleTemplates = templatesInCategory(templates, normalizedCategory);
+
+  useEffect(() => {
+    if (normalizedCategory !== activeCategory) setActiveCategory(normalizedCategory);
+  }, [activeCategory, normalizedCategory]);
+
+  function categoryLabel(id: TemplateCategoryId, tagId?: string): string {
+    if (tagId) return tagLabel(tagId);
+    return intl.formatMessage({ id: `editor.categories.${id}` });
+  }
+
   return (
     <div className="mx-auto w-[min(1240px,100%)] pb-24 md:pb-28">
-      <div className="mb-[42px]">
+      <div className="mb-8 flex items-end justify-between gap-5 max-sm:items-start">
         <div>
-          <a className="mb-6 block w-max text-[13px] text-muted-foreground transition-colors hover:text-foreground" href="#/">
-            <FormattedMessage id="editor.backToLobby" />
-          </a>
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">CREATE A ROOM</span>
           <div className="mb-2.5 flex items-center gap-2.5 sm:gap-3">
             <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">
@@ -350,52 +371,75 @@ export function EditorView() {
       {!showEditor && (
         <section className="mb-[42px]">
           {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
-            <div
-              className={cn(
-                'flex flex-col gap-3 rounded-[18px] border border-dashed border-border-strong bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]',
-                isBlank && 'border-solid border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <SparklesIcon className="size-4 text-primary-bright" aria-hidden="true" />
-                <b className="text-sm md:text-base"><FormattedMessage id="editor.newRoom.title" /></b>
+          <Tabs className="w-full min-w-0" value={normalizedCategory} onValueChange={(value) => setActiveCategory(value as TemplateCategoryId)}>
+            <div className="mb-5 w-full min-w-0 overflow-hidden rounded-xl bg-secondary/65 p-1">
+              <div className="scrollbar-hidden w-full min-w-0 overflow-x-auto">
+                <TabsList className="h-auto min-w-max gap-1 rounded-none bg-transparent p-0" aria-label={intl.formatMessage({ id: 'editor.categories.ariaLabel' })}>
+                  {categories.map((category) => (
+                    <TabsTrigger key={category.id} value={category.id} className="h-9 flex-none gap-2 rounded-lg px-3">
+                      {categoryLabel(category.id, category.tagId)}
+                      <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">{category.count}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
               </div>
-              <button
-                type="button"
-                className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
-                disabled={importing}
-                onClick={() => chooseTemplate(blankTemplate)}
-              >
-                <SparklesIcon /><FormattedMessage id="editor.newRoom.blank" />
-              </button>
-              <Button asChild variant="outline" className={cn(startCardBtn, 'h-auto')}>
-                <label>
-                  <FileArchiveIcon />
-                  {importing ? intl.formatMessage({ id: 'editor.newRoom.importing' }) : intl.formatMessage({ id: 'editor.newRoom.importZip' })}
-                  <input className="hidden" type="file" accept=".zip" disabled={importing} onChange={onZipSelected} />
-                </label>
-              </Button>
-              <form onSubmit={onGithubSubmit} className="relative">
-                <Link2Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <input
-                  className={cn(startCardBtn, 'justify-start pr-9 pl-9 font-medium')}
-                  type="url"
-                  inputMode="url"
-                  placeholder={intl.formatMessage({ id: 'editor.newRoom.githubPlaceholder' })}
-                  value={githubUrl}
-                  disabled={importing}
-                  onChange={(event) => setGithubUrl(event.target.value)}
-                />
-                {githubUrl.trim() && (
-                  <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label={intl.formatMessage({ id: 'editor.newRoom.githubImportAria' })}>
-                    <ArrowRightIcon className="size-4" />
-                  </button>
-                )}
-              </form>
             </div>
+          </Tabs>
 
-            {templates.map((template) => {
+          {visibleTemplates.length === 0 && normalizedCategory !== 'all' ? (
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-[20px] border border-dashed border-border-strong bg-card/55 p-8 text-center">
+              <SparklesIcon className="mb-3 size-8 text-primary-bright/70" aria-hidden="true" />
+              <b><FormattedMessage id="editor.library.emptyTitle" /></b>
+              <p className="mt-1 text-sm text-muted-foreground"><FormattedMessage id="editor.library.emptyDescription" /></p>
+            </div>
+          ) : (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
+            {normalizedCategory === 'all' && (
+              <div
+                className={cn(
+                  'flex min-h-full flex-col gap-3 rounded-[18px] border border-dashed border-border-strong bg-[linear-gradient(150deg,var(--surface-2),var(--surface))] p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]',
+                  isBlank && 'border-solid border-[#d6a900] shadow-[0_0_0_2px_rgba(214,169,0,0.32),0_18px_44px_rgba(214,169,0,0.18)]',
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <SparklesIcon className="size-4 text-primary-bright" aria-hidden="true" />
+                  <b className="text-sm md:text-base"><FormattedMessage id="editor.newRoom.title" /></b>
+                </div>
+                <button
+                  type="button"
+                  className={cn(startCardBtn, isBlank && 'border-[#d6a900] text-primary-bright')}
+                  disabled={importing}
+                  onClick={() => chooseTemplate(blankTemplate)}
+                >
+                  <SparklesIcon /><FormattedMessage id="editor.newRoom.blank" />
+                </button>
+                <Button asChild variant="outline" className={cn(startCardBtn, 'h-auto')}>
+                  <label>
+                    <FileArchiveIcon />
+                    {importing ? intl.formatMessage({ id: 'editor.newRoom.importing' }) : intl.formatMessage({ id: 'editor.newRoom.importZip' })}
+                    <input className="hidden" type="file" accept=".zip" disabled={importing} onChange={onZipSelected} />
+                  </label>
+                </Button>
+                <form onSubmit={onGithubSubmit} className="relative">
+                  <Link2Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                  <input
+                    className={cn(startCardBtn, 'justify-start pr-9 pl-9 font-medium')}
+                    type="url"
+                    inputMode="url"
+                    placeholder={intl.formatMessage({ id: 'editor.newRoom.githubPlaceholder' })}
+                    value={githubUrl}
+                    disabled={importing}
+                    onChange={(event) => setGithubUrl(event.target.value)}
+                  />
+                  {githubUrl.trim() && (
+                    <button type="submit" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-md p-1 text-primary-bright hover:bg-surface-2" disabled={importing} aria-label={intl.formatMessage({ id: 'editor.newRoom.githubImportAria' })}>
+                      <ArrowRightIcon className="size-4" />
+                    </button>
+                  )}
+                </form>
+              </div>
+            )}
+            {visibleTemplates.map((template) => {
               const selected = selectedTemplateId === template.id;
               const loadState = templateLoadState(templateLoadStates, template.id);
               const templateReady = loadState.status === 'ready' && loadedTemplateId === template.id;
@@ -471,6 +515,7 @@ export function EditorView() {
               );
             })}
           </div>
+          )}
         </section>
       )}
 

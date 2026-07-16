@@ -12,6 +12,8 @@ export interface TemplateMeta {
   description: string;
   descriptionFallback?: 'importedTemplate';
   source: CustomPackageRecord['source'];
+  tags: string[];
+  imported: boolean;
 }
 
 export async function listImportedTemplates(): Promise<TemplateMeta[]> {
@@ -22,6 +24,8 @@ export async function listImportedTemplates(): Promise<TemplateMeta[]> {
     description: item.manifest.description ?? '',
     ...(item.manifest.description ? {} : { descriptionFallback: 'importedTemplate' as const }),
     source: item.source,
+    tags: item.manifest.tags ?? [],
+    imported: item.source.type === 'zip' || item.source.type === 'github',
   }));
 }
 

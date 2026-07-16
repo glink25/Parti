@@ -72,6 +72,23 @@ h1, h2, h3, p { margin-top: 0; }
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
+/* Keep overflow areas scrollable while removing platform-specific scrollbar chrome. */
+.scrollbar-hidden {
+  scrollbar-width: none !important;
+  scrollbar-color: transparent transparent !important;
+  -ms-overflow-style: none !important;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+.scrollbar-hidden::-webkit-scrollbar-thumb,
+.scrollbar-hidden::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Geist Variable', sans-serif;

@@ -4,6 +4,7 @@
     "header": {
       "tagline": "和朋友一起创造，一起游玩",
       "backToLobby": "返回 Parti 大厅",
+      "back": "返回大厅",
       "github": "在 GitHub 上查看 Parti 源码"
     }
   },
@@ -155,6 +156,24 @@
     "title": "创建联机房间",
     "description": "选择一个模板开始创作，完成后立即邀请朋友加入。",
     "aiCreateAria": "使用 AI 创建房间",
+    "library": {
+      "emptyTitle": "这个分类还没有模板",
+      "emptyDescription": "可以切换其他分类，或从上方导入一个房间。"
+    },
+    "categories": {
+      "ariaLabel": "房间模板分类",
+      "all": "全部",
+      "imported": "已导入",
+      "simple": "简易模板",
+      "tags": {
+        "tabletop": "棋牌",
+        "party": "聚会",
+        "role-playing": "角色扮演",
+        "action": "动作",
+        "turn-based": "回合制",
+        "co-op": "合作"
+      }
+    },
     "newRoom": {
       "title": "新建房间",
       "blank": "从空白模版开始",
