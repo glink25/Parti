@@ -13,12 +13,12 @@ import {
   undercoverCount,
   type DealResult,
 } from './game-logic';
-import type { WordPair } from './words';
+import type { WordPair } from './word-bank';
 
 const PAIRS: WordPair[] = [
   { id: 'daily-1', category: 'daily', civilian: '杯子', undercover: '碗' },
   { id: 'daily-2', category: 'daily', civilian: '牙刷', undercover: '梳子' },
-  { id: 'weapons-1', category: 'weapons', civilian: '长剑', undercover: '短剑' },
+  { id: 'food-1', category: 'food', civilian: '牛奶', undercover: '豆浆' },
 ];
 const WORDS = { civilian: '杯子', undercover: '碗' };
 
@@ -34,7 +34,7 @@ describe('role counts', () => {
 
 describe('categories and pairs', () => {
   it('normalizes categories and filters pairs', () => {
-    expect(normalizeCategories(['daily', 'daily', 'weapons'])).toEqual(['daily', 'weapons']);
+    expect(normalizeCategories(['daily', 'daily', 'food'])).toEqual(['daily', 'food']);
     expect(normalizeCategories([])).toBeNull();
     expect(normalizeCategories(['unknown'])).toBeNull();
     expect(eligiblePairs(PAIRS, ['daily']).map(({ id }) => id)).toEqual(['daily-1', 'daily-2']);

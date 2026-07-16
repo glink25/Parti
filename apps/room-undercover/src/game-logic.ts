@@ -1,4 +1,5 @@
-import { CATEGORIES, type Category, type WordPair } from './words';
+import { CATEGORIES, type Category } from './categories';
+import type { WordPair } from './word-bank';
 
 export type Role = 'civilian' | 'undercover' | 'blank';
 export type Winner = Role;

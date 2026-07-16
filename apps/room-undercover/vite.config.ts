@@ -11,7 +11,8 @@ function workerBundle(outDir: string): Plugin {
   const workerFiles = [
     path.resolve(appDir, 'src/worker.ts'),
     path.resolve(appDir, 'src/game-logic.ts'),
-    path.resolve(appDir, 'src/words.ts'),
+    path.resolve(appDir, 'src/categories.ts'),
+    path.resolve(appDir, 'src/word-bank.ts'),
   ];
 
   return {

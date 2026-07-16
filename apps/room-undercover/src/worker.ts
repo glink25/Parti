@@ -14,7 +14,8 @@ import {
   type RevealedWords,
   type Winner,
 } from './game-logic';
-import { WORD_PAIRS, type Category } from './words';
+import type { Category } from './categories';
+import { WORD_PAIRS } from './word-bank';
 
 type Player = { id: string; name: string; role: 'host' | 'player' | 'spectator' };
 type PublicPlayer = { id: string; name: string; role: 'host' | 'player' };

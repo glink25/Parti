@@ -1,7 +1,8 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { blankAppearanceChance, choosePair, dealCards, resolveElimination, undercoverCount, type DealResult, type EliminationResult, type Role, type Winner } from './game-logic';
-import { CATEGORIES, WORD_PAIRS, type Category } from './words';
+import { CATEGORIES, CATEGORY_LABELS, type Category } from './categories';
+import { WORD_PAIRS } from './word-bank';
 import './styles.css';
 
 type DealMode = 'classic' | 'custom';
@@ -20,12 +21,6 @@ type DealSettings = { mode: DealMode; includeBlank: boolean; categories: Categor
 type DealSettingsChange = { mode: DealMode } | { includeBlank: boolean } | { categories: Category[] } | { playerCount: number };
 type DealPayload = { civilianWord?: string; undercoverWord?: string };
 
-const CATEGORY_LABELS: Record<Category, { icon: string; name: string; note: string }> = {
-  entertainment: { icon: '✦', name: '娱乐', note: '影视 · 音乐 · 游戏' },
-  weapons: { icon: '⚔', name: '武器', note: '装备与防具' },
-  daily: { icon: '⌂', name: '日常', note: '生活相似物' },
-  nsfw: { icon: '♥', name: 'NSFW', note: '含蓄成人向' },
-};
 const MODE_LABELS: Record<DealMode, { icon: string; name: string; note: string }> = {
   classic: { icon: '双', name: '经典词库', note: '房主参与' },
   custom: { icon: '笔', name: '自定义', note: '房主填词' },
