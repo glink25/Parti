@@ -1,0 +1,33 @@
+{
+  "partiVersion": "0.1.0",
+  "protocolVersion": 1,
+  "id": "tank-battle",
+  "name": "像素坦克大战",
+  "version": "0.1.0",
+  "packageMode": "filesystem",
+  "description": "2–4 人像素坦克基地攻防：混战、2v2、中立 AI 与经典道具。",
+  "cover": "cover.jpg",
+  "tags": ["co-op"],
+  "author": { "name": "Parti" },
+  "entry": { "ui": "index.html", "worker": "room.worker.js" },
+  "room": { "minPlayers": 2, "maxPlayers": 4, "allowSpectators": false },
+  "sync": { "mode": "snapshot" },
+  "permissions": {
+    "network": false,
+    "storage": "session",
+    "camera": false,
+    "microphone": false,
+    "clipboard": false,
+    "sensors": []
+  },
+  "actions": {
+    "lobby.ready": { "payload": "{ ready: boolean }" },
+    "lobby.configure": { "payload": "{ mode, mapId }" },
+    "lobby.team": { "payload": "{ team }" },
+    "game.start": {},
+    "player.input": { "payload": "{ direction }" },
+    "player.fire": {},
+    "game.rematch": {},
+    "game.returnToLobby": {}
+  }
+}

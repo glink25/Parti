@@ -44,5 +44,7 @@ The rules in this section apply whenever an agent creates, modifies, debugs, or 
 - Reading underlying implementation is allowed only when there is concrete evidence of a lower-level protocol/runtime bug and inspecting it is necessary to diagnose that bug. State that reason before expanding the investigation.
 - If the public documentation is insufficient, ask the user for the missing contract detail or for permission to inspect a specific implementation area instead of exploring the repository broadly.
 
-## 7. Make sure room:dev command work
-- When start a new room project, make sure room build options can be implemented into apps/web's dev & build command
+## 7. Wire new room apps into the dev/build harness
+
+- When creating or modifying a monorepo room app (`apps/room-*` or `apps/template-*`), follow the build and worker packaging checklist in `docs/room-dev-harness.md`.
+- Before finishing, verify `pnpm room:dev <app>` starts without errors (for `room-*`, also confirm `build:room` succeeds).

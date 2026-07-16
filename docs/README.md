@@ -24,6 +24,7 @@ my-room/
 | [worker-api.md](./worker-api.md) | `defineRoom` / `ctx` / 生命周期 / action 完整参考 | 写房间逻辑时查 |
 | [client-api.md](./client-api.md) | 全局 `parti.*` UI API 完整参考 | 写房间 UI 时查 |
 | [manifest.md](./manifest.md) | `parti.room.json` 字段表 | 配置清单时查 |
+| [room-dev-harness.md](./room-dev-harness.md) | 仓库内 `room-*` / `template-*` 打包与 Harness 接入 | 在本仓库新建或修改 Room 应用时读 |
 | [protocol-reference.md](./protocol-reference.md) | 底层协议消息 / 错误码（进阶、可选） | 一般无需阅读 |
 
 平台与 Runtime 集成文档：

@@ -1,0 +1,23 @@
+{
+  "name": "@parti/room-tank-battle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev:room": "vite build --watch --mode room-dev",
+    "build:room": "vite build --mode room-build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@parti/flow": "workspace:*",
+    "littlejsengine": "1.18.15"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.5",
+    "vitest": "^2.1.8"
+  }
+}

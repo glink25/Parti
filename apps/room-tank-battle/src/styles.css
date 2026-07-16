@@ -1,0 +1,43 @@
+:root { color: #f7e6a8; background: #080b0a; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { image-rendering: pixelated; background: radial-gradient(circle at 50% 40%, #17221b, #070908 68%); }
+#game-root { position: fixed; inset: 0; display: grid; place-items: center; }
+#game-root canvas { image-rendering: pixelated; max-width: 100%; max-height: 100%; }
+.panel {
+  position: fixed; z-index: 80; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(680px, calc(100% - 32px)); max-height: calc(100% - 120px); overflow: auto;
+  padding: 22px; border: 4px solid #d9b64c; background: #111813f2; box-shadow: 0 0 0 4px #3b472d, 0 20px 60px #000b;
+}
+.panel:empty { display: none; }
+h1 { margin: 0 0 4px; color: #ffe781; font-size: clamp(24px, 5vw, 42px); letter-spacing: 2px; }
+h2 { font-size: 15px; color: #9cb77b; margin: 18px 0 8px; }
+p { margin: 6px 0; }
+.subtle { color: #899187; font-size: 12px; }
+.players { display: grid; gap: 7px; margin: 12px 0; }
+.player { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 9px 11px; background: #202920; border-left: 5px solid #78846c; }
+.player.red { border-color: #e45445; }.player.blue { border-color: #4d83df; }
+.badge { padding: 3px 7px; background: #35412f; color: #d9e7bf; font-size: 11px; }
+.controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.field { display: grid; gap: 5px; color: #aab59d; font-size: 12px; min-width: 0; }
+button { border: 2px solid #71805c; background: #242f23; color: #f7e6a8; padding: 10px 12px; font: inherit; cursor: pointer; }
+button:hover:not(:disabled) { background: #394a34; border-color: #d9b64c; }
+button:disabled { opacity: .38; cursor: not-allowed; }
+.dropdown { position: relative; }
+.dropdown-trigger { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; }
+.dropdown-popup { display: none; position: absolute; z-index: 120; left: 0; right: 0; top: calc(100% + 4px); max-height: 220px; overflow-y: auto; padding: 5px; border: 2px solid #d9b64c; background: #111813; box-shadow: 0 10px 28px #000c; }
+.dropdown.open .dropdown-popup { display: grid; }
+.dropdown-popup button { border: 0; padding: 9px; text-align: left; }
+.dropdown-popup button.selected { color: #ffe781; background: #394a34; }
+.touch-controls { display: none; position: fixed; z-index: 60; inset: 0; pointer-events: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.touch-controls.enabled { display: block; }
+.touch-stick, .touch-fire { position: absolute; bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px)); width: 112px; height: 112px; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; pointer-events: auto; }
+.touch-stick { left: max(20px, calc(env(safe-area-inset-left) + 12px)); border: 4px solid #f7e6a899; background: #17221bcc; box-shadow: inset 0 0 0 18px #0005, 0 5px 18px #000a; }
+.touch-stick-knob { position: absolute; width: 48px; height: 48px; left: 28px; top: 28px; border-radius: 50%; background: #ffe781; border: 4px solid #332b17; box-shadow: 0 3px 8px #000b; pointer-events: none; }
+.touch-fire { right: max(24px, calc(env(safe-area-inset-right) + 16px)); border: 5px solid #ffd0b9; background: #c8402fdd; color: white; font-weight: 900; font-size: 18px; box-shadow: inset 0 -8px 0 #792217, 0 5px 18px #000a; }
+.touch-fire.pressed { transform: translateY(4px) scale(.96); background: #ff6a4f; box-shadow: inset 0 -3px 0 #792217; }
+@media (min-width: 760px) and (hover: hover) and (pointer: fine) { .touch-controls.enabled { display: none; } }
+.primary { width: 100%; margin-top: 12px; background: #8e3d2f; border-color: #ed7d5e; font-weight: 800; }
+.team-buttons { display: flex; gap: 5px; }
+.team-buttons button { padding: 5px 8px; font-size: 11px; }
+@media (max-width: 600px) { .panel { top: calc(50% + 20px); padding: 16px; max-height: calc(100% - 112px); } .controls { grid-template-columns: 1fr; } }
