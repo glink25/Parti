@@ -27,12 +27,12 @@ export function UserSettings({ user, onChange }: UserSettingsProps) {
     <>
       <Button
         variant="ghost"
-        className="max-w-[150px] gap-2 px-2 text-muted-foreground hover:text-foreground sm:max-w-[210px] sm:px-2.5"
+          className="max-w-[110px] gap-1.5 px-2 text-muted-foreground hover:text-foreground sm:max-w-[210px] sm:gap-2 sm:px-2.5"
         aria-label={intl.formatMessage({ id: 'user.settings.ariaLabel' }, { name: user.name })}
         onClick={openSettings}
       >
         <UserRoundIcon />
-        <span className="hidden truncate sm:inline">{user.name}</span>
+          <span className="truncate">{user.name}</span>
       </Button>
       {loaded && (
         <Suspense fallback={null}>

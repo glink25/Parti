@@ -111,7 +111,7 @@ function AppLayout() {
               aria-label={intl.formatMessage({ id: 'app.header.backToLobby' })}
             >
               <Logo />
-              <span>Parti</span>
+              <span className="hidden sm:inline">Parti</span>
             </a>
             {!isLobbyRoute && (
               <Button asChild variant="ghost" size="sm" className="ml-1 gap-1.5 text-muted-foreground sm:ml-4">
@@ -122,7 +122,7 @@ function AppLayout() {
               </Button>
             )}
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              <Button asChild variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-foreground">
+              <Button asChild variant="ghost" size="sm" className="gap-1.5 px-2 text-muted-foreground hover:text-foreground sm:px-3">
                 <a
                   href="https://github.com/glink25/Parti"
                   target="_blank"
@@ -130,6 +130,7 @@ function AppLayout() {
                   aria-label={intl.formatMessage({ id: 'app.header.github' })}
                 >
                   <GithubIcon />
+                  <span>GitHub</span>
                 </a>
               </Button>
               <UserSettings user={user} onChange={setUser} />

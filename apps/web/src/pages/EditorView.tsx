@@ -373,10 +373,10 @@ export function EditorView() {
           {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
           <Tabs className="w-full min-w-0" value={normalizedCategory} onValueChange={(value) => setActiveCategory(value as TemplateCategoryId)}>
             <div className="mb-5 w-full min-w-0 overflow-hidden rounded-xl bg-secondary/65 p-1">
-              <div className="scrollbar-hidden w-full min-w-0 overflow-x-auto">
-                <TabsList className="h-auto min-w-max gap-1 rounded-none bg-transparent p-0" aria-label={intl.formatMessage({ id: 'editor.categories.ariaLabel' })}>
+              <div className="scrollbar-hidden w-full min-w-0 touch-pan-x overflow-x-auto overflow-y-hidden">
+                <TabsList className="h-9 min-w-max gap-1 rounded-none bg-transparent p-0" aria-label={intl.formatMessage({ id: 'editor.categories.ariaLabel' })}>
                   {categories.map((category) => (
-                    <TabsTrigger key={category.id} value={category.id} className="h-9 flex-none gap-2 rounded-lg px-3">
+                    <TabsTrigger key={category.id} value={category.id} className="h-9 flex-none gap-2 rounded-lg px-3 after:hidden">
                       {categoryLabel(category.id, category.tagId)}
                       <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">{category.count}</span>
                     </TabsTrigger>
