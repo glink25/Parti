@@ -1,8 +1,14 @@
 import './style.css';
 import {
+  DART_BODY_LENGTH,
+  LAUNCH_DART_TIP_RADIUS,
+  PLAYER_ORBIT_RADIUS,
   REBASE_MS,
   SHOT_FLIGHT_MS,
+  STUCK_DART_TIP_RADIUS,
   applyPredictedShot,
+  computeSceneLayout,
+  flyingDartTipRadius,
   lobbyReadiness,
   seatWorldAngle,
   simulateShot,
@@ -439,28 +445,40 @@ function drawBoard(cx: number, cy: number, radius: number, rotation: number, eve
   context.beginPath(); context.arc(0, 0, radius * .17, 0, TAU); context.fillStyle = '#6c1f19'; context.fill(); context.beginPath(); context.arc(0, 0, radius * .075, 0, TAU); context.fillStyle = '#d9a844'; context.fill(); context.restore();
 }
 
-function drawDart(angle: number, radius: number, cx: number, cy: number, color: string, widthFactor: number, alpha = 1, distanceOffset = 0) {
-  const inner = radius - radius * .06 + distanceOffset; const outer = radius + radius * .27 + distanceOffset;
-  const x1 = cx + Math.cos(angle) * inner; const y1 = cy + Math.sin(angle) * inner; const x2 = cx + Math.cos(angle) * outer; const y2 = cy + Math.sin(angle) * outer;
-  context.save(); context.globalAlpha = alpha; context.strokeStyle = '#ded2bd'; context.lineWidth = Math.max(2, radius * .014 * widthFactor); context.lineCap = 'round'; context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
-  const wing = radius * .055 * widthFactor; context.translate(x2, y2); context.rotate(angle); context.fillStyle = color; context.beginPath(); context.moveTo(0, 0); context.lineTo(wing * 1.4, -wing); context.lineTo(wing * 1.4, wing); context.closePath(); context.fill(); context.restore();
+function drawDartShape(tipX: number, tipY: number, tailAngle: number, radius: number, color: string, widthFactor: number, alpha = 1) {
+  const length = radius * DART_BODY_LENGTH;
+  const tailX = tipX + Math.cos(tailAngle) * length;
+  const tailY = tipY + Math.sin(tailAngle) * length;
+  context.save(); context.globalAlpha = alpha; context.strokeStyle = '#ded2bd'; context.lineWidth = Math.max(2, radius * .014 * widthFactor); context.lineCap = 'round'; context.beginPath(); context.moveTo(tipX, tipY); context.lineTo(tailX, tailY); context.stroke();
+  const wing = radius * .055 * widthFactor; context.translate(tailX, tailY); context.rotate(tailAngle); context.fillStyle = color; context.beginPath(); context.moveTo(0, 0); context.lineTo(wing * 1.4, -wing); context.lineTo(wing * 1.4, wing); context.closePath(); context.fill(); context.restore();
 }
 
-function drawReadyDart(game: GameState, radius: number, cx: number, cy: number, offset: number, now: number) {
+function drawRadialDart(angle: number, tipRadius: number, radius: number, cx: number, cy: number, color: string, widthFactor: number, alpha = 1) {
+  drawDartShape(
+    cx + Math.cos(angle) * radius * tipRadius,
+    cy + Math.sin(angle) * radius * tipRadius,
+    angle,
+    radius,
+    color,
+    widthFactor,
+    alpha,
+  );
+}
+
+function drawReadyDart(game: GameState, radius: number, cx: number, cy: number, offset: number) {
   if (!game.turn || !replica || replica.phase === 'flying' || replica.phase === 'done') return;
   const player = game.players[game.turn.playerId];
   if (!player || player.status !== 'alive') return;
   const angle = seatWorldAngle(player.seat, game.activeOrder.length) + offset;
-  const pulse = .78 + Math.sin(now / 180) * .12;
   context.save();
   context.shadowColor = colorFor(player.id);
   context.shadowBlur = 14;
-  drawDart(angle, radius, cx, cy, colorFor(player.id), game.turn.dartWidth, pulse, radius * .13);
+  drawRadialDart(angle, LAUNCH_DART_TIP_RADIUS, radius, cx, cy, colorFor(player.id), game.turn.dartWidth);
   context.restore();
 }
 
 function drawPlayers(game: GameState, cx: number, cy: number, radius: number, offset: number) {
-  const orbit = radius * 1.43;
+  const orbit = radius * PLAYER_ORBIT_RADIUS;
   for (const id of game.activeOrder) {
     const player = game.players[id]; if (!player) continue;
     const angle = seatWorldAngle(player.seat, game.activeOrder.length) + offset; const x = cx + Math.cos(angle) * orbit; const y = cy + Math.sin(angle) * orbit; const color = colorFor(id);
@@ -475,10 +493,10 @@ function drawRemoteFlight(flight: RemoteFlight, progress: number, game: GameStat
   const player = game.players[flight.commit.playerId]; if (!player) return;
   const startAngle = seatWorldAngle(player.seat, game.activeOrder.length) + offset;
   const endAngle = flight.commit.boardAngle + rotation + offset;
-  const sx = cx + Math.cos(startAngle) * radius * 1.35; const sy = cy + Math.sin(startAngle) * radius * 1.35;
-  const ex = cx + Math.cos(endAngle) * radius; const ey = cy + Math.sin(endAngle) * radius;
+  const sx = cx + Math.cos(startAngle) * radius * LAUNCH_DART_TIP_RADIUS; const sy = cy + Math.sin(startAngle) * radius * LAUNCH_DART_TIP_RADIUS;
+  const ex = cx + Math.cos(endAngle) * radius * STUCK_DART_TIP_RADIUS; const ey = cy + Math.sin(endAngle) * radius * STUCK_DART_TIP_RADIUS;
   const eased = 1 - Math.pow(1 - progress, 3); const x = sx + (ex - sx) * eased; const y = sy + (ey - sy) * eased; const angle = Math.atan2(ey - sy, ex - sx);
-  context.save(); context.translate(x, y); context.rotate(angle); context.strokeStyle = '#ded2bd'; context.lineWidth = 3; context.beginPath(); context.moveTo(-radius * .12, 0); context.lineTo(radius * .08, 0); context.stroke(); context.fillStyle = colorFor(player.id); context.fillRect(-radius * .16, -4, radius * .06, 8); context.restore();
+  drawDartShape(x, y, angle + Math.PI, radius, colorFor(player.id), flight.commit.widthFactor);
 }
 
 function completeRemoteFlight(index: number, now: number) {
@@ -514,17 +532,17 @@ function renderFrame(now: number) {
   const bounds = arena.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); const pixelWidth = Math.max(1, Math.round(bounds.width * dpr)); const pixelHeight = Math.max(1, Math.round(bounds.height * dpr));
   if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) { canvas.width = pixelWidth; canvas.height = pixelHeight; }
   context.setTransform(dpr, 0, 0, dpr, 0, 0); context.clearRect(0, 0, bounds.width, bounds.height);
-  const cx = bounds.width / 2; const cy = bounds.height / 2; const radius = Math.max(48, Math.min(bounds.width, bounds.height) * (bounds.width < 560 ? .29 : .31));
+  const { cx, cy, radius } = computeSceneLayout(bounds.width, bounds.height);
   const game = displayState(); const rotation = visualRotation(now); lastVisualRotation = rotation; const offset = viewOffset(game);
   drawBoard(cx, cy, radius, rotation + offset, game?.event ?? null);
   if (game) {
-    for (const dart of replica?.darts ?? game.darts) drawDart(dart.boardAngle + rotation + offset, radius, cx, cy, colorFor(dart.ownerId), dart.widthFactor);
+    for (const dart of replica?.darts ?? game.darts) drawRadialDart(dart.boardAngle + rotation + offset, STUCK_DART_TIP_RADIUS, radius, cx, cy, colorFor(dart.ownerId), dart.widthFactor);
     drawPlayers(game, cx, cy, radius, offset);
-    drawReadyDart(game, radius, cx, cy, offset, now);
+    drawReadyDart(game, radius, cx, cy, offset);
     if (replica?.pending) {
       const progress = Math.max(0, Math.min(1, (now - replica.pending.started) / SHOT_FLIGHT_MS));
-      const player = game.players[replica.pending.shot.playerId]; const angle = seatWorldAngle(player.seat, game.activeOrder.length) + offset; const eased = 1 - Math.pow(1 - progress, 3);
-      drawDart(angle, radius, cx, cy, colorFor(player.id), replica.pending.shot.widthFactor, 1, radius * .43 * (1 - eased));
+      const player = game.players[replica.pending.shot.playerId]; const angle = seatWorldAngle(player.seat, game.activeOrder.length) + offset;
+      drawRadialDart(angle, flyingDartTipRadius(progress), radius, cx, cy, colorFor(player.id), replica.pending.shot.widthFactor);
     }
     for (let index = remoteFlights.length - 1; index >= 0; index -= 1) {
       const progress = (now - remoteFlights[index].started) / SHOT_FLIGHT_MS;

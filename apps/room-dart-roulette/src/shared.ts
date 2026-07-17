@@ -15,6 +15,11 @@ export const MIN_TURN_MS = 5_000;
 export const SHOT_FLIGHT_MS = 520;
 export const REBASE_MS = 150;
 export const WATCHDOG_MS = 20_000;
+export const SCENE_EXTENT = 1.82;
+export const STUCK_DART_TIP_RADIUS = .94;
+export const LAUNCH_DART_TIP_RADIUS = 1.35;
+export const DART_BODY_LENGTH = .33;
+export const PLAYER_ORBIT_RADIUS = 1.43;
 
 export type Phase = 'lobby' | 'playing' | 'finished';
 export type PlayerStatus = 'waiting' | 'queued' | 'alive' | 'eliminated';
@@ -125,6 +130,24 @@ export type ShotValidationReason =
   | 'DUPLICATE' | 'NOT_CURRENT_PLAYER' | 'STALE_TURN' | 'OUT_OF_ORDER' | 'BAD_TIMING'
   | 'BAD_ANGLE' | 'BAD_WIDTH' | 'BAD_ROTATION' | 'BAD_COLLISION_TARGET'
   | 'BAD_COLLISION_RESULT' | 'BAD_SCORE' | 'BAD_ZONE_EFFECT';
+
+export type SceneLayout = { cx: number; cy: number; radius: number };
+
+export function computeSceneLayout(width: number, height: number, padding = 12): SceneLayout {
+  const safeWidth = Math.max(0, width - padding * 2);
+  const safeHeight = Math.max(0, height - padding * 2);
+  return {
+    cx: width / 2,
+    cy: height / 2,
+    radius: Math.max(0, Math.min(safeWidth, safeHeight) / (SCENE_EXTENT * 2)),
+  };
+}
+
+export function flyingDartTipRadius(progress: number): number {
+  const clamped = Math.max(0, Math.min(1, progress));
+  const eased = 1 - Math.pow(1 - clamped, 3);
+  return LAUNCH_DART_TIP_RADIUS + (STUCK_DART_TIP_RADIUS - LAUNCH_DART_TIP_RADIUS) * eased;
+}
 
 export function lobbyReadiness(players: Record<string, GamePlayer>) {
   const candidates = Object.values(players).filter((player) => player.connected && player.status === 'waiting');

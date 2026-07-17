@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { TAU } from './worker/logic';
-import { lobbyReadiness, seatWorldAngle, simulateShot, turnDurationForRound, validateShotCommit, type GamePlayer, type TurnSnapshot } from './shared';
+import {
+  LAUNCH_DART_TIP_RADIUS,
+  SCENE_EXTENT,
+  STUCK_DART_TIP_RADIUS,
+  computeSceneLayout,
+  flyingDartTipRadius,
+  lobbyReadiness,
+  seatWorldAngle,
+  simulateShot,
+  turnDurationForRound,
+  validateShotCommit,
+  type GamePlayer,
+  type TurnSnapshot,
+} from './shared';
 
 const turn: TurnSnapshot = {
   id: 'turn-1-player-a',
@@ -95,6 +108,33 @@ describe('player-relative camera', () => {
       const offset = Math.PI / 2 - world;
       expect(world + offset).toBeCloseTo(Math.PI / 2);
     }
+  });
+});
+
+describe('responsive scene geometry', () => {
+  it('fits the complete scene inside landscape, portrait and short arenas', () => {
+    for (const [width, height] of [[1280, 720], [390, 720], [900, 360], [320, 240]]) {
+      const layout = computeSceneLayout(width, height, 12);
+      const extent = layout.radius * SCENE_EXTENT;
+      expect(layout.cx - extent).toBeGreaterThanOrEqual(12);
+      expect(layout.cx + extent).toBeLessThanOrEqual(width - 12);
+      expect(layout.cy - extent).toBeGreaterThanOrEqual(12);
+      expect(layout.cy + extent).toBeLessThanOrEqual(height - 12);
+    }
+  });
+
+  it('keeps the launch gap proportional while the whole scene scales', () => {
+    const desktop = computeSceneLayout(1200, 800);
+    const mobile = computeSceneLayout(390, 640);
+    const desktopGap = desktop.radius * (LAUNCH_DART_TIP_RADIUS - 1);
+    const mobileGap = mobile.radius * (LAUNCH_DART_TIP_RADIUS - 1);
+    expect(desktopGap / desktop.radius).toBeCloseTo(.35);
+    expect(mobileGap / mobile.radius).toBeCloseTo(.35);
+  });
+
+  it('starts the flight at the ready position and ends at the stuck position', () => {
+    expect(flyingDartTipRadius(0)).toBe(LAUNCH_DART_TIP_RADIUS);
+    expect(flyingDartTipRadius(1)).toBe(STUCK_DART_TIP_RADIUS);
   });
 });
 

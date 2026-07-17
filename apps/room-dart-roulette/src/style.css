@@ -90,9 +90,9 @@ button { font: inherit; }
   position: relative;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: clamp(150px, 18vw, 220px) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 6px;
+  gap: 6px 10px;
   align-items: stretch;
 }
 
@@ -106,12 +106,11 @@ button { font: inherit; }
 }
 
 .scoreboard {
-  position: absolute;
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
   z-index: 4;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: clamp(150px, 18vw, 220px);
+  width: 100%;
   padding: 10px;
   overflow: auto;
   scrollbar-width: thin;
@@ -139,7 +138,7 @@ button { font: inherit; }
 .player-score { color: var(--gold); font-weight: 900; font-variant-numeric: tabular-nums; }
 
 .arena {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 1;
   position: relative;
   min-width: 0;
@@ -269,7 +268,7 @@ button { font: inherit; }
 .rank-row:first-child { color: #ffd77e; background: rgba(231,179,90,.13); }
 
 .turn-panel {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 2;
   justify-self: center;
   width: min(560px, calc(100% - 24px));
@@ -332,22 +331,34 @@ button { font: inherit; }
   .topbar { min-height: 38px; padding-bottom: 4px; }
   .brand { font-size: .8rem; }
   .event-pill { position: absolute; left: 12px; right: 74px; top: 48px; text-align: center; z-index: 7; }
-  .game-shell { gap: 5px; }
+  .game-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 5px;
+  }
   .scoreboard {
-    left: max(8px, env(safe-area-inset-left));
-    top: 58px;
-    transform: none;
-    width: min(145px, 33vw);
-    max-height: 38vh;
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+    max-height: 58px;
     padding: 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
     background: rgba(34,18,12,.72);
   }
-  .player-card { padding: 5px 3px; grid-template-columns: 3px minmax(0, 1fr) auto; gap: 5px; }
+  .player-card { flex: 0 0 min(145px, 38vw); padding: 5px 3px; grid-template-columns: 3px minmax(0, 1fr) auto; gap: 5px; }
+  .player-card + .player-card { margin-top: 0; }
   .player-swatch { width: 3px; height: 23px; }
   .player-name { font-size: .68rem; }
   .player-meta { display: none; }
   .player-score { font-size: .72rem; }
+  .arena { grid-column: 1; grid-row: 2; }
   .turn-panel {
+    grid-column: 1;
+    grid-row: 3;
     grid-template-columns: minmax(90px, 1fr) minmax(140px, 190px) 54px;
     gap: 8px;
     padding: 7px 8px;
