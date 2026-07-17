@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#160d09" />
+    <title>飞镖轮盘</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">✦</span><span>飞镖轮盘</span></div>
+        <div id="event-pill" class="event-pill" hidden></div>
+        <button id="mute-button" class="icon-button" type="button" aria-label="静音">🔊</button>
+      </header>
+
+      <main class="game-shell">
+        <aside id="scoreboard" class="scoreboard" aria-label="玩家状态"></aside>
+        <section id="arena" class="arena" aria-label="旋转飞镖标靶">
+          <canvas id="game-canvas"></canvas>
+          <div id="phase-overlay" class="phase-overlay"></div>
+        </section>
+        <aside class="turn-panel">
+          <div id="turn-label" class="turn-label">等待开局</div>
+          <div class="timer-ring" id="timer-ring"><span id="timer-value">--</span></div>
+          <div id="shots-left" class="shots-left">候场中</div>
+          <button id="shoot-button" class="shoot-button" type="button" disabled>
+            <span class="shoot-button-title">发射飞镖</span>
+            <span class="shoot-button-hint">把握转盘时机</span>
+          </button>
+        </aside>
+      </main>
+      <div id="live-region" class="sr-only" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
