@@ -19,7 +19,8 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { copyTextToClipboard } from '@/lib/clipboard';
+import { copyTextToClipboard, readTextFromClipboard } from '@/lib/clipboard';
+import { toast } from 'sonner';
 import { createRoomSnapshot } from '../lib/customRooms';
 import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom';
 import { deleteImportedTemplate } from '../lib/templates';
@@ -92,6 +93,13 @@ export function EditorView() {
   const [aiCopyError, setAiCopyError] = useState<string | null>(null);
   const [aiImportLoaded, setAiImportLoaded] = useState(false);
   const [aiImportOpen, setAiImportOpen] = useState(false);
+  const [aiImportSession, setAiImportSession] = useState<{
+    initialText: string;
+    autoConfirm: boolean;
+    autoConfirmToken: number;
+    clipboardReadFailed: boolean;
+  } | null>(null);
+  const aiImportTokenRef = useRef(0);
 
   useEffect(() => {
     selectedTemplateIdRef.current = selectedTemplateId;
@@ -325,6 +333,7 @@ export function EditorView() {
   }
 
   function openAiImportDialog(): void {
+    setAiImportSession(null);
     setAiImportLoaded(true);
     setAiImportOpen(true);
   }
@@ -336,6 +345,24 @@ export function EditorView() {
     setActiveFile('manifest');
     setDirty(true);
     setError(null);
+    toast.success(intl.formatMessage({ id: 'editor.aiImport.successToast' }));
+  }
+
+  async function goAddFromAiCreation(): Promise<void> {
+    const clipped = await readTextFromClipboard();
+    setAiDialogOpen(false);
+    setAiPromptCopied(false);
+    setAiCopyError(null);
+    openBlankEditor();
+    aiImportTokenRef.current += 1;
+    setAiImportSession({
+      initialText: clipped ?? '',
+      autoConfirm: true,
+      autoConfirmToken: aiImportTokenRef.current,
+      clipboardReadFailed: !clipped,
+    });
+    setAiImportLoaded(true);
+    setAiImportOpen(true);
   }
 
   const isBlank = selectedTemplateId === 'blank';
@@ -632,15 +659,23 @@ export function EditorView() {
         }}
         onCopy={() => void copyAiPrompt()}
         onGoAdd={() => {
-          setAiDialogOpen(false);
-          setAiPromptCopied(false);
-          setAiCopyError(null);
-          openBlankEditor();
+          void goAddFromAiCreation();
         }}
       />
       {aiImportLoaded && (
         <Suspense fallback={null}>
-          <AiResultImportDialog open={aiImportOpen} onOpenChange={setAiImportOpen} onImport={applyAiImport} />
+          <AiResultImportDialog
+            open={aiImportOpen}
+            onOpenChange={(open) => {
+              setAiImportOpen(open);
+              if (!open) setAiImportSession(null);
+            }}
+            onImport={applyAiImport}
+            initialText={aiImportSession?.initialText ?? ''}
+            autoConfirm={aiImportSession?.autoConfirm ?? false}
+            autoConfirmToken={aiImportSession?.autoConfirmToken}
+            clipboardReadFailed={aiImportSession?.clipboardReadFailed ?? false}
+          />
         </Suspense>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { ClipboardPasteIcon, SparklesIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,27 +13,73 @@ const FILE_LABELS: Record<keyof AiRoomFiles, string> = {
   worker: 'room.worker.js',
 };
 
+/** Survives StrictMode remount so auto-confirm runs once per session token. */
+const consumedAutoConfirmTokens = new Set<number>();
+
 export function AiResultImportDialog({
   open,
   onOpenChange,
   onImport,
+  initialText = '',
+  autoConfirm = false,
+  autoConfirmToken,
+  clipboardReadFailed = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (files: AiRoomFiles) => void;
+  initialText?: string;
+  autoConfirm?: boolean;
+  /** Monotonic token from parent; required when autoConfirm is true. */
+  autoConfirmToken?: number;
+  /** True when the parent already tried clipboard.readText and got nothing. */
+  clipboardReadFailed?: boolean;
 }) {
   const intl = useIntl();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
+  const onImportRef = useRef(onImport);
+  const onOpenChangeRef = useRef(onOpenChange);
+  onImportRef.current = onImport;
+  onOpenChangeRef.current = onOpenChange;
 
   useEffect(() => {
     if (!open) {
       setText('');
       setError(null);
       setPasting(false);
+      return;
     }
-  }, [open]);
+    setText(initialText);
+    setError(null);
+  }, [open, initialText]);
+
+  useEffect(() => {
+    if (!open || !autoConfirm || autoConfirmToken == null) return;
+    if (consumedAutoConfirmTokens.has(autoConfirmToken)) return;
+    consumedAutoConfirmTokens.add(autoConfirmToken);
+
+    const trimmed = initialText.trim();
+    if (!trimmed) {
+      setError(
+        intl.formatMessage({
+          id: clipboardReadFailed ? 'editor.error.clipboardFailed' : 'editor.aiImport.empty',
+        }),
+      );
+      return;
+    }
+
+    const parsed = parseAiRoomMarkdown(trimmed);
+    if (!parsed.ok) {
+      const names = parsed.missing.map((fileKey) => FILE_LABELS[fileKey]).join(', ');
+      setError(intl.formatMessage({ id: 'editor.aiImport.parseFailed' }, { files: names }));
+      return;
+    }
+
+    onImportRef.current(parsed.files);
+    onOpenChangeRef.current(false);
+  }, [open, autoConfirm, autoConfirmToken, initialText, clipboardReadFailed, intl]);
 
   async function onPaste(): Promise<void> {
     setPasting(true);

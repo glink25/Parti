@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from 'lucide-react';
 import { GithubIcon } from '@/components/icons/GithubIcon';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/ui/sonner';
 import { Lobby } from './pages/Lobby';
 import { loadLocalUser } from './lib/localUser';
 import { UserSettings } from './components/UserSettings';
@@ -152,5 +153,10 @@ function AppLayout() {
 }
 
 export function App() {
-  return <PageFullscreenProvider><AppLayout /></PageFullscreenProvider>;
+  return (
+    <PageFullscreenProvider>
+      <AppLayout />
+      <Toaster />
+    </PageFullscreenProvider>
+  );
 }
