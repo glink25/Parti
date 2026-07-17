@@ -4,6 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { SelectableTemplate } from './editorDefaults';
 
+const AI_PLATFORMS = [
+  { id: 'chatgpt', label: 'ChatGPT', url: 'https://chatgpt.com/' },
+  { id: 'claude', label: 'Claude', url: 'https://claude.ai/' },
+  { id: 'gemini', label: 'Gemini', url: 'https://gemini.google.com/' },
+  { id: 'deepseek', label: 'DeepSeek', url: 'https://chat.deepseek.com/' },
+  { id: 'qwen', label: '通义千问', url: 'https://www.tongyi.com/qianwen' },
+  { id: 'kimi', label: 'Kimi', url: 'https://kimi.moonshot.cn/' },
+] as const;
+
 export function TemplateReplaceDialog({ pending, onCancel, onConfirm }: { pending: SelectableTemplate | null; onCancel: () => void; onConfirm: () => void }) {
   const intl = useIntl();
   return (
@@ -42,13 +51,13 @@ export function AiCreationDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-lg">
+        <DialogHeader className="shrink-0">
           <BotIcon className="mb-2 size-11 rounded-xl bg-secondary p-2.5 text-primary-bright" aria-hidden="true" />
           <DialogTitle><FormattedMessage id="editor.ai.dialogTitle" /></DialogTitle>
           <DialogDescription><FormattedMessage id="editor.ai.dialogDescription" /></DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 text-sm">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto text-sm">
           <div className="rounded-xl border border-border bg-surface-2 p-4">
             <p className="font-semibold text-foreground"><FormattedMessage id="editor.ai.filesTitle" /></p>
             <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-muted-foreground">
@@ -65,12 +74,28 @@ export function AiCreationDialog({
               <li><FormattedMessage id="editor.ai.step3" /></li>
             </ol>
           </div>
+          <div>
+            <p className="text-muted-foreground"><FormattedMessage id="editor.ai.platformsTitle" /></p>
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+              {AI_PLATFORMS.map((platform) => (
+                <a
+                  key={platform.id}
+                  href={platform.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="!underline underline-offset-2 hover:text-foreground"
+                >
+                  {platform.label}
+                </a>
+              ))}
+            </div>
+          </div>
           <p className="rounded-lg border border-primary-bright/20 bg-secondary/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
             <FormattedMessage id="editor.ai.warning" />
           </p>
           {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">{error}</p>}
         </div>
-        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+        <DialogFooter className="shrink-0 flex-col gap-2 sm:flex-row sm:justify-end">
           <Button variant="outline" className="w-full sm:w-auto" onClick={onGoAdd}>
             <FormattedMessage id="editor.ai.goAdd" />
             <ArrowRightIcon data-icon="inline-end" />

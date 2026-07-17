@@ -221,6 +221,7 @@
       "step1": "Copy the prompt and send it to your AI.",
       "step2": "Add gameplay, player count, win conditions, and visual style.",
       "step3": "When AI finishes, click “AI already generated — add now”, then use “Quick import AI result” on the editor page to paste the full reply into the three files.",
+      "platformsTitle": "Ask an AI",
       "warning": "AI-generated code may still have bugs. Review before importing and validate with local preview.",
       "copy": "Create with AI",
       "copied": "Prompt copied",
