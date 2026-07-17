@@ -615,7 +615,7 @@ function PeerJoinView({
       </div>
     );
   }
-  if (error) return <RoomError message={error} />;
+  if (error) return <RoomError message={error} showTips />;
   if (!state || !roomId || !hostPeerId) {
     return (
       <div className={playerGate}>
@@ -776,14 +776,22 @@ function lanAnnouncement(
   };
 }
 
-function RoomError({ message }: { message: string }) {
+function RoomError({ message, showTips }: { message: string; showTips?: boolean }) {
   const intl = useIntl();
   const friendlyMessage = formatRoomError(intl, message);
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,211,55,0.25),transparent_34rem)] p-6">
-      <Card className="w-[min(440px,100%)] gap-3 p-[26px] text-center">
+      <Card className={`gap-3 p-[26px] text-center ${showTips ? 'w-[min(480px,100%)]' : 'w-[min(440px,100%)]'}`}>
         <h2 className="text-xl font-semibold"><FormattedMessage id="peer.error.title" /></h2>
         <p className="leading-[1.6] text-muted-foreground">{friendlyMessage}</p>
+        {showTips && (
+          <ol className="list-decimal space-y-1.5 pl-5 text-left text-sm leading-[1.5] text-muted-foreground">
+            <li><FormattedMessage id="peer.error.tipNetwork" /></li>
+            <li><FormattedMessage id="peer.error.tipSameWifi" /></li>
+            <li><FormattedMessage id="peer.error.tipSyncMethod" /></li>
+            <li><FormattedMessage id="peer.error.tipHostOnline" /></li>
+          </ol>
+        )}
         <Button asChild variant="outline"><a href="#/"><FormattedMessage id="peer.error.backToLobby" /></a></Button>
       </Card>
     </div>

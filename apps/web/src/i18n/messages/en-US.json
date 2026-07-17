@@ -283,7 +283,11 @@
     "error": {
       "title": "Unable to enter room",
       "backToLobby": "Back to lobby",
-      "connectionFailed": "Cannot reach the host. Make sure the room is still active and try again.",
+      "connectionFailed": "Cannot reach the host. Try the steps below, then retry.",
+      "tipNetwork": "Make sure your network connection is stable",
+      "tipSameWifi": "Try joining the same Wi‑Fi network as the host",
+      "tipSyncMethod": "Ask the host to switch Sync method in User Settings and recreate the room",
+      "tipHostOnline": "Confirm the host is still in the room and that you are using the latest invite link",
       "credentialRequired": "This room requires a password",
       "invalidCredential": "Incorrect room password"
     },

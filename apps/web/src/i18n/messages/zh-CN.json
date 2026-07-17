@@ -283,7 +283,11 @@
     "error": {
       "title": "暂时无法进入房间",
       "backToLobby": "返回大厅",
-      "connectionFailed": "暂时无法连接房主，请确认房间仍在进行并稍后重试。",
+      "connectionFailed": "暂时无法连接房主。可按下面步骤排查后重试。",
+      "tipNetwork": "确保网络环境稳定",
+      "tipSameWifi": "尝试与房主连接到同一 Wi‑Fi 局域网",
+      "tipSyncMethod": "让房主在「用户设置 → 同步方式」中换一种同步方式后重建房间",
+      "tipHostOnline": "确认房主仍在房间内，并使用最新邀请链接",
       "credentialRequired": "该房间需要密码",
       "invalidCredential": "房间密码错误"
     },
