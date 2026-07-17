@@ -38,6 +38,7 @@ import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/Edi
 import { EditorActionDock } from '@/components/editor/EditorActionDock';
 import {
   buildTemplateCategories,
+  isSimpleTemplateId,
   normalizeTemplateCategory,
   templatesInCategory,
   type TemplateCategoryId,
@@ -348,20 +349,21 @@ export function EditorView() {
       <div className="mb-8 flex items-end justify-between gap-5 max-sm:items-start">
         <div>
           <span className="mb-2.5 block text-[11px] font-extrabold tracking-[0.16em] text-primary-bright">CREATE A ROOM</span>
-          <div className="mb-2.5 flex items-center gap-2.5 sm:gap-3">
+          <div className="mb-2.5 flex flex-wrap items-center gap-2.5 sm:gap-3">
             <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">
               <FormattedMessage id="editor.title" />
             </h1>
             <Button
               type="button"
               variant="outline"
-              size="icon"
-              className="mt-1 shrink-0 rounded-full text-primary-bright shadow-sm focus-visible:ring-2 focus-visible:ring-primary-bright/50 sm:mt-2"
+              size="sm"
+              className="mt-1 h-auto shrink-0 gap-2 rounded-full px-3 py-2 text-primary-bright shadow-sm focus-visible:ring-2 focus-visible:ring-primary-bright/50 sm:mt-2"
               aria-label={intl.formatMessage({ id: 'editor.aiCreateAria' })}
               title={intl.formatMessage({ id: 'editor.aiCreateAria' })}
               onClick={() => setAiDialogOpen(true)}
             >
               <BotIcon aria-hidden="true" />
+              <FormattedMessage id="editor.aiCreateDescription" />
             </Button>
           </div>
           <p className="text-[15px] text-muted-foreground"><FormattedMessage id="editor.description" /></p>
@@ -489,7 +491,7 @@ export function EditorView() {
                         </span>
                       )}
                     </button>
-                    {selected && templateReady && (
+                    {selected && templateReady && (isSimpleTemplateId(template.id) || template.imported) && (
                       <Button
                         variant="ghost"
                         size="sm"

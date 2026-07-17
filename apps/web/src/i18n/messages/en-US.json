@@ -156,6 +156,7 @@
     "title": "Create online room",
     "description": "Pick a template to start building, then invite friends when you're ready.",
     "aiCreateAria": "Create room with AI",
+    "aiCreateDescription": "Can’t find the game you want? Let AI build one.",
     "library": {
       "emptyTitle": "No templates in this category",
       "emptyDescription": "Try another category or import a room above."

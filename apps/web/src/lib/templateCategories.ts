@@ -8,6 +8,10 @@ export const KNOWN_TAG_ORDER = [
 
 const SIMPLE_TEMPLATE_IDS = new Set(['chat', 'counter']);
 
+export function isSimpleTemplateId(templateId: string): boolean {
+  return SIMPLE_TEMPLATE_IDS.has(templateId);
+}
+
 export interface TemplateCategory {
   id: TemplateCategoryId;
   tagId?: string;
@@ -17,7 +21,7 @@ export interface TemplateCategory {
 export function templatesInCategory(templates: TemplateListEntry[], categoryId: TemplateCategoryId) {
   if (categoryId === 'all') return templates;
   if (categoryId === 'imported') return templates.filter((template) => template.imported);
-  if (categoryId === 'simple') return templates.filter((template) => SIMPLE_TEMPLATE_IDS.has(template.id));
+  if (categoryId === 'simple') return templates.filter((template) => isSimpleTemplateId(template.id));
   const tagId = categoryId.slice(4);
   return templates.filter((template) => template.tags.includes(tagId));
 }
@@ -36,7 +40,7 @@ export function buildTemplateCategories(
   };
   const simpleCategory: TemplateCategory = {
     id: 'simple',
-    count: templates.filter((template) => SIMPLE_TEMPLATE_IDS.has(template.id)).length,
+    count: templates.filter((template) => isSimpleTemplateId(template.id)).length,
   };
 
   const tagCategories = [...tags]

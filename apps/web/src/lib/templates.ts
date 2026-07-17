@@ -3,6 +3,7 @@ import { createPackage, type RoomPackageInput } from '@parti/room-packager';
 import { rooms as registry } from 'virtual:room-registry';
 import { getDb, type CustomPackageRecord } from './db';
 import { createDraftId } from './ids';
+import { isImportedTemplateSource } from './templateSources';
 
 const BUILTIN_IDS = new Set(registry.map(({ dir, manifest }) => manifest.id ?? dir));
 
@@ -25,7 +26,7 @@ export async function listImportedTemplates(): Promise<TemplateMeta[]> {
     ...(item.manifest.description ? {} : { descriptionFallback: 'importedTemplate' as const }),
     source: item.source,
     tags: item.manifest.tags ?? [],
-    imported: item.source.type === 'zip' || item.source.type === 'github',
+    imported: isImportedTemplateSource(item.source),
   }));
 }
 

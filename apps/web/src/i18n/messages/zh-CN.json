@@ -156,6 +156,7 @@
     "title": "创建联机房间",
     "description": "选择一个模板开始创作，完成后立即邀请朋友加入。",
     "aiCreateAria": "使用 AI 创建房间",
+    "aiCreateDescription": "没有想要的游戏？让AI写一个",
     "library": {
       "emptyTitle": "这个分类还没有模板",
       "emptyDescription": "可以切换其他分类，或从上方导入一个房间。"
