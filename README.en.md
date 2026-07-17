@@ -9,12 +9,13 @@ Parti is a web platform and runtime for creating and playing multiplayer interac
 | I want to… | Start here |
 | --- | --- |
 | Try Parti | [Open the live app](https://parti.linkai.work/), browse the lobby, create a room, and invite friends |
-| Create a room | Read the [room development quickstart](./docs/getting-started.md) or begin with the [complete tic-tac-toe example](./docs/example-tic-tac-toe.md) |
+| Create with AI | See [Create a multiplayer room with AI](#create-a-multiplayer-room-with-ai): copy the prompt → generate → one-click import → invite friends |
+| Write a room by hand | Read the [room development quickstart](./docs/getting-started.md) or begin with the [complete tic-tac-toe example](./docs/example-tic-tac-toe.md) |
 | Work on Parti | See [Local development](#local-development) and [Repository structure](#repository-structure) |
 
 ## What Parti provides
 
-- **Create and import**: Start with a blank room or a built-in template, edit room files in the editor, or import a room package from ZIP or GitHub.
+- **Create and import**: Start with a blank room or a built-in template, edit room files in the editor; generate a room with AI and import it in one click; or import a room package from ZIP or GitHub.
 - **Instant multiplayer**: A host creates a room in the browser and connects to players over WebRTC; room code can be distributed peer to peer by the host.
 - **Simple invitations**: Share a link or QR code, protect a room with a four-digit password, or optionally publish it in the online lobby.
 - **Gameplay-first APIs**: Creators submit actions and update authoritative state; the runtime handles the protocol, full-state snapshots, and event broadcasts.
@@ -23,6 +24,16 @@ Parti is a web platform and runtime for creating and playing multiplayer interac
 - **Ready-to-play examples**: The repository includes chat, counter, word guessing, multiplayer snake, and Dou Dizhu rooms.
 
 Parti uses a **host-authoritative** model: players send intentions, while a Worker in the host's browser owns the single authoritative state and synchronizes results to everyone. Creators do not need to manage WebRTC, `postMessage`, sequence numbers, or acknowledgements directly.
+
+## Create a multiplayer room with AI
+
+You do not need to learn the APIs first. Open the create page on the [live app](https://parti.linkai.work/), copy a Parti-ready prompt, and send it to ChatGPT, Claude, Gemini, or another AI you already use. The model follows the repository `docs` contract and returns complete room code. Paste the reply to import the three files, then invite friends with a link or QR code.
+
+1. On the create page, click “Can’t find the game you want? Let AI build one.”, copy the prompt, and send it to your AI.
+2. Add gameplay, player count, win conditions, and visual style, then wait for the full reply.
+3. Back in the editor, use “Quick import AI result” to paste the reply into `parti.room.json`, `index.html`, and `room.worker.js`; preview, create the room, and invite friends.
+
+AI-generated code may still have bugs—preview locally before inviting. To write a room from scratch instead, see [Create a room](#create-a-room) below.
 
 ## Intended use and limitations
 

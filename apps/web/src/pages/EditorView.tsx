@@ -370,6 +370,9 @@ export function EditorView() {
     ? loadedTemplateId === 'blank'
     : templateLoadStates[selectedTemplateId]?.status === 'ready' && loadedTemplateId === selectedTemplateId;
   const goCreate = showEditor || !isBlank;
+  const selectedEntry = templates.find((t) => t.id === selectedTemplateId);
+  const showLocalPreview =
+    import.meta.env.DEV || showEditor || Boolean(selectedEntry?.imported);
   const fileValue = activeFile === 'manifest' ? manifestText : activeFile === 'html' ? htmlText : workerText;
   const fileLabel = activeFile === 'manifest' ? 'parti.room.json' : activeFile === 'html' ? 'index.html' : 'room.worker.js';
 
@@ -641,6 +644,7 @@ export function EditorView() {
         canCreate={goCreate}
         busy={busy}
         selectionReady={selectionReady}
+        showLocalPreview={showLocalPreview}
         onEdit={openBlankEditor}
         onCreate={(target) => void onCreate(target)}
       />
