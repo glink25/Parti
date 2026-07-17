@@ -220,11 +220,22 @@
       "stepsTitle": "How to use",
       "step1": "Copy the prompt and send it to your AI.",
       "step2": "Add gameplay, player count, win conditions, and visual style.",
-      "step3": "Review the code, zip the three files, or upload to GitHub and import here.",
+      "step3": "When AI finishes, click “AI already generated — add now”, then use “Quick import AI result” on the editor page to paste the full reply into the three files.",
       "warning": "AI-generated code may still have bugs. Review before importing and validate with local preview.",
       "copy": "Create with AI",
       "copied": "Prompt copied",
-      "prompt": "Please help me create a multiplayer online game room that can be imported directly into Parti.\n\nBefore designing and writing code, read and understand all documents in this GitHub docs directory:\nhttps://github.com/glink25/Parti/tree/main/docs\n\nStrictly follow the docs on Manifest, client API, Worker API, protocol, and Host Runtime. Room state must be authoritative on the Worker; clients may only read state and submit actions through the Parti API.\n\nIf critical details are missing, ask brief necessary questions first. Once you have enough info, the final result must:\n1. Provide a complete file structure with at least parti.room.json, index.html, and room.worker.js.\n2. Output full contents of all three files—no ellipses, pseudocode, placeholders, or unsupported dependencies.\n3. Ensure manifest entry files, player counts, and permissions match the code.\n4. Implement multiplayer sync, server-side action validation, win/end conditions, and safe handling of bad input.\n5. UI should be clear, responsive, and usable on mobile.\n6. Self-review against all Parti docs before output.\n\nFormat the answer so the user can save each file and zip them for direct Parti import.\n\nMy game idea (please fill in gameplay, player count, win/lose conditions, and visual style):\n[Describe your game idea here]"
+      "goAdd": "AI already generated — add now",
+      "prompt": "Please help me create a multiplayer online game room that can be imported directly into Parti.\n\nBefore designing and writing code, read and understand all documents in this GitHub docs directory:\nhttps://github.com/glink25/Parti/tree/main/docs\n\nStrictly follow the docs on Manifest, client API, Worker API, protocol, and Host Runtime. Room state must be authoritative on the Worker; clients may only read state and submit actions through the Parti API.\n\nIf critical details are missing, ask brief necessary questions first. Once you have enough info, the final result must:\n1. Provide a complete file structure with at least parti.room.json, index.html, and room.worker.js.\n2. Output full contents of all three files—no ellipses, pseudocode, placeholders, or unsupported dependencies.\n3. Ensure manifest entry files, player counts, and permissions match the code.\n4. Implement multiplayer sync, server-side action validation, win/end conditions, and safe handling of bad input.\n5. UI should be clear, responsive, and usable on mobile.\n6. Self-review against all Parti docs before output.\n\nFormat the final answer as Markdown with one fenced code block per file. The fence info string MUST be the filename so the user can one-click import:\n\n### parti.room.json\n```parti.room.json\n(full JSON contents)\n```\n\n### index.html\n```index.html\n(full HTML contents)\n```\n\n### room.worker.js\n```room.worker.js\n(full worker code)\n```\n\nMy game idea (please fill in gameplay, player count, win/lose conditions, and visual style):\n[Describe your game idea here]"
+    },
+    "aiImport": {
+      "open": "Quick import AI result",
+      "title": "Import AI result",
+      "description": "Paste the AI’s full reply. We parse Markdown code fences and fill parti.room.json, index.html, and room.worker.js.",
+      "placeholder": "Paste the AI reply here…",
+      "paste": "Paste here",
+      "confirm": "Import",
+      "empty": "Paste or type the AI reply first.",
+      "parseFailed": "Could not find complete files: {files}. Make sure the reply includes Markdown fences named after each file."
     },
     "defaults": {
       "blankName": "Blank room",

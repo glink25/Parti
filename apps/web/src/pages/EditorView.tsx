@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   BotIcon,
+  ClipboardPasteIcon,
   FileArchiveIcon,
   FilePlusIcon,
   Link2Icon,
@@ -36,6 +37,7 @@ import {
 } from '@/components/editor/editorDefaults';
 import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs';
 import { EditorActionDock } from '@/components/editor/EditorActionDock';
+import type { AiRoomFiles } from '@/components/editor/parseAiRoomMarkdown';
 import {
   buildTemplateCategories,
   isSimpleTemplateId,
@@ -43,6 +45,10 @@ import {
   templatesInCategory,
   type TemplateCategoryId,
 } from '@/lib/templateCategories';
+
+const AiResultImportDialog = lazy(() =>
+  import('@/components/editor/AiResultImportDialog').then((module) => ({ default: module.AiResultImportDialog })),
+);
 
 function formatError(intl: ReturnType<typeof useIntl>, reason: unknown): string {
   return formatResolveError(intl, reason);
@@ -84,6 +90,8 @@ export function EditorView() {
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiPromptCopied, setAiPromptCopied] = useState(false);
   const [aiCopyError, setAiCopyError] = useState<string | null>(null);
+  const [aiImportLoaded, setAiImportLoaded] = useState(false);
+  const [aiImportOpen, setAiImportOpen] = useState(false);
 
   useEffect(() => {
     selectedTemplateIdRef.current = selectedTemplateId;
@@ -309,6 +317,27 @@ export function EditorView() {
     window.setTimeout(() => setAiPromptCopied(false), 1800);
   }
 
+  function openBlankEditor(): void {
+    if (selectedTemplateId !== 'blank' || loadedTemplateId !== 'blank') {
+      void commitTemplateSelection(blankTemplate);
+    }
+    setShowEditor(true);
+  }
+
+  function openAiImportDialog(): void {
+    setAiImportLoaded(true);
+    setAiImportOpen(true);
+  }
+
+  function applyAiImport(files: AiRoomFiles): void {
+    setManifestText(files.manifest);
+    setHtmlText(files.html);
+    setWorkerText(files.worker);
+    setActiveFile('manifest');
+    setDirty(true);
+    setError(null);
+  }
+
   const isBlank = selectedTemplateId === 'blank';
   const selectionReady = isBlank
     ? loadedTemplateId === 'blank'
@@ -523,9 +552,15 @@ export function EditorView() {
 
       {showEditor && (
         <section className="mb-[42px]">
-          <button type="button" className="mb-[18px] inline-flex w-max cursor-pointer items-center gap-1 border-0 bg-transparent text-[13px] text-muted-foreground transition-colors hover:text-foreground" onClick={() => setShowEditor(false)}>
-            <ArrowLeftIcon data-icon="inline-start" /><FormattedMessage id="editor.backToTemplates" />
-          </button>
+          <div className="mb-[18px] flex flex-wrap items-center justify-between gap-3">
+            <button type="button" className="inline-flex w-max cursor-pointer items-center gap-1 border-0 bg-transparent text-[13px] text-muted-foreground transition-colors hover:text-foreground" onClick={() => setShowEditor(false)}>
+              <ArrowLeftIcon data-icon="inline-start" /><FormattedMessage id="editor.backToTemplates" />
+            </button>
+            <Button type="button" variant="outline" size="sm" className="gap-2" onClick={openAiImportDialog}>
+              <ClipboardPasteIcon data-icon="inline-start" />
+              <FormattedMessage id="editor.aiImport.open" />
+            </Button>
+          </div>
           {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
           <div className="overflow-hidden rounded-[17px] border border-border bg-[#0c0f18] shadow-[0_18px_55px_rgba(0,0,0,0.25)]">
             <Tabs value={activeFile} onValueChange={(value) => setActiveFile(value as EditorFile)}>
@@ -575,10 +610,39 @@ export function EditorView() {
         </section>
       )}
 
-      <EditorActionDock canCreate={goCreate} busy={busy} selectionReady={selectionReady} onEdit={() => setShowEditor(true)} onCreate={(target) => void onCreate(target)} />
+      <EditorActionDock
+        canCreate={goCreate}
+        busy={busy}
+        selectionReady={selectionReady}
+        onEdit={openBlankEditor}
+        onCreate={(target) => void onCreate(target)}
+      />
 
       <TemplateReplaceDialog pending={pendingTemplate} onCancel={() => setPendingTemplate(null)} onConfirm={() => { if (pendingTemplate) void commitTemplateSelection(pendingTemplate); }} />
-      <AiCreationDialog open={aiDialogOpen} copied={aiPromptCopied} error={aiCopyError} onOpenChange={(open) => { setAiDialogOpen(open); if (!open) { setAiPromptCopied(false); setAiCopyError(null); } }} onCopy={() => void copyAiPrompt()} />
+      <AiCreationDialog
+        open={aiDialogOpen}
+        copied={aiPromptCopied}
+        error={aiCopyError}
+        onOpenChange={(open) => {
+          setAiDialogOpen(open);
+          if (!open) {
+            setAiPromptCopied(false);
+            setAiCopyError(null);
+          }
+        }}
+        onCopy={() => void copyAiPrompt()}
+        onGoAdd={() => {
+          setAiDialogOpen(false);
+          setAiPromptCopied(false);
+          setAiCopyError(null);
+          openBlankEditor();
+        }}
+      />
+      {aiImportLoaded && (
+        <Suspense fallback={null}>
+          <AiResultImportDialog open={aiImportOpen} onOpenChange={setAiImportOpen} onImport={applyAiImport} />
+        </Suspense>
+      )}
     </div>
   );
 }

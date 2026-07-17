@@ -220,11 +220,22 @@
       "stepsTitle": "使用方式",
       "step1": "复制提示词并发送给 AI。",
       "step2": "补充玩法、玩家人数、胜负条件和视觉风格。",
-      "step3": "检查生成的代码，将三个文件打包为 ZIP，或上传 GitHub 后回到这里导入。",
+      "step3": "AI 生成后点击「AI 已经生成，去添加」，在编辑页用「快速导入 AI 结果」粘贴整段回复即可填入三个文件。",
       "warning": "AI 生成的代码仍可能出错。导入前请检查内容，并先通过本地预览验证玩法。",
       "copy": "让 AI 帮我创建",
       "copied": "提示词已复制",
-      "prompt": "请帮我创建一个可以直接导入 Parti 的多人联机游戏房间。\n\n开始设计和编写代码前，请先阅读并理解以下 GitHub docs 目录中的全部文档：\nhttps://github.com/glink25/Parti/tree/main/docs\n\n请严格遵守文档中关于 Manifest、客户端 API、Worker API、协议和 Host Runtime 的约束，尤其注意房间状态必须由 Worker 权威管理，客户端只能通过 Parti API 读取状态和提交动作。\n\n如果需求中缺少会影响实现的关键信息，请先提出简短、必要的问题；信息足够后再生成最终结果。最终结果必须：\n1. 给出可直接保存的完整文件结构，至少包含 parti.room.json、index.html 和 room.worker.js。\n2. 分别输出三个文件的完整内容，不使用省略号、伪代码、占位实现或 Parti 不支持的依赖。\n3. 确保 manifest 的入口文件、玩家人数和权限配置与代码一致。\n4. 正确实现多人状态同步、服务端动作校验、胜负或结束条件，并安全处理异常或恶意输入。\n5. UI 应清晰、响应式，并能在手机端正常操作。\n6. 输出前自行复核代码与全部 Parti 文档约束，修正发现的问题。\n\n请将最终答案整理成用户可以逐个保存文件、打包为 ZIP 后直接导入 Parti 的形式。\n\n我的游戏创意如下（请补充玩法、玩家人数、胜负条件和视觉风格）：\n[在这里补充你的游戏创意]"
+      "goAdd": "AI 已经生成，去添加",
+      "prompt": "请帮我创建一个可以直接导入 Parti 的多人联机游戏房间。\n\n开始设计和编写代码前，请先阅读并理解以下 GitHub docs 目录中的全部文档：\nhttps://github.com/glink25/Parti/tree/main/docs\n\n请严格遵守文档中关于 Manifest、客户端 API、Worker API、协议和 Host Runtime 的约束，尤其注意房间状态必须由 Worker 权威管理，客户端只能通过 Parti API 读取状态和提交动作。\n\n如果需求中缺少会影响实现的关键信息，请先提出简短、必要的问题；信息足够后再生成最终结果。最终结果必须：\n1. 给出可直接保存的完整文件结构，至少包含 parti.room.json、index.html 和 room.worker.js。\n2. 分别输出三个文件的完整内容，不使用省略号、伪代码、占位实现或 Parti 不支持的依赖。\n3. 确保 manifest 的入口文件、玩家人数和权限配置与代码一致。\n4. 正确实现多人状态同步、服务端动作校验、胜负或结束条件，并安全处理异常或恶意输入。\n5. UI 应清晰、响应式，并能在手机端正常操作。\n6. 输出前自行复核代码与全部 Parti 文档约束，修正发现的问题。\n\n请按以下 Markdown 格式输出最终答案（每个文件一个代码块，info string 必须使用文件名，便于用户一键导入）：\n\n### parti.room.json\n```parti.room.json\n（完整 JSON 内容）\n```\n\n### index.html\n```index.html\n（完整 HTML 内容）\n```\n\n### room.worker.js\n```room.worker.js\n（完整 Worker 代码）\n```\n\n我的游戏创意如下（请补充玩法、玩家人数、胜负条件和视觉风格）：\n[在这里补充你的游戏创意]"
+    },
+    "aiImport": {
+      "open": "快速导入 AI 结果",
+      "title": "导入 AI 生成结果",
+      "description": "粘贴 AI 的整段回复。我们会解析其中的 Markdown 代码块，并填入 parti.room.json、index.html 与 room.worker.js。",
+      "placeholder": "在此粘贴 AI 回复…",
+      "paste": "粘贴到此处",
+      "confirm": "确认导入",
+      "empty": "请先粘贴或输入 AI 回复内容。",
+      "parseFailed": "未能解析到完整文件：{files}。请确认回复中包含对应文件名的 Markdown 代码块。"
     },
     "defaults": {
       "blankName": "空白房间",

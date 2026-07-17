@@ -1,5 +1,5 @@
 import { FormattedMessage, useIntl } from 'react-intl';
-import { BotIcon, CheckIcon, CopyIcon, RotateCcwIcon } from 'lucide-react';
+import { ArrowRightIcon, BotIcon, CheckIcon, CopyIcon, RotateCcwIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { SelectableTemplate } from './editorDefaults';
@@ -25,7 +25,21 @@ export function TemplateReplaceDialog({ pending, onCancel, onConfirm }: { pendin
   );
 }
 
-export function AiCreationDialog({ open, copied, error, onOpenChange, onCopy }: { open: boolean; copied: boolean; error: string | null; onOpenChange: (open: boolean) => void; onCopy: () => void }) {
+export function AiCreationDialog({
+  open,
+  copied,
+  error,
+  onOpenChange,
+  onCopy,
+  onGoAdd,
+}: {
+  open: boolean;
+  copied: boolean;
+  error: string | null;
+  onOpenChange: (open: boolean) => void;
+  onCopy: () => void;
+  onGoAdd: () => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
@@ -56,7 +70,11 @@ export function AiCreationDialog({ open, copied, error, onOpenChange, onCopy }: 
           </p>
           {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">{error}</p>}
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={onGoAdd}>
+            <FormattedMessage id="editor.ai.goAdd" />
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
           <Button className="w-full sm:w-auto" onClick={onCopy}>
             {copied ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
             <FormattedMessage id={copied ? 'editor.ai.copied' : 'editor.ai.copy'} />
