@@ -3,6 +3,7 @@ import {
   REBASE_MS,
   SHOT_FLIGHT_MS,
   applyPredictedShot,
+  lobbyReadiness,
   seatWorldAngle,
   simulateShot,
   type GamePlayer,
@@ -322,7 +323,8 @@ function mountOverlay(phase: Phase) {
   const card = document.createElement('div');
   card.className = 'overlay-card';
   if (phase === 'lobby') {
-    card.innerHTML = '<h1>飞镖轮盘</h1><p>贴近对手的飞镖赢得高分，碰到任何飞镖都会失去生命。留到最后，成为酒馆里的王牌镖客。</p><div class="roster" data-role="roster"></div><button class="host-action" data-action="start" type="button">开始对局</button><p data-role="lobby-note">至少需要 2 名玩家</p>';
+    card.innerHTML = '<h1>飞镖轮盘</h1><p>贴近对手的飞镖赢得高分，碰到任何飞镖都会失去生命。留到最后，成为酒馆里的王牌镖客。</p><div class="roster" data-role="roster"></div><div class="lobby-actions"><button class="ready-action" data-action="ready" type="button" aria-pressed="false">准备</button><button class="host-action" data-action="start" type="button">开始对局</button></div><p data-role="lobby-note">至少需要 2 名玩家</p>';
+    card.querySelector<HTMLButtonElement>('[data-action="ready"]')!.addEventListener('click', () => { ensureAudio(); void parti.action('toggle_ready'); });
     card.querySelector<HTMLButtonElement>('[data-action="start"]')!.addEventListener('click', () => { ensureAudio(); void parti.action('start_game'); });
   } else {
     card.innerHTML = '<h1 data-role="winner-title">本局结束</h1><p data-role="winner-copy"></p><div class="ranking" data-role="ranking"></div><button class="host-action" data-action="lobby" type="button">返回候场</button>';
@@ -338,14 +340,34 @@ function escapeHtml(value: string): string {
 function updateOverlay(game: GameState) {
   if (mountedPhase !== game.phase) mountOverlay(game.phase);
   if (game.phase === 'lobby') {
-    const waiting = Object.values(game.players).filter((player) => player.connected && player.status === 'waiting');
+    const readiness = lobbyReadiness(game.players);
+    const waiting = readiness.candidates;
     const roster = overlay.querySelector<HTMLElement>('[data-role="roster"]');
-    if (roster) roster.replaceChildren(...waiting.map((player) => { const chip = document.createElement('span'); chip.className = 'roster-chip'; chip.textContent = `${player.isHost ? '♛ ' : ''}${player.name}`; return chip; }));
-    const isHost = parti.playerId === game.hostId;
+    if (roster) roster.replaceChildren(...waiting.map((player) => {
+      const chip = document.createElement('span');
+      chip.className = `roster-chip ${player.ready ? 'ready' : 'not-ready'}`;
+      chip.textContent = `${player.ready ? '✓ ' : '○ '}${player.isHost ? '♛ ' : ''}${player.name}`;
+      return chip;
+    }));
+    const me = parti.playerId ? game.players[parti.playerId] : null;
+    const isHost = parti.playerId === game.hostId || me?.isHost === true;
+    const ready = overlay.querySelector<HTMLButtonElement>('[data-action="ready"]');
+    if (ready) {
+      const canReady = Boolean(me?.connected && me.status === 'waiting');
+      ready.hidden = !canReady;
+      ready.disabled = !canReady;
+      ready.textContent = me?.ready ? '取消准备' : '准备';
+      ready.classList.toggle('is-ready', me?.ready === true);
+      ready.setAttribute('aria-pressed', String(me?.ready === true));
+    }
     const start = overlay.querySelector<HTMLButtonElement>('[data-action="start"]');
-    if (start) { start.hidden = !isHost; start.disabled = waiting.length < 2; }
+    if (start) { start.hidden = !isHost; start.disabled = !readiness.canStart; }
     const note = overlay.querySelector<HTMLElement>('[data-role="lobby-note"]');
-    if (note) note.textContent = isHost ? (waiting.length < 2 ? `还需 ${2 - waiting.length} 名玩家` : `${waiting.length} 名玩家已候场`) : '等待房主开始对局';
+    if (note) {
+      if (waiting.length < 2) note.textContent = `还需 ${2 - waiting.length} 名玩家加入并准备`;
+      else if (readiness.unready.length > 0) note.textContent = `还有 ${readiness.unready.length} 名玩家未准备`;
+      else note.textContent = isHost ? '全员已准备，可以开始对局' : '全员已准备，等待房主开始';
+    }
   }
   if (game.phase === 'finished') {
     const winner = game.winnerId ? game.players[game.winnerId] : null;
@@ -381,7 +403,7 @@ function updateScoreboard(game: GameState) {
     card.classList.toggle('eliminated', player.status === 'eliminated');
     card.classList.toggle('queued', player.status === 'queued' || player.status === 'waiting');
     card.querySelector<HTMLElement>('.player-name')!.textContent = `${player.isHost ? '♛ ' : ''}${player.name}${player.id === parti.playerId ? '（你）' : ''}`;
-    card.querySelector<HTMLElement>('.player-meta')!.textContent = player.status === 'queued' ? '下局候场' : player.status === 'waiting' ? '等待开局' : player.status === 'eliminated' ? '已淘汰' : `${'♥'.repeat(player.health)}${'♡'.repeat(3 - player.health)}${player.connected ? '' : ' · 离线'}`;
+    card.querySelector<HTMLElement>('.player-meta')!.textContent = player.status === 'queued' ? '下局候场' : player.status === 'waiting' ? (player.ready ? '已准备' : '未准备') : player.status === 'eliminated' ? '已淘汰' : `${'♥'.repeat(player.health)}${'♡'.repeat(3 - player.health)}${player.connected ? '' : ' · 离线'}`;
     card.querySelector<HTMLElement>('.player-score')!.textContent = game.phase === 'lobby' ? '—' : String(player.score);
     scoreboard.append(card);
   }
@@ -539,6 +561,19 @@ parti.onEvent('roulette:commit-rejected', (payload) => {
   liveRegion.textContent = `本地结果未被接受，正在重新同步：${payload.reason}`;
   const latest = parti.getState() as GameState | null;
   if (latest?.schema === 'dart-roulette@2' && latest.phase === 'playing' && latest.turn) { state = latest; beginReplica(latest, performance.now(), true); }
+});
+
+parti.onEvent('roulette:lobby-error', (payload) => {
+  const messages: Record<string, [string, string]> = {
+    NOT_IN_LOBBY: ['当前无法准备或开局', '对局状态已经发生变化'],
+    NOT_WAITING: ['当前无法准备', '你不在本局候场名单中'],
+    HOST_ONLY: ['只有房主可以开始对局', '请等待房主操作'],
+    NEED_MORE_PLAYERS: ['人数不足', `还需 ${payload.missing ?? 1} 名玩家`],
+    TOO_MANY_PLAYERS: ['人数超出限制', '本游戏最多支持 8 名玩家'],
+    PLAYERS_NOT_READY: ['还有玩家未准备', `请等待剩余 ${payload.count ?? 1} 名玩家准备`],
+  };
+  const [title, detail] = messages[payload.reason] ?? ['操作未完成', '请根据当前大厅状态重试'];
+  enqueueFeedback({ kind: 'penalty', icon: '!', title, detail, duration: 1_500 });
 });
 
 parti.onEvent('roulette:health-changed', (payload) => {

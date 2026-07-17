@@ -28,6 +28,7 @@
     "sensors": []
   },
   "actions": {
+    "toggle_ready": {},
     "start_game": {},
     "accept_turn": { "payload": "{ turnId, revision }" },
     "commit_shot": { "payload": "ShotCommit" },

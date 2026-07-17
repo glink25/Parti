@@ -26,6 +26,7 @@ export type GamePlayer = {
   name: string;
   isHost: boolean;
   connected: boolean;
+  ready: boolean;
   status: PlayerStatus;
   seat: number;
   health: number;
@@ -124,6 +125,16 @@ export type ShotValidationReason =
   | 'DUPLICATE' | 'NOT_CURRENT_PLAYER' | 'STALE_TURN' | 'OUT_OF_ORDER' | 'BAD_TIMING'
   | 'BAD_ANGLE' | 'BAD_WIDTH' | 'BAD_ROTATION' | 'BAD_COLLISION_TARGET'
   | 'BAD_COLLISION_RESULT' | 'BAD_SCORE' | 'BAD_ZONE_EFFECT';
+
+export function lobbyReadiness(players: Record<string, GamePlayer>) {
+  const candidates = Object.values(players).filter((player) => player.connected && player.status === 'waiting');
+  const unready = candidates.filter((player) => !player.ready);
+  return {
+    candidates,
+    unready,
+    canStart: candidates.length >= 2 && candidates.length <= 8 && unready.length === 0,
+  };
+}
 
 export function seatWorldAngle(seat: number, playerCount: number): number {
   return -Math.PI / 2 + (seat / playerCount) * Math.PI * 2;

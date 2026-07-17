@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TAU } from './worker/logic';
-import { seatWorldAngle, simulateShot, turnDurationForRound, validateShotCommit, type TurnSnapshot } from './shared';
+import { lobbyReadiness, seatWorldAngle, simulateShot, turnDurationForRound, validateShotCommit, type GamePlayer, type TurnSnapshot } from './shared';
 
 const turn: TurnSnapshot = {
   id: 'turn-1-player-a',
@@ -95,5 +95,42 @@ describe('player-relative camera', () => {
       const offset = Math.PI / 2 - world;
       expect(world + offset).toBeCloseTo(Math.PI / 2);
     }
+  });
+});
+
+function lobbyPlayer(id: string, ready: boolean, overrides: Partial<GamePlayer> = {}): GamePlayer {
+  return {
+    id,
+    name: id,
+    isHost: id === 'host',
+    connected: true,
+    ready,
+    status: 'waiting',
+    seat: -1,
+    health: 3,
+    score: 0,
+    nextTurnShots: 1,
+    nextTurnWidth: 1,
+    stats: { shots: 0, safeHits: 0, collisions: 0, timeouts: 0 },
+    ...overrides,
+  };
+}
+
+describe('lobby readiness', () => {
+  it('requires at least two ready waiting players, including the host', () => {
+    expect(lobbyReadiness({ host: lobbyPlayer('host', true) }).canStart).toBe(false);
+    expect(lobbyReadiness({ host: lobbyPlayer('host', false), guest: lobbyPlayer('guest', true) }).canStart).toBe(false);
+    expect(lobbyReadiness({ host: lobbyPlayer('host', true), guest: lobbyPlayer('guest', true) }).canStart).toBe(true);
+  });
+
+  it('excludes disconnected and queued players from the current start group', () => {
+    const result = lobbyReadiness({
+      host: lobbyPlayer('host', true),
+      guest: lobbyPlayer('guest', true),
+      offline: lobbyPlayer('offline', false, { connected: false }),
+      queued: lobbyPlayer('queued', false, { status: 'queued' }),
+    });
+    expect(result.candidates.map((player) => player.id)).toEqual(['host', 'guest']);
+    expect(result.canStart).toBe(true);
   });
 });

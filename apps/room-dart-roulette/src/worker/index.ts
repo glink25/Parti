@@ -1,6 +1,7 @@
 import { defineRoom } from '@parti/worker-sdk';
 import {
   WATCHDOG_MS,
+  lobbyReadiness,
   turnDurationForRound,
   validateShotCommit,
   type Dart,
@@ -35,6 +36,7 @@ function initialPlayer(player: { id: string; name: string; role: string }, statu
     name: player.name || '无名镖客',
     isHost: player.role === 'host',
     connected: true,
+    ready: false,
     status,
     seat: -1,
     health: 3,
@@ -43,6 +45,19 @@ function initialPlayer(player: { id: string; name: string; role: string }, statu
     nextTurnWidth: 1,
     stats: { shots: 0, safeHits: 0, collisions: 0, timeouts: 0 },
   };
+}
+
+function syncHost(ctx: RoomContext): string | null {
+  const hostId = ctx.host?.id ?? ctx.state.hostId ?? null;
+  ctx.state.hostId = hostId;
+  for (const candidate of Object.values(ctx.state.players as Record<string, GamePlayer>)) {
+    candidate.isHost = candidate.id === hostId;
+  }
+  return hostId;
+}
+
+function lobbyError(ctx: RoomContext, playerId: string, reason: string, details: Record<string, number> = {}) {
+  ctx.send(playerId, 'roulette:lobby-error', { reason, ...details });
 }
 
 function randomEventThreshold(ctx: RoomContext): number {
@@ -313,12 +328,13 @@ const room = defineRoom({
   },
 
   onRestore(ctx: RoomContext) {
+    syncHost(ctx);
     if (ctx.state.phase === 'playing' && ctx.state.turn) scheduleWatchdog(ctx, ctx.state.turn);
   },
 
   onJoin(ctx: RoomContext, player: { id: string; name: string; role: string }) {
     ctx.state.players[player.id] = initialPlayer(player, ctx.state.phase === 'lobby' ? 'waiting' : 'queued');
-    if (player.role === 'host') ctx.state.hostId = player.id;
+    syncHost(ctx);
   },
 
   onReconnect(ctx: RoomContext, player: { id: string; name: string; role: string }) {
@@ -329,6 +345,7 @@ const room = defineRoom({
     } else {
       ctx.state.players[player.id] = initialPlayer(player, ctx.state.phase === 'lobby' ? 'waiting' : 'queued');
     }
+    syncHost(ctx);
   },
 
   onLeave(ctx: RoomContext, player: { id: string }) {
@@ -336,18 +353,52 @@ const room = defineRoom({
     if (!existing) return;
     if (ctx.state.phase === 'playing' && existing.status === 'alive') existing.connected = false;
     else delete ctx.state.players[player.id];
+    syncHost(ctx);
   },
 
   actions: {
+    toggle_ready(ctx: RoomContext, { player }: { player: { id: string } }) {
+      syncHost(ctx);
+      if (ctx.state.phase !== 'lobby') {
+        lobbyError(ctx, player.id, 'NOT_IN_LOBBY');
+        return;
+      }
+      const candidate = ctx.state.players[player.id] as GamePlayer | undefined;
+      if (!candidate || !candidate.connected || candidate.status !== 'waiting') {
+        lobbyError(ctx, player.id, 'NOT_WAITING');
+        return;
+      }
+      candidate.ready = !candidate.ready;
+    },
+
     start_game(ctx: RoomContext, { player }: { player: { id: string } }) {
-      if (ctx.state.phase !== 'lobby' || player.id !== ctx.state.hostId) return;
-      const candidates = Object.values(ctx.state.players as Record<string, GamePlayer>)
-        .filter((candidate) => candidate.connected && candidate.status === 'waiting');
-      if (candidates.length < 2 || candidates.length > 8) return;
+      if (ctx.state.phase !== 'lobby') {
+        lobbyError(ctx, player.id, 'NOT_IN_LOBBY');
+        return;
+      }
+      if (player.id !== syncHost(ctx)) {
+        lobbyError(ctx, player.id, 'HOST_ONLY');
+        return;
+      }
+      const readiness = lobbyReadiness(ctx.state.players);
+      if (readiness.candidates.length < 2) {
+        lobbyError(ctx, player.id, 'NEED_MORE_PLAYERS', { missing: 2 - readiness.candidates.length });
+        return;
+      }
+      if (readiness.candidates.length > 8) {
+        lobbyError(ctx, player.id, 'TOO_MANY_PLAYERS');
+        return;
+      }
+      if (readiness.unready.length > 0) {
+        lobbyError(ctx, player.id, 'PLAYERS_NOT_READY', { count: readiness.unready.length });
+        return;
+      }
+      const candidates = readiness.candidates;
       const order = shuffle(candidates.map((candidate) => candidate.id), () => ctx.random());
       for (const candidate of Object.values(ctx.state.players as Record<string, GamePlayer>)) {
         const seat = order.indexOf(candidate.id);
         candidate.status = seat >= 0 ? 'alive' : 'queued';
+        candidate.ready = false;
         candidate.seat = seat;
         candidate.health = 3;
         candidate.score = 0;
@@ -407,13 +458,18 @@ const room = defineRoom({
     },
 
     return_to_lobby(ctx: RoomContext, { player }: { player: { id: string } }) {
-      if (ctx.state.phase !== 'finished' || player.id !== ctx.state.hostId) return;
+      if (ctx.state.phase !== 'finished') return;
+      if (player.id !== syncHost(ctx)) {
+        lobbyError(ctx, player.id, 'HOST_ONLY');
+        return;
+      }
       for (const [id, candidate] of Object.entries(ctx.state.players as Record<string, GamePlayer>)) {
         if (!candidate.connected) {
           delete ctx.state.players[id];
           continue;
         }
         candidate.status = 'waiting';
+        candidate.ready = false;
         candidate.seat = -1;
         candidate.health = 3;
         candidate.nextTurnShots = 1;
