@@ -19,15 +19,25 @@
         <section id="arena" class="arena" aria-label="旋转飞镖标靶">
           <canvas id="game-canvas"></canvas>
           <div id="phase-overlay" class="phase-overlay"></div>
+          <div id="feedback-flash" class="feedback-flash" aria-hidden="true"></div>
+          <div id="global-feedback" class="global-feedback" role="status" aria-live="assertive" hidden>
+            <span id="feedback-icon" class="feedback-icon"></span>
+            <span class="feedback-copy">
+              <strong id="feedback-title"></strong>
+              <span id="feedback-detail"></span>
+            </span>
+          </div>
         </section>
         <aside class="turn-panel">
-          <div id="turn-label" class="turn-label">等待开局</div>
-          <div class="timer-ring" id="timer-ring"><span id="timer-value">--</span></div>
-          <div id="shots-left" class="shots-left">候场中</div>
+          <div class="turn-copy">
+            <div id="turn-label" class="turn-label">等待开局</div>
+            <div id="shots-left" class="shots-left">候场中</div>
+          </div>
           <button id="shoot-button" class="shoot-button" type="button" disabled>
             <span class="shoot-button-title">发射飞镖</span>
             <span class="shoot-button-hint">把握转盘时机</span>
           </button>
+          <div class="timer-ring" id="timer-ring"><span id="timer-value">--</span></div>
         </aside>
       </main>
       <div id="live-region" class="sr-only" aria-live="polite"></div>

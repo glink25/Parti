@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "id": "dart-roulette",
   "name": "飞镖轮盘",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packageMode": "filesystem",
   "description": "围绕不停旋转的木质标靶轮流发射飞镖，贴近对手得分，碰镖扣血，并应对不断变化的轮盘事件。",
   "tags": ["party", "action", "multiplayer"],
@@ -28,7 +28,9 @@
   },
   "actions": {
     "start_game": {},
-    "shoot": {},
+    "accept_turn": { "payload": "{ turnId, revision }" },
+    "commit_shot": { "payload": "ShotCommit" },
+    "commit_timeout": { "payload": "TimeoutCommit" },
     "return_to_lobby": {}
   }
 }

@@ -11,6 +11,7 @@ function bundledRoomWorker(outDir: string): Plugin {
     buildStart() {
       this.addWatchFile(workerEntry);
       this.addWatchFile(resolve(import.meta.dirname, 'src/worker/logic.ts'));
+      this.addWatchFile(resolve(import.meta.dirname, 'src/shared.ts'));
     },
     async closeBundle() {
       const outfile = resolve(outDir, 'worker.js');

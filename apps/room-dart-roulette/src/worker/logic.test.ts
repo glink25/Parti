@@ -25,11 +25,11 @@ describe('angle and rotation helpers', () => {
   });
 
   it('supports clockwise, accelerated and reverse rotation', () => {
-    const clockwise = { anchorAngle: 0, anchorAt: 1_000, speedFactor: 1, direction: 1 as const };
-    expect(rotationAngleAt(clockwise, 1_000 + BASE_ROTATION_MS / 4)).toBeCloseTo(Math.PI / 2);
-    expect(rotationAngleAt({ ...clockwise, speedFactor: 1.5 }, 1_000 + BASE_ROTATION_MS / 4)).toBeCloseTo(Math.PI * .75);
-    expect(rotationAngleAt({ ...clockwise, direction: -1 }, 1_000 + BASE_ROTATION_MS / 4)).toBeCloseTo(TAU - Math.PI / 2);
-    expect(boardAngleFromWorld(clockwise, Math.PI, 1_000 + BASE_ROTATION_MS / 4)).toBeCloseTo(Math.PI / 2);
+    const clockwise = { anchorAngle: 0, anchorElapsed: 0, speedFactor: 1, direction: 1 as const };
+    expect(rotationAngleAt(clockwise, BASE_ROTATION_MS / 4)).toBeCloseTo(Math.PI / 2);
+    expect(rotationAngleAt({ ...clockwise, speedFactor: 1.5 }, BASE_ROTATION_MS / 4)).toBeCloseTo(Math.PI * .75);
+    expect(rotationAngleAt({ ...clockwise, direction: -1 }, BASE_ROTATION_MS / 4)).toBeCloseTo(TAU - Math.PI / 2);
+    expect(boardAngleFromWorld(clockwise, Math.PI, BASE_ROTATION_MS / 4)).toBeCloseTo(Math.PI / 2);
   });
 });
 

@@ -1,108 +1,33 @@
 import { defineRoom } from '@parti/worker-sdk';
 import {
+  WATCHDOG_MS,
+  turnDurationForRound,
+  validateShotCommit,
+  type Dart,
+  type EventKind,
+  type GamePlayer,
+  type GameState,
+  type PlayerStatus,
+  type RouletteEvent,
+  type ShotCommit,
+  type TimeoutCommit,
+  type TurnSnapshot,
+  type ZoneEffect,
+} from '../shared';
+import {
   TAU,
   ZONE_ARC,
-  boardAngleFromWorld,
   clampHealth,
-  findCollision,
-  isInsideZone,
+  normalizeAngle,
   pickZoneAngle,
   rotationAngleAt,
-  scoreSafeDart,
   shuffle,
   timeoutDamage,
-  type Rotation,
 } from './logic';
-
-type Phase = 'lobby' | 'playing' | 'finished';
-type PlayerStatus = 'waiting' | 'queued' | 'alive' | 'eliminated';
-type EventKind = 'speed_up' | 'reverse' | 'heal_zone' | 'slow_zone' | 'wide_zone' | 'multishot_zone';
-
-type GamePlayer = {
-  id: string;
-  name: string;
-  isHost: boolean;
-  connected: boolean;
-  status: PlayerStatus;
-  seat: number;
-  health: number;
-  score: number;
-  nextTurnShots: number;
-  nextTurnWidth: number;
-  stats: { shots: number; safeHits: number; collisions: number; timeouts: number };
-};
-
-type Dart = {
-  id: string;
-  ownerId: string;
-  boardAngle: number;
-  widthFactor: number;
-  score: number;
-};
-
-type RouletteEvent = {
-  id: string;
-  kind: EventKind;
-  label: string;
-  description: string;
-  zoneAngle: number | null;
-  zoneArc: number | null;
-  triggeredAt: number;
-  activated: boolean;
-};
-
-type Turn = {
-  id: string;
-  playerId: string;
-  required: number;
-  fired: number;
-  dartWidth: number;
-  startedAt: number;
-  deadline: number;
-};
-
-type PendingShot = {
-  id: string;
-  playerId: string;
-  worldAngle: number;
-  boardAngle: number;
-  widthFactor: number;
-  firedAt: number;
-  impactAt: number;
-};
-
-type GameState = {
-  schema: 'dart-roulette@1';
-  phase: Phase;
-  hostId: string | null;
-  serverNow: number;
-  players: Record<string, GamePlayer>;
-  activeOrder: string[];
-  currentIndex: number;
-  turn: Turn | null;
-  rotation: Rotation;
-  darts: Dart[];
-  event: RouletteEvent | null;
-  shotsSinceEvent: number;
-  nextEventAt: number;
-  pendingShot: PendingShot | null;
-  winnerId: string | null;
-  finishedAt: number | null;
-  round: number;
-};
 
 type RoomContext = any;
 
-const TURN_MS = 10_000;
-const SHOT_FLIGHT_MS = 520;
-const EVENT_KINDS: EventKind[] = [
-  'speed_up',
-  'reverse',
-  'heal_zone',
-  'slow_zone',
-  'wide_zone',
-  'multishot_zone',
-];
+const EVENT_KINDS: EventKind[] = ['speed_up', 'reverse', 'heal_zone', 'slow_zone', 'wide_zone', 'multishot_zone'];
 
 function initialPlayer(player: { id: string; name: string; role: string }, status: PlayerStatus): GamePlayer {
   return {
@@ -120,105 +45,42 @@ function initialPlayer(player: { id: string; name: string; role: string }, statu
   };
 }
 
-function touch(ctx: RoomContext, at = ctx.now()) {
-  ctx.state.serverNow = at;
-}
-
 function randomEventThreshold(ctx: RoomContext): number {
   return 3 + Math.floor(ctx.random() * 3);
-}
-
-function setRotation(ctx: RoomContext, at: number, speedFactor: number, direction: 1 | -1) {
-  const currentAngle = rotationAngleAt(ctx.state.rotation, at);
-  ctx.state.rotation = { anchorAngle: currentAngle, anchorAt: at, speedFactor, direction };
 }
 
 function aliveIds(state: GameState): string[] {
   return state.activeOrder.filter((id) => state.players[id]?.status === 'alive');
 }
 
-function finishIfNeeded(ctx: RoomContext, at: number): boolean {
+function scheduleWatchdog(ctx: RoomContext, turn: TurnSnapshot) {
+  ctx.setTimer('dart-roulette:watchdog', WATCHDOG_MS, () => {
+    const current = ctx.state.turn as TurnSnapshot | null;
+    if (ctx.state.phase !== 'playing' || !current || current.id !== turn.id || current.revision !== turn.revision) return;
+    applyTimeout(ctx, current, Math.max(current.durationMs, current.logicalElapsed), true);
+  });
+}
+
+function finishIfNeeded(ctx: RoomContext): boolean {
   const alive = aliveIds(ctx.state);
   if (alive.length > 1) return false;
-  ctx.clearTimer('dart-roulette:turn');
-  ctx.clearTimer('dart-roulette:shot');
+  ctx.clearTimer('dart-roulette:watchdog');
   ctx.state.phase = 'finished';
   ctx.state.turn = null;
-  ctx.state.pendingShot = null;
   ctx.state.winnerId = alive[0] ?? null;
-  ctx.state.finishedAt = at;
-  touch(ctx, at);
+  ctx.state.boardRevision += 1;
   ctx.broadcast('roulette:game-over', { winnerId: ctx.state.winnerId });
   return true;
 }
 
-function scheduleTurnTimeout(ctx: RoomContext, turn: Turn, delay = TURN_MS) {
-  ctx.setTimer('dart-roulette:turn', Math.max(0, delay), () => {
-    if (ctx.state.phase !== 'playing' || ctx.state.turn?.id !== turn.id || ctx.state.pendingShot) return;
-    resolveTimeout(ctx, turn.id);
-  });
-}
-
-function beginTurn(ctx: RoomContext, playerId: string, at: number) {
-  const player = ctx.state.players[playerId] as GamePlayer;
-  const required = player.nextTurnShots;
-  const dartWidth = player.nextTurnWidth;
-  player.nextTurnShots = 1;
-  player.nextTurnWidth = 1;
-  const turn: Turn = {
-    id: `turn-${at}-${playerId}-${ctx.state.round}`,
-    playerId,
-    required,
-    fired: 0,
-    dartWidth,
-    startedAt: at,
-    deadline: at + TURN_MS,
-  };
-  ctx.state.turn = turn;
-  touch(ctx, at);
-  scheduleTurnTimeout(ctx, turn);
-  ctx.broadcast('roulette:turn', { playerId, required, deadline: turn.deadline });
-}
-
-function advanceTurn(ctx: RoomContext, at: number) {
-  if (finishIfNeeded(ctx, at)) return;
-  const order = ctx.state.activeOrder as string[];
-  let nextIndex = ctx.state.currentIndex;
-  for (let step = 1; step <= order.length; step += 1) {
-    const candidate = (ctx.state.currentIndex + step) % order.length;
-    if (ctx.state.players[order[candidate]]?.status === 'alive') {
-      nextIndex = candidate;
-      if (candidate <= ctx.state.currentIndex) ctx.state.round += 1;
-      break;
-    }
-  }
-  ctx.state.currentIndex = nextIndex;
-  beginTurn(ctx, order[nextIndex], at);
-}
-
-function resolveTimeout(ctx: RoomContext, turnId: string) {
-  const at = ctx.now();
-  const turn = ctx.state.turn as Turn | null;
-  if (!turn || turn.id !== turnId || ctx.state.phase !== 'playing') return;
-  const player = ctx.state.players[turn.playerId] as GamePlayer;
-  const damage = timeoutDamage(turn.required, turn.fired);
-  player.health = clampHealth(player.health - damage);
-  player.stats.timeouts += 1;
-  if (player.health === 0) player.status = 'eliminated';
-  ctx.state.turn = null;
-  touch(ctx, at);
-  ctx.broadcast('roulette:timeout', { playerId: player.id, damage, remaining: damage });
-  advanceTurn(ctx, at);
-}
-
-function eventCopy(kind: EventKind, id: string, at: number, zoneAngle: number | null): RouletteEvent {
+function eventCopy(kind: EventKind, id: string, zoneAngle: number | null): RouletteEvent {
   const definitions: Record<EventKind, [string, string]> = {
     speed_up: ['烈酒加速', '转盘速度提升至 1.5 倍'],
     reverse: ['酒馆反转', '转盘开始逆向旋转'],
     heal_zone: ['暖炉祝福', '命中奖励区可恢复 1 点血量'],
     slow_zone: ['冰镇时刻', '命中奖励区可让转盘减速'],
     wide_zone: ['笨重镖区', '命中者下一回合使用 1.5 倍宽镖'],
-    multishot_zone: ['三镖罚单', '命中者下一回合必须连续发射 3 支'],
+    multishot_zone: ['三镖罚单', '命中者下一回合须在总时限内发射 3 支'],
   };
   return {
     id,
@@ -227,106 +89,202 @@ function eventCopy(kind: EventKind, id: string, at: number, zoneAngle: number | 
     description: definitions[kind][1],
     zoneAngle,
     zoneArc: zoneAngle === null ? null : ZONE_ARC,
-    triggeredAt: at,
     activated: false,
   };
 }
 
-function triggerRandomEvent(ctx: RoomContext, at: number) {
+function triggerRandomEvent(ctx: RoomContext) {
   let kind = EVENT_KINDS[Math.floor(ctx.random() * EVENT_KINDS.length)];
-  if (ctx.state.event?.kind === kind) {
-    kind = EVENT_KINDS[(EVENT_KINDS.indexOf(kind) + 1) % EVENT_KINDS.length];
-  }
-  setRotation(ctx, at, kind === 'speed_up' ? 1.5 : 1, kind === 'reverse' ? -1 : 1);
+  if (ctx.state.event?.kind === kind) kind = EVENT_KINDS[(EVENT_KINDS.indexOf(kind) + 1) % EVENT_KINDS.length];
+  const angle = ctx.state.rotation.anchorAngle;
+  ctx.state.rotation = {
+    anchorAngle: angle,
+    anchorElapsed: 0,
+    speedFactor: kind === 'speed_up' ? 1.5 : 1,
+    direction: kind === 'reverse' ? -1 : 1,
+  };
   const isZone = kind.endsWith('_zone');
   const zoneAngle = isZone ? pickZoneAngle(ctx.state.darts, () => ctx.random()) : null;
-  const event = eventCopy(kind, `event-${at}-${Math.floor(ctx.random() * 1_000_000)}`, at, zoneAngle);
-  ctx.state.event = event;
+  ctx.state.event = eventCopy(kind, `event-${ctx.state.boardRevision}-${Math.floor(ctx.random() * 1_000_000)}`, zoneAngle);
   ctx.state.shotsSinceEvent = 0;
   ctx.state.nextEventAt = randomEventThreshold(ctx);
-  touch(ctx, at);
-  ctx.broadcast('roulette:event', event);
+  ctx.state.eventDue = false;
+  ctx.broadcast('roulette:event', ctx.state.event);
 }
 
-function applyZone(ctx: RoomContext, player: GamePlayer, boardAngle: number, at: number): string | null {
-  const event = ctx.state.event as RouletteEvent | null;
-  if (!event || event.zoneAngle === null || !isInsideZone(boardAngle, event.zoneAngle, event.zoneArc ?? ZONE_ARC)) {
-    return null;
-  }
-  event.activated = true;
-  switch (event.kind) {
-    case 'heal_zone':
-      player.health = clampHealth(player.health + 1);
-      return 'heal';
-    case 'slow_zone':
-      setRotation(ctx, at, 0.7, 1);
-      return 'slow';
-    case 'wide_zone':
-      player.nextTurnWidth = 1.5;
-      return 'wide';
-    case 'multishot_zone':
-      player.nextTurnShots = 3;
-      return 'multishot';
-    default:
-      return null;
+function beginTurn(ctx: RoomContext, playerId: string) {
+  const player = ctx.state.players[playerId] as GamePlayer;
+  ctx.state.turnRevision += 1;
+  const turn: TurnSnapshot = {
+    id: `turn-${ctx.state.turnRevision}-${playerId}`,
+    revision: ctx.state.turnRevision,
+    playerId,
+    required: player.nextTurnShots,
+    durationMs: turnDurationForRound(ctx.state.round),
+    committed: 0,
+    dartWidth: player.nextTurnWidth,
+    accepted: false,
+    lastAcceptedSeq: 0,
+    acceptedShotIds: [],
+    logicalElapsed: 0,
+  };
+  player.nextTurnShots = 1;
+  player.nextTurnWidth = 1;
+  ctx.state.turn = turn;
+  scheduleWatchdog(ctx, turn);
+  ctx.broadcast('roulette:turn-granted', { turnId: turn.id, revision: turn.revision, playerId });
+}
+
+function advanceTurn(ctx: RoomContext) {
+  if (finishIfNeeded(ctx)) return;
+  const previousTurn = ctx.state.turn as TurnSnapshot | null;
+  const endElapsed = previousTurn?.logicalElapsed ?? 0;
+  const endAngle = rotationAngleAt(ctx.state.rotation, endElapsed);
+  ctx.state.rotation = {
+    anchorAngle: endAngle,
+    anchorElapsed: 0,
+    speedFactor: ctx.state.rotation.speedFactor,
+    direction: ctx.state.rotation.direction,
+  };
+  if (ctx.state.eventDue) triggerRandomEvent(ctx);
+
+  const order = ctx.state.activeOrder as string[];
+  for (let step = 1; step <= order.length; step += 1) {
+    const candidate = (ctx.state.currentIndex + step) % order.length;
+    if (ctx.state.players[order[candidate]]?.status === 'alive') {
+      const wrapped = candidate <= ctx.state.currentIndex;
+      if (wrapped) ctx.state.round += 1;
+      ctx.state.currentIndex = candidate;
+      beginTurn(ctx, order[candidate]);
+      if (wrapped) {
+        ctx.broadcast('roulette:round-started', {
+          round: ctx.state.round,
+          durationMs: turnDurationForRound(ctx.state.round),
+        });
+      }
+      return;
+    }
   }
 }
 
-function resolveShot(ctx: RoomContext, shotId: string) {
-  const pending = ctx.state.pendingShot as PendingShot | null;
-  const turn = ctx.state.turn as Turn | null;
-  if (!pending || pending.id !== shotId || !turn || ctx.state.phase !== 'playing') return;
-  const at = pending.impactAt;
-  const player = ctx.state.players[pending.playerId] as GamePlayer;
-  const collision = findCollision(ctx.state.darts, pending.boardAngle, pending.widthFactor) as Dart | null;
-  let score = 0;
-  let zoneEffect: string | null = null;
+function reject(ctx: RoomContext, playerId: string, reason: string) {
+  const turn = ctx.state.turn as TurnSnapshot | null;
+  ctx.send(playerId, 'roulette:commit-rejected', {
+    turnId: turn?.id ?? null,
+    revision: turn?.revision ?? null,
+    reason,
+    boardRevision: ctx.state.boardRevision,
+  });
+}
 
+function validateShot(ctx: RoomContext, playerId: string, commit: ShotCommit): string | null {
+  const turn = ctx.state.turn as TurnSnapshot | null;
+  if (!turn || ctx.state.phase !== 'playing') return 'NO_ACTIVE_TURN';
+  if (!commit || typeof commit !== 'object') return 'BAD_PAYLOAD';
+  return validateShotCommit({
+    commit,
+    turn,
+    playerId,
+    rotation: ctx.state.rotation,
+    darts: ctx.state.darts,
+    event: ctx.state.event,
+  });
+}
+
+function applyZoneResult(ctx: RoomContext, player: GamePlayer, effect: ZoneEffect) {
+  if (!effect) return;
+  if (ctx.state.event) ctx.state.event.activated = true;
+  if (effect === 'heal') player.health = clampHealth(player.health + 1);
+  if (effect === 'wide') player.nextTurnWidth = 1.5;
+  if (effect === 'multishot') player.nextTurnShots = 3;
+}
+
+function applyShot(ctx: RoomContext, commit: ShotCommit) {
+  const turn = ctx.state.turn as TurnSnapshot;
+  const player = ctx.state.players[commit.playerId] as GamePlayer;
+  const collided = commit.outcome.collisionTargetId !== null;
+  const healthBefore = player.health;
   player.stats.shots += 1;
-  turn.fired += 1;
-  if (collision) {
+  if (collided) {
     player.health = clampHealth(player.health - 1);
     player.stats.collisions += 1;
     if (player.health === 0) player.status = 'eliminated';
   } else {
-    score = scoreSafeDart(ctx.state.darts, player.id, pending.boardAngle, pending.widthFactor);
-    player.score += score;
-    player.stats.safeHits += 1;
     ctx.state.darts.push({
-      id: pending.id,
+      id: commit.shotId,
       ownerId: player.id,
-      boardAngle: pending.boardAngle,
-      widthFactor: pending.widthFactor,
-      score,
+      boardAngle: normalizeAngle(commit.boardAngle),
+      widthFactor: commit.widthFactor,
+      score: commit.outcome.score,
     });
-    zoneEffect = applyZone(ctx, player, pending.boardAngle, at);
+    player.score += commit.outcome.score;
+    player.stats.safeHits += 1;
+    applyZoneResult(ctx, player, commit.outcome.zoneEffect);
   }
 
-  ctx.state.pendingShot = null;
+  ctx.state.rotation = commit.rotationAfter;
+  turn.committed += 1;
+  turn.lastAcceptedSeq = commit.seq;
+  turn.acceptedShotIds.push(commit.shotId);
+  turn.logicalElapsed = commit.impactElapsed;
   ctx.state.shotsSinceEvent += 1;
-  touch(ctx, at);
-  ctx.broadcast('roulette:dart-resolved', {
-    shotId,
-    playerId: player.id,
-    boardAngle: pending.boardAngle,
-    collision: Boolean(collision),
-    collisionOwnerId: collision?.ownerId ?? null,
-    score,
-    health: player.health,
-    zoneEffect,
-  });
-
-  if (ctx.state.shotsSinceEvent >= ctx.state.nextEventAt) triggerRandomEvent(ctx, at);
-  if (player.status !== 'alive' || turn.fired >= turn.required) {
-    ctx.state.turn = null;
-    advanceTurn(ctx, at);
-  } else {
-    turn.startedAt = at;
-    turn.deadline = at + TURN_MS;
-    touch(ctx, at);
-    scheduleTurnTimeout(ctx, turn);
-    ctx.broadcast('roulette:turn', { playerId: player.id, required: turn.required - turn.fired, deadline: turn.deadline });
+  if (ctx.state.shotsSinceEvent >= ctx.state.nextEventAt) ctx.state.eventDue = true;
+  ctx.state.boardRevision += 1;
+  ctx.broadcast('roulette:shot-committed', commit);
+  if (commit.outcome.zoneEffect) {
+    ctx.broadcast('roulette:zone-triggered', {
+      playerId: player.id,
+      effect: commit.outcome.zoneEffect,
+      eventKind: ctx.state.event?.kind ?? null,
+    });
   }
+  if (player.health !== healthBefore) {
+    ctx.broadcast('roulette:health-changed', {
+      playerId: player.id,
+      delta: player.health - healthBefore,
+      health: player.health,
+      reason: collided ? 'collision' : 'zone',
+    });
+  }
+  if (player.status === 'eliminated') {
+    ctx.broadcast('roulette:player-eliminated', { playerId: player.id });
+  }
+
+  if (player.status !== 'alive' || turn.committed >= turn.required) {
+    ctx.clearTimer('dart-roulette:watchdog');
+    advanceTurn(ctx);
+  }
+}
+
+function applyTimeout(ctx: RoomContext, turn: TurnSnapshot, finalElapsed: number, watchdog: boolean) {
+  const player = ctx.state.players[turn.playerId] as GamePlayer;
+  const healthBefore = player.health;
+  const damage = timeoutDamage(turn.required, turn.committed);
+  player.health = clampHealth(player.health - damage);
+  player.stats.timeouts += 1;
+  if (player.health === 0) player.status = 'eliminated';
+  turn.logicalElapsed = finalElapsed;
+  ctx.state.rotation = {
+    anchorAngle: rotationAngleAt(ctx.state.rotation, finalElapsed),
+    anchorElapsed: finalElapsed,
+    speedFactor: ctx.state.rotation.speedFactor,
+    direction: ctx.state.rotation.direction,
+  };
+  ctx.state.boardRevision += 1;
+  ctx.broadcast('roulette:timeout', { playerId: player.id, damage, watchdog });
+  if (player.health !== healthBefore) {
+    ctx.broadcast('roulette:health-changed', {
+      playerId: player.id,
+      delta: player.health - healthBefore,
+      health: player.health,
+      reason: watchdog ? 'connection-timeout' : 'turn-timeout',
+    });
+  }
+  if (player.status === 'eliminated') {
+    ctx.broadcast('roulette:player-eliminated', { playerId: player.id });
+  }
+  ctx.clearTimer('dart-roulette:watchdog');
+  advanceTurn(ctx);
 }
 
 const room = defineRoom({
@@ -334,53 +292,33 @@ const room = defineRoom({
 
   initialState(): GameState {
     return {
-      schema: 'dart-roulette@1',
+      schema: 'dart-roulette@2',
       phase: 'lobby',
       hostId: null,
-      serverNow: 0,
       players: {},
       activeOrder: [],
       currentIndex: 0,
       turn: null,
-      rotation: { anchorAngle: 0, anchorAt: 0, speedFactor: 1, direction: 1 },
+      rotation: { anchorAngle: 0, anchorElapsed: 0, speedFactor: 1, direction: 1 },
       darts: [],
       event: null,
       shotsSinceEvent: 0,
       nextEventAt: 4,
-      pendingShot: null,
+      eventDue: false,
+      boardRevision: 0,
+      turnRevision: 0,
       winnerId: null,
-      finishedAt: null,
       round: 1,
     };
   },
 
-  onCreate(ctx: RoomContext) {
-    touch(ctx);
-  },
-
   onRestore(ctx: RoomContext) {
-    const at = ctx.now();
-    touch(ctx, at);
-    if (ctx.state.phase !== 'playing') return;
-    const pending = ctx.state.pendingShot as PendingShot | null;
-    if (pending) {
-      const delay = pending.impactAt - at;
-      if (delay <= 0) resolveShot(ctx, pending.id);
-      else ctx.setTimer('dart-roulette:shot', delay, () => resolveShot(ctx, pending.id));
-      return;
-    }
-    const turn = ctx.state.turn as Turn | null;
-    if (!turn) return;
-    const delay = turn.deadline - at;
-    if (delay <= 0) resolveTimeout(ctx, turn.id);
-    else scheduleTurnTimeout(ctx, turn, delay);
+    if (ctx.state.phase === 'playing' && ctx.state.turn) scheduleWatchdog(ctx, ctx.state.turn);
   },
 
   onJoin(ctx: RoomContext, player: { id: string; name: string; role: string }) {
-    const status: PlayerStatus = ctx.state.phase === 'lobby' ? 'waiting' : 'queued';
-    ctx.state.players[player.id] = initialPlayer(player, status);
+    ctx.state.players[player.id] = initialPlayer(player, ctx.state.phase === 'lobby' ? 'waiting' : 'queued');
     if (player.role === 'host') ctx.state.hostId = player.id;
-    touch(ctx);
   },
 
   onReconnect(ctx: RoomContext, player: { id: string; name: string; role: string }) {
@@ -391,18 +329,13 @@ const room = defineRoom({
     } else {
       ctx.state.players[player.id] = initialPlayer(player, ctx.state.phase === 'lobby' ? 'waiting' : 'queued');
     }
-    touch(ctx);
   },
 
   onLeave(ctx: RoomContext, player: { id: string }) {
     const existing = ctx.state.players[player.id] as GamePlayer | undefined;
     if (!existing) return;
-    if (ctx.state.phase === 'playing' && existing.status === 'alive') {
-      existing.connected = false;
-    } else {
-      delete ctx.state.players[player.id];
-    }
-    touch(ctx);
+    if (ctx.state.phase === 'playing' && existing.status === 'alive') existing.connected = false;
+    else delete ctx.state.players[player.id];
   },
 
   actions: {
@@ -411,7 +344,6 @@ const room = defineRoom({
       const candidates = Object.values(ctx.state.players as Record<string, GamePlayer>)
         .filter((candidate) => candidate.connected && candidate.status === 'waiting');
       if (candidates.length < 2 || candidates.length > 8) return;
-      const at = ctx.now();
       const order = shuffle(candidates.map((candidate) => candidate.id), () => ctx.random());
       for (const candidate of Object.values(ctx.state.players as Record<string, GamePlayer>)) {
         const seat = order.indexOf(candidate.id);
@@ -426,51 +358,56 @@ const room = defineRoom({
       ctx.state.phase = 'playing';
       ctx.state.activeOrder = order;
       ctx.state.currentIndex = 0;
-      ctx.state.rotation = { anchorAngle: 0, anchorAt: at, speedFactor: 1, direction: 1 };
+      ctx.state.rotation = { anchorAngle: 0, anchorElapsed: 0, speedFactor: 1, direction: 1 };
       ctx.state.darts = [];
       ctx.state.event = null;
       ctx.state.shotsSinceEvent = 0;
       ctx.state.nextEventAt = randomEventThreshold(ctx);
-      ctx.state.pendingShot = null;
+      ctx.state.eventDue = false;
+      ctx.state.boardRevision += 1;
       ctx.state.winnerId = null;
-      ctx.state.finishedAt = null;
       ctx.state.round = 1;
-      touch(ctx, at);
-      beginTurn(ctx, order[0], at);
+      beginTurn(ctx, order[0]);
       ctx.broadcast('roulette:game-started', { order });
     },
 
-    shoot(ctx: RoomContext, { player }: { player: { id: string } }) {
-      const turn = ctx.state.turn as Turn | null;
-      if (ctx.state.phase !== 'playing' || !turn || ctx.state.pendingShot || turn.playerId !== player.id) return;
-      const shooter = ctx.state.players[player.id] as GamePlayer;
-      if (!shooter || shooter.status !== 'alive') return;
-      const firedAt = ctx.now();
-      if (firedAt >= turn.deadline) {
-        resolveTimeout(ctx, turn.id);
+    accept_turn(ctx: RoomContext, { player, payload }: { player: { id: string }; payload: { turnId?: string; revision?: number } }) {
+      const turn = ctx.state.turn as TurnSnapshot | null;
+      if (!turn || turn.playerId !== player.id || payload?.turnId !== turn.id || payload?.revision !== turn.revision) return;
+      turn.accepted = true;
+      scheduleWatchdog(ctx, turn);
+    },
+
+    commit_shot(ctx: RoomContext, { player, payload }: { player: { id: string }; payload: ShotCommit }) {
+      const reason = validateShot(ctx, player.id, payload);
+      if (reason === 'DUPLICATE') return;
+      if (reason) {
+        reject(ctx, player.id, reason);
         return;
       }
-      ctx.clearTimer('dart-roulette:turn');
-      const impactAt = firedAt + SHOT_FLIGHT_MS;
-      const worldAngle = -Math.PI / 2 + (shooter.seat / ctx.state.activeOrder.length) * TAU;
-      const pending: PendingShot = {
-        id: `dart-${firedAt}-${player.id}-${turn.fired}`,
-        playerId: player.id,
-        worldAngle,
-        boardAngle: boardAngleFromWorld(ctx.state.rotation, worldAngle, impactAt),
-        widthFactor: turn.dartWidth,
-        firedAt,
-        impactAt,
-      };
-      ctx.state.pendingShot = pending;
-      touch(ctx, firedAt);
-      ctx.broadcast('roulette:dart-fired', pending);
-      ctx.setTimer('dart-roulette:shot', SHOT_FLIGHT_MS, () => resolveShot(ctx, pending.id));
+      applyShot(ctx, payload);
+    },
+
+    commit_timeout(ctx: RoomContext, { player, payload }: { player: { id: string }; payload: TimeoutCommit }) {
+      const turn = ctx.state.turn as TurnSnapshot | null;
+      if (!turn || !payload || turn.playerId !== player.id || payload.turnId !== turn.id || payload.revision !== turn.revision) {
+        reject(ctx, player.id, 'STALE_TURN');
+        return;
+      }
+      if (payload.seq !== turn.lastAcceptedSeq + 1 || !Number.isFinite(payload.finalElapsed) || !Number.isFinite(payload.rotationEndAngle)) {
+        reject(ctx, player.id, 'BAD_TIMEOUT');
+        return;
+      }
+      const expected = Math.max(turn.durationMs, turn.logicalElapsed);
+      if (Math.abs(payload.finalElapsed - expected) > 0.5 || payload.rotationEndAngle < 0 || payload.rotationEndAngle >= TAU) {
+        reject(ctx, player.id, 'BAD_TIMEOUT');
+        return;
+      }
+      applyTimeout(ctx, turn, payload.finalElapsed, false);
     },
 
     return_to_lobby(ctx: RoomContext, { player }: { player: { id: string } }) {
       if (ctx.state.phase !== 'finished' || player.id !== ctx.state.hostId) return;
-      const at = ctx.now();
       for (const [id, candidate] of Object.entries(ctx.state.players as Record<string, GamePlayer>)) {
         if (!candidate.connected) {
           delete ctx.state.players[id];
@@ -488,10 +425,9 @@ const room = defineRoom({
       ctx.state.turn = null;
       ctx.state.darts = [];
       ctx.state.event = null;
-      ctx.state.pendingShot = null;
+      ctx.state.eventDue = false;
       ctx.state.winnerId = null;
-      ctx.state.finishedAt = null;
-      touch(ctx, at);
+      ctx.state.boardRevision += 1;
     },
   },
 });

@@ -11,7 +11,7 @@ export type DartLike = {
 
 export type Rotation = {
   anchorAngle: number;
-  anchorAt: number;
+  anchorElapsed: number;
   speedFactor: number;
   direction: 1 | -1;
 };
@@ -26,14 +26,14 @@ export function angularDistance(a: number, b: number): number {
   return Math.min(distance, TAU - distance);
 }
 
-export function rotationAngleAt(rotation: Rotation, at: number): number {
-  const elapsed = Math.max(0, at - rotation.anchorAt);
-  const delta = (elapsed / BASE_ROTATION_MS) * TAU * rotation.speedFactor * rotation.direction;
+export function rotationAngleAt(rotation: Rotation, elapsed: number): number {
+  const segmentElapsed = Math.max(0, elapsed - rotation.anchorElapsed);
+  const delta = (segmentElapsed / BASE_ROTATION_MS) * TAU * rotation.speedFactor * rotation.direction;
   return normalizeAngle(rotation.anchorAngle + delta);
 }
 
-export function boardAngleFromWorld(rotation: Rotation, worldAngle: number, at: number): number {
-  return normalizeAngle(worldAngle - rotationAngleAt(rotation, at));
+export function boardAngleFromWorld(rotation: Rotation, worldAngle: number, elapsed: number): number {
+  return normalizeAngle(worldAngle - rotationAngleAt(rotation, elapsed));
 }
 
 export function collisionLimit(widthA: number, widthB: number): number {
