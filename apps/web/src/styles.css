@@ -52,8 +52,16 @@
   --sidebar-ring: var(--ring);
 }
 
-* { box-sizing: border-box; }
-html, body, #root { min-height: 100%; }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   background:
@@ -61,15 +69,36 @@ body {
     radial-gradient(circle at 90% 20%, rgba(255, 232, 131, 0.24), transparent 28rem),
     var(--bg);
   color: var(--text);
+  touch-action: manipulation;
 }
+
 /* The page shell toggles this only while a room owns the viewport. */
-body.room-expanded { overflow: hidden; }
-a { color: inherit; text-decoration: none; }
-h1, h2, h3, p { margin-top: 0; }
+body.room-expanded {
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
 
 .sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Keep overflow areas scrollable while removing platform-specific scrollbar chrome. */
@@ -78,12 +107,14 @@ h1, h2, h3, p { margin-top: 0; }
   scrollbar-color: transparent transparent !important;
   -ms-overflow-style: none !important;
 }
+
 .scrollbar-hidden::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
   background: transparent !important;
 }
+
 .scrollbar-hidden::-webkit-scrollbar-thumb,
 .scrollbar-hidden::-webkit-scrollbar-track {
   background: transparent !important;
@@ -178,13 +209,19 @@ h1, h2, h3, p { margin-top: 0; }
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground font-sans;
   }
-  button, input, textarea {
+
+  button,
+  input,
+  textarea {
     font: inherit;
   }
-  button:not(:disabled), [role="button"]:not(:disabled) {
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
     cursor: pointer;
   }
 }

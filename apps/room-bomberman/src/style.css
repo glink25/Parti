@@ -16,7 +16,7 @@ body {
     height: 100%;
     overflow: hidden;
     background: radial-gradient(circle at 30% 10%, #24395b, #0d1422 65%);
-    touch-action: none
+    touch-action: manipulation
 }
 
 button,
