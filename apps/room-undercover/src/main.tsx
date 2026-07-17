@@ -21,9 +21,9 @@ type DealSettings = { mode: DealMode; includeBlank: boolean; categories: Categor
 type DealSettingsChange = { mode: DealMode } | { includeBlank: boolean } | { categories: Category[] } | { playerCount: number };
 type DealPayload = { civilianWord?: string; undercoverWord?: string };
 
-const MODE_LABELS: Record<DealMode, { icon: string; name: string; note: string }> = {
-  classic: { icon: '双', name: '经典词库', note: '房主参与' },
-  custom: { icon: '笔', name: '自定义', note: '房主填词' },
+const MODE_LABELS: Record<DealMode, { name: string; note: string }> = {
+  classic: { name: '经典模式', note: '房主参与' },
+  custom: { name: '自定义模式', note: '房主填词' },
 };
 const WINNER_LABELS: Record<Winner, string> = { civilian: '好人胜利', undercover: '卧底胜利', blank: '白板胜利' };
 
@@ -51,7 +51,7 @@ function DealTable({ settings, modes, playerCountRange, notice, onChange, onDeal
 
   return <div className="deal-table">
     {playerCountRange && <div className="player-stepper"><span>玩家人数</span><button onClick={() => onChange({ playerCount: Math.max(playerCountRange.min, settings.playerCount - 1) })} disabled={settings.playerCount === playerCountRange.min}>−</button><strong>{settings.playerCount}</strong><button onClick={() => onChange({ playerCount: Math.min(playerCountRange.max, settings.playerCount + 1) })} disabled={settings.playerCount === playerCountRange.max}>＋</button></div>}
-    {modes.length > 1 && <div className="mode-grid">{modes.map((mode) => { const meta = MODE_LABELS[mode]; const active = settings.mode === mode; return <button key={mode} className={`mode-card ${active ? 'is-active' : ''}`} onClick={() => onChange({ mode })}><span>{meta.icon}</span><strong>{meta.name}</strong><small>{meta.note}</small></button>; })}</div>}
+    {modes.length > 1 && <div className="mode-grid">{modes.map((mode) => { const meta = MODE_LABELS[mode]; const active = settings.mode === mode; return <button key={mode} className={`mode-card ${active ? 'is-active' : ''}`} onClick={() => onChange({ mode })}><strong>{meta.name}</strong><small>{meta.note}</small></button>; })}</div>}
     <button className={`blank-toggle ${settings.includeBlank ? 'is-active' : ''}`} onClick={() => onChange({ includeBlank: !settings.includeBlank })} aria-pressed={settings.includeBlank}><span>□</span><span><strong>加入白板</strong><small>{settings.playerCount < 6 ? `${blankChance}% 概率出现` : '本局固定出现 · 占用一名卧底'}</small></span><b>{settings.includeBlank ? '已开启' : '未开启'}</b></button>
     {settings.mode !== 'custom' ? <><div className="section-heading category-title"><h3>选择词牌分类</h3><span>{selectedSummary}</span></div><div className="category-grid">{CATEGORIES.map((category) => {
       const meta = CATEGORY_LABELS[category]; const active = settings.categories.includes(category);
@@ -188,18 +188,33 @@ function App() {
       </div>
     </section> : <section className="online-layout">
       <article className={`secret-card ${revealed ? 'is-revealed' : ''}`}>
-        {card && hasCurrentCard && revealed ? <><p className="card-kicker">{card.word ? '你的词语' : '你是白板'}</p><div className={`secret-word ${card.word ? '' : 'is-blank'}`}>{card.word || '空白牌'}</div>{card.word ? <p>记住它，然后把牌藏好。</p> : <p>没有词，也不会因说中词里的字而自爆。<br />请保持镇定，假装一切尽在掌握。</p>}<button className="card-action ghost" onClick={() => setRevealed(false)}>我记住了</button></>
-        : hasCurrentCard ? <><div className="sealed-icon">✦</div><h2>你的牌已送达</h2><p>确认没人偷看，再翻开牌面。</p><button className="card-action" onClick={() => setRevealed(true)}>查看我的词牌</button></>
-        : <><div className="waiting-orbit"><span /></div><h2>{state?.phase === 'waiting' ? '牌桌准备中' : '等待下一轮'}</h2><p>房主发牌后，你的秘密词语只会出现在这里。</p></>}
+        {state?.phase === 'finished' && state.revealedWords && state.winner ? <div className="online-result">
+          <div className="stage-icon">结</div>
+          <p className="eyebrow">ROUND COMPLETE</p>
+          <h2>{WINNER_LABELS[state.winner]}</h2>
+          <p>本轮身份已全部揭晓</p>
+          <div className="result-words">
+            <span><small>好人词</small><strong>{state.revealedWords.civilian}</strong></span>
+            <i>VS</i>
+            <span><small>{state.resultHadUndercover ? '卧底词' : '本局未发卧底'}</small><strong>{state.revealedWords.undercover}</strong></span>
+          </div>
+          <small className="result-note">{state.resultHadBlank ? '本局有白板' : '本局无白板'}</small>
+          {isHost ? <button className="card-action stage-primary" onClick={() => setDealTableOpen(true)}>开始下一轮</button> : <div className="waiting-message">等待房主开启下一轮</div>}
+        </div>
+        : card && hasCurrentCard && revealed ? <><p className="card-kicker">{card.word ? '你的词语' : '你是白板'}</p><div className={`secret-word ${card.word ? '' : 'is-blank'}`}>{card.word || '空白牌'}</div>{card.word ? <p>记住它，然后把牌藏好。</p> : <p>没有词，也不会因说中词里的字而自爆。<br />请保持镇定，假装一切尽在掌握。</p>}<button className="card-action ghost" onClick={() => setRevealed(false)}>我记住了</button></>
+        : hasCurrentCard ? <><div className="sealed-icon">✦</div><p className="eyebrow stage-kicker">SECRET CARD</p><h2>你的牌已送达</h2><p>确认没人偷看，再翻开牌面。</p><button className="card-action" onClick={() => setRevealed(true)}>查看我的词牌</button></>
+        : !state ? <><div className="waiting-orbit"><span /></div><h2>正在连接牌桌</h2><p>正在获取房间状态，请稍候。</p></>
+        : state.phase === 'waiting' && isHost ? <><div className="stage-icon">发</div><p className="eyebrow stage-kicker">HOST CONTROLS</p><h2>{state.round ? '准备重新发牌' : '准备开始第一轮'}</h2><p>进入发牌台选择词牌、模式和白板规则。</p><button className="card-action stage-primary" onClick={() => setDealTableOpen(true)}>打开发牌台</button><small className="stage-note">{participantCount >= 3 ? `${participantCount} 人已就位` : `至少需要 3 名收牌玩家 · 当前 ${participantCount} 人`}</small></>
+        : state.phase === 'waiting' ? <><div className="stage-icon is-muted">候</div><p className="eyebrow stage-kicker">WAITING FOR HOST</p><h2>等待房主发牌</h2><p>房主正在配置词牌与规则，发牌后你的秘密词语会出现在这里。</p><div className="waiting-message">已入座 · 等待开局</div></>
+        : <><div className="stage-icon is-muted">游</div><p className="eyebrow stage-kicker">ROUND IN PROGRESS</p><h2>{isHost && state.roundMode === 'custom' ? '本轮主持中' : '本轮进行中'}</h2><p>{isHost && state.roundMode === 'custom' ? '词牌已发给所有参与玩家，你可以专心主持描述与投票。' : '你未参与当前轮次，可以旁观并等待下一轮发牌。'}</p><div className="waiting-message">第 {state.round} 轮正在进行</div></>}
       </article>
       <aside className="table-panel panel">
         <div className="section-heading"><div><p className="eyebrow">AT THE TABLE</p><h2>在场玩家</h2></div><b>{state?.players.length ?? 0}/12</b></div>
         <ul className="roster">{state?.players.map((player, index) => <li key={player.id}><span className={`avatar avatar-${index % 5}`}>{player.name.slice(0, 1)}</span><span className="player-name">{player.name}{player.id === playerId && <small>你</small>}</span>{state.eliminatedPlayerIds.includes(player.id) ? <em>已出局</em> : player.role === 'host' ? <em>房主</em> : state.dealtPlayerIds.includes(player.id) ? <i>●</i> : null}</li>)}</ul>
         <div className="table-actions">
-          {isHost && <button className="host-button" onClick={() => setDealTableOpen(true)}>发牌台 <span>›</span></button>}
-          {hasCurrentCard && <button className="eliminate-button" disabled={!canEliminateSelf} onClick={() => setEliminateModalOpen(true)}>{isEliminated ? '已出局' : '我出局了'}</button>}
+          {isHost && state?.phase === 'active' && <button className="host-button is-secondary" onClick={() => setDealTableOpen(true)}>重新发牌 <span>›</span></button>}
+          {state?.phase === 'active' && hasCurrentCard && <button className="eliminate-button" disabled={!canEliminateSelf} onClick={() => setEliminateModalOpen(true)}>{isEliminated ? '已出局' : '我出局了'}</button>}
         </div>
-        {state?.phase === 'finished' && state.revealedWords && state.winner && <div className="round-result"><small>{WINNER_LABELS[state.winner]} · {state.resultHadBlank ? '本局有白板' : '本局无白板'}</small><strong>{state.revealedWords.civilian} <i>VS</i> {state.revealedWords.undercover}</strong>{!state.resultHadUndercover && <i>本局未发卧底牌</i>}</div>}
       </aside>
     </section>}
 
