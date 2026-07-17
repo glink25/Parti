@@ -3,7 +3,6 @@ import { FormattedMessage, useIntl } from 'react-intl';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
-  BotIcon,
   ClipboardPasteIcon,
   FileArchiveIcon,
   FilePlusIcon,
@@ -19,7 +18,6 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { copyTextToClipboard, readTextFromClipboard } from '@/lib/clipboard';
 import { toast } from 'sonner';
 import { createRoomSnapshot } from '../lib/customRooms';
 import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom';
@@ -29,14 +27,18 @@ import { useLocale } from '@/i18n/LocaleProvider';
 import { formatResolveError, templateDescription } from '@/i18n/formatErrors';
 import {
   blankManifest,
-  getAiRoomPrompt,
   getBlankTemplate,
   getDefaultHtml,
   DEFAULT_WORKER,
   type EditorFile,
   type SelectableTemplate,
 } from '@/components/editor/editorDefaults';
-import { AiCreationDialog, TemplateReplaceDialog } from '@/components/editor/EditorDialogs';
+import { TemplateReplaceDialog } from '@/components/editor/EditorDialogs';
+import {
+  AiCreationEntry,
+  consumeAiImportHandoff,
+  type AiImportHandoff,
+} from '@/components/editor/AiCreationEntry';
 import { EditorActionDock } from '@/components/editor/EditorActionDock';
 import type { AiRoomFiles } from '@/components/editor/parseAiRoomMarkdown';
 import {
@@ -88,9 +90,6 @@ export function EditorView() {
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [githubUrl, setGithubUrl] = useState('');
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [aiPromptCopied, setAiPromptCopied] = useState(false);
-  const [aiCopyError, setAiCopyError] = useState<string | null>(null);
   const [aiImportLoaded, setAiImportLoaded] = useState(false);
   const [aiImportOpen, setAiImportOpen] = useState(false);
   const [aiImportSession, setAiImportSession] = useState<{
@@ -99,7 +98,7 @@ export function EditorView() {
     autoConfirmToken: number;
     clipboardReadFailed: boolean;
   } | null>(null);
-  const aiImportTokenRef = useRef(0);
+  const aiImportRouteHandledRef = useRef(false);
 
   useEffect(() => {
     selectedTemplateIdRef.current = selectedTemplateId;
@@ -314,17 +313,6 @@ export function EditorView() {
     }
   }
 
-  async function copyAiPrompt(): Promise<void> {
-    setAiCopyError(null);
-    const ok = await copyTextToClipboard(getAiRoomPrompt(locale));
-    if (!ok) {
-      setAiCopyError(intl.formatMessage({ id: 'editor.error.clipboardFailed' }));
-      return;
-    }
-    setAiPromptCopied(true);
-    window.setTimeout(() => setAiPromptCopied(false), 1800);
-  }
-
   function openBlankEditor(): void {
     if (selectedTemplateId !== 'blank' || loadedTemplateId !== 'blank') {
       void commitTemplateSelection(blankTemplate);
@@ -348,22 +336,20 @@ export function EditorView() {
     toast.success(intl.formatMessage({ id: 'editor.aiImport.successToast' }));
   }
 
-  async function goAddFromAiCreation(): Promise<void> {
-    const clipped = await readTextFromClipboard();
-    setAiDialogOpen(false);
-    setAiPromptCopied(false);
-    setAiCopyError(null);
+  function goAddFromAiCreation(handoff: AiImportHandoff): void {
     openBlankEditor();
-    aiImportTokenRef.current += 1;
-    setAiImportSession({
-      initialText: clipped ?? '',
-      autoConfirm: true,
-      autoConfirmToken: aiImportTokenRef.current,
-      clipboardReadFailed: !clipped,
-    });
+    setAiImportSession(handoff);
     setAiImportLoaded(true);
     setAiImportOpen(true);
   }
+
+  useEffect(() => {
+    if (aiImportRouteHandledRef.current || window.location.hash !== '#/editor/ai-import') return;
+    aiImportRouteHandledRef.current = true;
+    const handoff = consumeAiImportHandoff();
+    window.history.replaceState(null, '', '#/editor');
+    if (handoff) goAddFromAiCreation(handoff);
+  }, []);
 
   const isBlank = selectedTemplateId === 'blank';
   const selectionReady = isBlank
@@ -412,18 +398,7 @@ export function EditorView() {
             <h1 className="text-[clamp(34px,5vw,54px)] font-extrabold tracking-[-0.05em]">
               <FormattedMessage id="editor.title" />
             </h1>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mt-1 h-auto shrink-0 gap-2 rounded-full px-3 py-2 text-primary-bright shadow-sm focus-visible:ring-2 focus-visible:ring-primary-bright/50 sm:mt-2"
-              aria-label={intl.formatMessage({ id: 'editor.aiCreateAria' })}
-              title={intl.formatMessage({ id: 'editor.aiCreateAria' })}
-              onClick={() => setAiDialogOpen(true)}
-            >
-              <BotIcon aria-hidden="true" />
-              <FormattedMessage id="editor.aiCreateDescription" />
-            </Button>
+            <AiCreationEntry onGoAdd={goAddFromAiCreation} />
           </div>
           <p className="text-[15px] text-muted-foreground"><FormattedMessage id="editor.description" /></p>
         </div>
@@ -650,22 +625,6 @@ export function EditorView() {
       />
 
       <TemplateReplaceDialog pending={pendingTemplate} onCancel={() => setPendingTemplate(null)} onConfirm={() => { if (pendingTemplate) void commitTemplateSelection(pendingTemplate); }} />
-      <AiCreationDialog
-        open={aiDialogOpen}
-        copied={aiPromptCopied}
-        error={aiCopyError}
-        onOpenChange={(open) => {
-          setAiDialogOpen(open);
-          if (!open) {
-            setAiPromptCopied(false);
-            setAiCopyError(null);
-          }
-        }}
-        onCopy={() => void copyAiPrompt()}
-        onGoAdd={() => {
-          void goAddFromAiCreation();
-        }}
-      />
       {aiImportLoaded && (
         <Suspense fallback={null}>
           <AiResultImportDialog

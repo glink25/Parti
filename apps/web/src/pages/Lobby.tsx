@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { JoinLinkInput } from '@/components/JoinLinkInput';
 import { ScanJoinButton } from '@/components/ScanJoinButton';
+import { AiCreationEntry, saveAiImportHandoff } from '@/components/editor/AiCreationEntry';
 import {
   LobbyClient,
   lobbyServiceUrl,
@@ -101,6 +102,12 @@ export function Lobby() {
             <JoinLinkInput />
             <ScanJoinButton />
           </div>
+          <AiCreationEntry
+            onGoAdd={(handoff) => {
+              saveAiImportHandoff(handoff);
+              window.location.hash = '#/editor/ai-import';
+            }}
+          />
           <Button asChild size="lg" className="h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
             <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
           </Button>
