@@ -33,6 +33,8 @@ export interface NetDeps {
   playerName(id: string): string;
   now(): number;
   latestState(): GameState | null;
+  /** 把提示延迟到世界稳定（上一镖落定、新世界切换完成）后执行 */
+  deferUntilSettled(fn: () => void): void;
   /** 收到快照后的 UI 刷新 */
   onState(state: GameState): void;
 }
@@ -75,8 +77,11 @@ export function createNet(deps: NetDeps): () => void {
   });
 
   on('dart:zone-triggered', ({ playerId, effect }) => {
-    const who = playerId === deps.myId() ? '你' : deps.playerName(playerId);
-    feedback.push(`${who}触发 ${ZONE_EFFECT_TEXT[effect.kind]}`, effect.kind === 'heal' ? 'good' : 'info');
+    // 事件提示延迟到世界稳定后弹出（落定前不制造「世界突变」观感）
+    deps.deferUntilSettled(() => {
+      const who = playerId === deps.myId() ? '你' : deps.playerName(playerId);
+      feedback.push(`${who}触发 ${ZONE_EFFECT_TEXT[effect.kind]}`, effect.kind === 'heal' ? 'good' : 'info');
+    });
   });
 
   on('dart:health-changed', ({ playerId, delta, reason }) => {
@@ -100,8 +105,10 @@ export function createNet(deps: NetDeps): () => void {
   });
 
   on('dart:event', ({ event }) => {
-    feedback.push(`轮盘事件：${EVENT_TEXT[event.kind]}`, 'info');
-    audio.play('event');
+    deps.deferUntilSettled(() => {
+      feedback.push(`轮盘事件：${EVENT_TEXT[event.kind]}`, 'info');
+      audio.play('event');
+    });
   });
 
   on('dart:game-started', () => {

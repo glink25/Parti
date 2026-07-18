@@ -129,7 +129,23 @@ Worker **不重新仿真**（它无法知道玩家真实的按下时刻），而
   「收到快照的当下」，rebase 会被迫在 150ms 内把圆盘快进到命中角度——肉眼可见的
   猛加速。因此新时间轴的 `logicalElapsed` 点被映射到正确的墙钟时刻 P：
   有仍在飞的镖时 P = 最新命中墙钟时刻（精确）；无飞行（超时/恢复）时按角度连续性
-  求解（最短弧）；首个回合 P = now。由此标靶角度与转速跨回合天然连续。
+  求解（最短弧），求解输入必须是**覆盖状态前捕获的旧视觉角**（混用新 rotation 与
+  旧时钟会让 P 偏出数秒）；首个回合 P = now。由此标靶角度与转速跨回合天然连续。
+- **逻辑时钟全程连续运行**：`logicalNow` 在任何阶段都是
+  `logicalEpoch + (now − wallEpoch)`，包括 aligning——零点映射已保证连续性，
+  冻结时钟反而会用 `turn.logicalElapsed` 去求值上一镖锚定在 `impactElapsed` 的
+  rotationAfter，把标靶瞬间倒拨数十度（曾导致下一出手方视角崩坏）。
+- **世界延迟切换（`pendingRotation` / `pendingEvent`）**：同理，快照里携带的新世界
+  （事件转速/方向、奖惩区域）不能即时应用——否则玩家点击发射的瞬间会看到
+  「速度突变、区域突现」。落定前客户端用上一镖的 `rotationAfter` 按旧转速外推，
+  新世界暂存，在落定时刻 P 由 `tick` 统一切换；激活（发 `accept_turn`）需等
+  `now ≥ P`，因此玩家可以发射时，转速、区域、倒计时全部已处于稳定状态。
+- **同回合合并的飞行中守卫**：快照（Worker 接受 commit 时发出）到达时镖还在飞，
+  同回合合并只推进 `turn.logicalElapsed` 数值，**不**采用新旋转锚点、不动时钟——
+  锚点统一由 `landLocalFlight` / `completeRemoteFlights` 在落定墙钟时刻采用，
+  否则角度会先跳后回（多镖回合每一镖都会触发）。
+- **提示延迟（`worldSettled`）**：`dart:event` / `dart:zone-triggered` 的提示文本
+  同样延迟到世界切换完成（或无延迟情形下的即时采用）才弹出。
 - 窗口与画面共用同一时钟：`windowElapsed = 发射墙钟 − P`，因此玩家看到的板面角度
   与 `simulateShot` 的仿真严格一致（瞄准即所得）；激活（发 `accept_turn`）需等
   `now ≥ P`，可感时限从落定的板面状态起算，不缩水。

@@ -44,6 +44,16 @@ function boot(initial: GameState): void {
   const feedback = new Feedback(must('feedback-root'));
   const liveRegion = must('live-region');
 
+  // 事件提示队列：dart:event / dart:zone-triggered 在 Worker 接受 commit 时就广播，
+  // 必须延迟到世界稳定（上一镖落定、新世界切换完成）后才弹出
+  const settledQueue: Array<() => void> = [];
+  const deferUntilSettled = (fn: () => void): void => {
+    settledQueue.push(fn);
+  };
+  const flushSettled = (): void => {
+    for (const fn of settledQueue.splice(0)) fn();
+  };
+
   const replicaHooks: ReplicaHooks = {
     acceptTurn: (p) => void parti.action('accept_turn', p),
     commitShot: (c) => void parti.action('commit_shot', c),
@@ -75,6 +85,7 @@ function boot(initial: GameState): void {
       feedback.push(`超时 −${damage}♥`, 'bad');
       audio.play('timeout');
     },
+    worldSettled: flushSettled,
   };
 
   const replica = new LocalReplica(myId, () => latest.activeOrder.length, replicaHooks);
@@ -98,6 +109,7 @@ function boot(initial: GameState): void {
   const refresh = (state: GameState): void => {
     latest = state;
     overlay.update(state, myId);
+    if (state.phase !== 'playing') settledQueue.length = 0; // 阶段结束丢弃滞留提示
     const turn = state.turn;
     if (turn && turn.id !== announcedTurnId) {
       announcedTurnId = turn.id;
@@ -114,6 +126,7 @@ function boot(initial: GameState): void {
     playerName: (id) => nameOf(id),
     now,
     latestState: () => latest,
+    deferUntilSettled,
     onState: refresh,
   });
   replica.handleSnapshot(initial, now());

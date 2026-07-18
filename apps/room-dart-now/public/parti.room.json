@@ -4,12 +4,24 @@
   "id": "dart-now",
   "name": "飞镖时刻",
   "version": "1.0.0",
+  "cover": "cover.jpg",
   "packageMode": "filesystem",
   "description": "2-8 人回合制飞镖派对：对旋转标靶判断提前量出手，贴镖得分、碰撞扣血，活到最后获胜。",
-  "author": { "name": "Parti" },
-  "entry": { "ui": "index.html", "worker": "worker.js" },
-  "room": { "minPlayers": 2, "maxPlayers": 8, "allowSpectators": false },
-  "sync": { "mode": "snapshot" },
+  "author": {
+    "name": "Parti"
+  },
+  "entry": {
+    "ui": "index.html",
+    "worker": "worker.js"
+  },
+  "room": {
+    "minPlayers": 2,
+    "maxPlayers": 8,
+    "allowSpectators": false
+  },
+  "sync": {
+    "mode": "snapshot"
+  },
   "permissions": {
     "network": false,
     "storage": "session",
@@ -21,9 +33,15 @@
   "actions": {
     "toggle_ready": {},
     "start_game": {},
-    "accept_turn": { "payload": "{ turnId, revision }" },
-    "commit_shot": { "payload": "ShotCommit" },
-    "commit_timeout": { "payload": "TimeoutCommit" },
+    "accept_turn": {
+      "payload": "{ turnId, revision }"
+    },
+    "commit_shot": {
+      "payload": "ShotCommit"
+    },
+    "commit_timeout": {
+      "payload": "TimeoutCommit"
+    },
     "return_to_lobby": {}
   }
 }

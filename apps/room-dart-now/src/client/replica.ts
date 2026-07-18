@@ -61,6 +61,11 @@ export interface ReplicaHooks {
   remoteShotLanded(commit: ShotCommit, playerId: string): void;
   /** 本地判定超时（预测扣血），用于 UI 反馈 */
   localTimeout(damage: number): void;
+  /**
+   * 世界（转速/方向/区域）已就绪：上一镖落定、新世界切换完成，
+   * 或快照即时采用（无延迟情形）。用于把排队的事件提示延迟到此刻弹出。
+   */
+  worldSettled?(): void;
 }
 
 function smoothstep(t: number): number {
@@ -91,6 +96,12 @@ export class LocalReplica {
   /** 本地已落地但尚未被快照确认的镖 */
   private readonly predictedIds = new Set<string>();
   private timedOut = false;
+  /**
+   * 快照先于上一镖落定到达时，新世界（转速/方向/区域）暂存于此，
+   * 等到落定时刻（wallEpoch）才切换——玩家激活发射时世界必须已稳定
+   */
+  private pendingRotation: Rotation | null = null;
+  private pendingEvent: ActiveEvent | null = null;
 
   constructor(
     private readonly myId: string,
@@ -121,11 +132,18 @@ export class LocalReplica {
     this.turn.acceptedShotIds = [...snapTurn.acceptedShotIds];
     if (snapTurn.logicalElapsed > this.turn.logicalElapsed) {
       this.turn.logicalElapsed = snapTurn.logicalElapsed;
-      this.rotation = state.rotation;
-      this.logicalEpoch = snapTurn.logicalElapsed;
-      this.wallEpoch = now;
+      // 有镖在飞（本地或远程）时不得采用新锚点——快照在 Worker 接受 commit 时
+      // 发出，镖还有几百毫秒才落定，提前快进时钟会让角度先跳后回；
+      // 锚点统一由 landLocalFlight / completeRemoteFlights 在落定时刻采用
+      if (!this.flight && this.remoteFlights.length === 0) {
+        this.rotation = state.rotation;
+        this.logicalEpoch = snapTurn.logicalElapsed;
+        this.wallEpoch = now;
+      }
     }
-    this.event = state.event;
+    // 世界切换未落地前，快照里的新区域只进暂存
+    if (this.pendingRotation) this.pendingEvent = state.event;
+    else this.event = state.event;
     for (const id of [...this.predictedIds]) {
       if (state.darts.some((d) => d.id === id)) this.predictedIds.delete(id);
     }
@@ -169,6 +187,16 @@ export class LocalReplica {
 
   tick(now: number): void {
     if (!this.turn) return;
+
+    // 上一镖落定 → 切换新世界（转速/方向/区域），逻辑时钟从时间轴零点起走
+    if (this.pendingRotation && now >= this.wallEpoch) {
+      this.rotation = this.pendingRotation;
+      this.event = this.pendingEvent;
+      this.pendingRotation = null;
+      this.pendingEvent = null;
+      this.logicalEpoch = this.turn.logicalElapsed;
+      this.hooks.worldSettled?.();
+    }
 
     // 重对齐完成且时钟到达时间轴零点（上一镖落定）→ 激活
     if (
@@ -248,7 +276,9 @@ export class LocalReplica {
   /** 当前应呈现的逻辑时刻 */
   logicalNow(now: number): number {
     if (!this.turn) return 0;
-    if (this.phase === 'aligning' || this.phase === 'recovering') return this.turn.logicalElapsed;
+    // 时钟全程连续运行（零点已映射到正确的墙钟时刻）——
+    // 切不可在 aligning 期间冻结：freeze 会用 turn.logicalElapsed 求值
+    // 上一镖的 rotationAfter（锚定在 impactElapsed），把标靶瞬间倒拨数十度
     return this.logicalEpoch + (now - this.wallEpoch);
   }
 
@@ -310,11 +340,13 @@ export class LocalReplica {
     this.predictedIds.clear();
     this.timedOut = false;
     this.rebasing = false;
+    this.pendingRotation = null;
+    this.pendingEvent = null;
     this.phase = 'observing';
   }
 
   private beginReplica(state: GameState, now: number, isMyTurn: boolean, recovering: boolean): void {
-    // 先记录切换前的视觉角（重对齐起点），再替换状态
+    // 先记录切换前的视觉角（重对齐起点 + 时钟求解输入），再替换任何状态
     const prevAngle = this.turn ? this.visualAngle(now) : null;
     const snapTurn = state.turn!;
     if (this.flight) {
@@ -327,21 +359,42 @@ export class LocalReplica {
         this.flight = null;
       }
     }
-    this.turn = { ...snapTurn, acceptedShotIds: [...snapTurn.acceptedShotIds] };
-    this.rotation = state.rotation;
-    this.event = state.event;
-    this.predictedIds.clear();
-    this.timedOut = false;
 
     // deferredDarts：仍在飞行的镖从快照里剔除，避免「钉着+飞着」同时出现
     const flyingIds = new Set(this.remoteFlights.map((f) => f.commit.shotId));
-    this.darts = state.darts.filter((d) => !flyingIds.has(d.id)).map((d) => ({ ...d }));
+    const nextDarts = state.darts.filter((d) => !flyingIds.has(d.id)).map((d) => ({ ...d }));
 
-    // 逻辑时钟映射：新时间轴的 logicalElapsed 点对应到正确的墙钟时刻。
-    // Worker 在命中逻辑时刻就推进回合，而快照到达时镖往往还在空中——
-    // 若按「收到快照的当下」起钟，rebase 会被迫把圆盘快进到命中角度（肉眼可见的猛加速）。
-    this.wallEpoch = this.computeEpochWall(now);
-    this.logicalEpoch = this.turn.logicalElapsed;
+    // 时钟决策（在覆盖 rotation/turn 之前完成）：
+    // 快照先于上一镖落定到达时，落定前世界必须保持原样——用上一镖的 rotationAfter
+    // 按旧转速外推，新世界（转速/方向/区域）暂存，落定时刻在 tick 里统一切换。
+    const latestFlight = this.latestPendingFlight();
+    const deferred = latestFlight !== null && latestFlight.impactWall > now;
+    const epochWall = deferred
+      ? latestFlight.impactWall
+      : this.computeEpochWall(now, prevAngle, state.rotation, snapTurn.logicalElapsed);
+
+    this.turn = { ...snapTurn, acceptedShotIds: [...snapTurn.acceptedShotIds] };
+    this.predictedIds.clear();
+    this.timedOut = false;
+    this.darts = nextDarts;
+    this.wallEpoch = epochWall;
+
+    if (deferred && latestFlight) {
+      this.pendingRotation = state.rotation;
+      this.pendingEvent = state.event;
+      // this.event 保持旧世界
+      this.rotation = latestFlight.commit.rotationAfter;
+      this.logicalEpoch = latestFlight.commit.impactElapsed;
+    } else {
+      this.pendingRotation = null;
+      this.pendingEvent = null;
+      this.rotation = state.rotation;
+      this.event = state.event;
+      this.logicalEpoch = snapTurn.logicalElapsed;
+      // 世界即时就绪（无延迟的情形），通知 UI 冲刷排队的事件提示
+      this.hooks.worldSettled?.();
+    }
+
     this.rebaseFrom = prevAngle ?? rotationAngleAt(this.rotation, this.logicalNow(now));
     this.rebasing = true;
     this.rebaseStart = now;
@@ -349,27 +402,41 @@ export class LocalReplica {
     this.phase = isMyTurn ? (recovering ? 'recovering' : 'aligning') : 'observing';
   }
 
+  /** 仍在飞的最晚一支镖（旧回合收尾），无则 null */
+  private latestPendingFlight(): RemoteFlight | null {
+    let latest: RemoteFlight | null = null;
+    for (const f of this.remoteFlights) {
+      if (!latest || f.impactWall > latest.impactWall) latest = f;
+    }
+    return latest;
+  }
+
   /**
-   * 求新时间轴 logicalEpoch 对应的墙钟时刻 P，使标靶角度跨回合连续：
+   * 求新时间轴 newLogicalElapsed 对应的墙钟时刻 P，使标靶角度跨回合连续：
    * - 有仍在飞的镖（旧回合收尾）：P = 最新命中墙钟时刻（精确）；
-   * - 无飞行（超时/恢复）：按角度连续性求解（最短弧）；
-   * - 首个回合：P = now。
+   * - 无飞行（超时/恢复）：以「切换前的旧视觉角 prevAngle」按角度连续性求解（最短弧）；
+   * - 首个回合（prevAngle 为 null）：P = now。
+   *
+   * prevAngle 必须在覆盖 this.rotation/this.turn 之前捕获——否则求解会
+   * 把新 rotation 与旧时钟混算，超时转换下 P 可偏出数秒。
    */
-  private computeEpochWall(now: number): number {
+  private computeEpochWall(
+    now: number,
+    prevAngle: number | null,
+    newRotation: Rotation,
+    newLogicalElapsed: number,
+  ): number {
     let latest = -Infinity;
     for (const f of this.remoteFlights) latest = Math.max(latest, f.impactWall);
     if (Number.isFinite(latest)) return latest;
-    if (!this.turn) return now;
+    if (prevAngle === null) return now;
 
-    const rotation = this.rotation;
-    const logicalElapsed = this.turn.logicalElapsed;
-    const current = this.visualAngle(now);
-    let delta = current - rotation.anchorAngle;
+    let delta = prevAngle - newRotation.anchorAngle;
     while (delta > Math.PI) delta -= TAU;
     while (delta < -Math.PI) delta += TAU;
-    const rate = (TAU / BASE_ROTATION_MS) * rotation.speedFactor * rotation.direction;
-    // rotationAngleAt(rotation, logicalElapsed + (now − P)) = currentAngle 的解
-    return now + (logicalElapsed - rotation.anchorElapsed) - delta / rate;
+    const rate = (TAU / BASE_ROTATION_MS) * newRotation.speedFactor * newRotation.direction;
+    // rotationAngleAt(newRotation, newLogicalElapsed + (now − P)) = prevAngle 的解
+    return now + (newLogicalElapsed - newRotation.anchorElapsed) - delta / rate;
   }
 
   private activate(): void {
