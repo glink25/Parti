@@ -82,22 +82,22 @@ export class Scene {
 
   /**
    * 布局量（供 HUD 对齐用）。
-   * 「标靶 + 飞镖准备区走廊」为内部游戏区，座位头像与标签在其之外；
+   * 「标靶 + 飞镖走廊」为核心区，尽量放大；座位头像与标签弱化贴边，
    * 整体在 HUD 安全区内缩放：顶部避开 top-bar，底部避开发射按钮区。
    */
   layout(): { cx: number; cy: number; boardR: number; seatR: number } {
-    const topPad = 64;
-    const bottomPad = Math.min(230, Math.max(180, this.height * 0.28));
-    const sidePad = 20;
+    const topPad = 56;
+    const bottomPad = Math.min(200, Math.max(160, this.height * 0.24));
+    const sidePad = 16;
     const availW = Math.max(120, this.width - sidePad * 2);
     const availH = Math.max(120, this.height - topPad - bottomPad);
-    // 座位圈 = 1.85×boardR；头像+标签外缘余量 ≈ 56px
-    const boardR = Math.max(56, (Math.min(availW, availH) / 2 - 56) / 1.85);
+    // 座位圈 = 1.78×boardR（弱化贴边）；头像+标签外缘余量 ≈ 18px
+    const boardR = Math.max(64, (Math.min(availW, availH) / 2 - 18) / 1.9);
     return {
       cx: this.width / 2,
       cy: topPad + availH / 2,
       boardR,
-      seatR: boardR * 1.85,
+      seatR: boardR * 1.78,
     };
   }
 
@@ -257,9 +257,9 @@ export class Scene {
     this.drawDart(cx, cy, this.readyRadius(boardR) + bob, angle, aim.color, 1, base);
   }
 
-  /** 投掷准备位：标靶外圈走廊中部，属于中心构图（与座位头像无关） */
+  /** 投掷准备位：标靶外圈走廊远端，属于中心构图（与座位头像无关） */
   private readyRadius(boardR: number): number {
-    return boardR * 1.35;
+    return boardR * 1.5;
   }
 
   /**
@@ -338,8 +338,8 @@ export class Scene {
 
   private drawSeats(cx: number, cy: number, seatR: number, view: SceneView): void {
     const { ctx } = this;
-    // 头像随场景整体缩放（小屏不挤压飞镖准备区走廊）
-    const avatarR = Math.min(30, Math.max(18, seatR * 0.16));
+    // 头像弱化：极小贴边，随场景整体缩放，不抢核心区域
+    const avatarR = Math.min(12, Math.max(8, seatR * 0.06));
     for (const p of view.seatedPlayers) {
       if (p.seat < 0) continue;
       const angle =
@@ -382,21 +382,21 @@ export class Scene {
       ctx.fillText((p.name || '?').slice(0, 1).toUpperCase(), x, y + 1);
 
       // 血量
-      ctx.font = '13px system-ui, sans-serif';
+      ctx.font = '9px system-ui, sans-serif';
       ctx.fillStyle = out ? '#7a7064' : '#ff6b6b';
       const hearts = out ? '✕' : '♥'.repeat(Math.max(0, p.health)) || '✕';
-      ctx.fillText(hearts, x, y + radius + 14);
+      ctx.fillText(hearts, x, y + radius + 9);
 
       // 分数
       ctx.fillStyle = '#e8d8b8';
-      ctx.font = 'bold 12px system-ui, sans-serif';
-      ctx.fillText(`${p.score}`, x, y - radius - 10);
+      ctx.font = 'bold 9px system-ui, sans-serif';
+      ctx.fillText(`${p.score}`, x, y - radius - 7);
 
       // 离线标记
       if (!p.connected && !out) {
         ctx.fillStyle = '#cfc4b2';
-        ctx.font = '10px system-ui, sans-serif';
-        ctx.fillText('离线', x, y + radius + 28);
+        ctx.font = '8px system-ui, sans-serif';
+        ctx.fillText('离线', x, y + radius + 18);
       }
       ctx.restore();
     }

@@ -96,14 +96,14 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  gap: 4px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
   pointer-events: none;
 }
 
 #shots-indicator {
-  min-height: 18px;
-  font-size: 13px;
+  min-height: 16px;
+  font-size: 12px;
   font-weight: 600;
   color: #d8c49a;
 }
@@ -111,8 +111,8 @@ body {
 #fire-button {
   pointer-events: auto;
   position: relative;
-  width: 108px;
-  height: 108px;
+  width: 86px;
+  height: 86px;
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -121,13 +121,15 @@ body {
   display: grid;
   place-items: center;
   touch-action: manipulation;
-  transition: transform 0.08s ease, background 0.2s ease;
+  opacity: 0.85;
+  transition: transform 0.08s ease, background 0.2s ease, opacity 0.2s ease;
 }
 
 #fire-button.armed {
   background: radial-gradient(circle at 35% 30%, #e8a33d, #b05e1c 72%);
   color: #2c1704;
-  box-shadow: 0 0 28px rgba(232, 163, 61, 0.45);
+  opacity: 1;
+  box-shadow: 0 0 22px rgba(232, 163, 61, 0.4);
 }
 
 #fire-button.armed:active {
@@ -139,7 +141,7 @@ body {
 }
 
 #fire-label {
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 2px;
   z-index: 1;
@@ -170,11 +172,11 @@ body {
 }
 
 #timer-text {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: #ffe9b8;
-  min-height: 28px;
+  min-height: 24px;
 }
 
 #timer-text.urgent {
