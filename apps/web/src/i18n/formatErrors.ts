@@ -1,5 +1,6 @@
 import type { IntlShape } from 'react-intl';
 import { ImportRoomError } from '@/lib/importRoom';
+import { MarketError } from '@/lib/market';
 import type { FetchPackageError } from '@/lib/fetchPackageOverPeer';
 import type { LobbyStatusKey } from '@/lib/lobbyApi';
 import type { UserNameValidationError } from '@/lib/localUser';
@@ -51,6 +52,9 @@ export function formatResolveError(intl: IntlShape, reason: unknown): string {
     return intl.formatMessage({ id: 'rooms.unknown' }, { id: reason.roomId });
   }
   if (reason instanceof ImportRoomError) return formatImportError(intl, reason);
+  if (reason instanceof MarketError) {
+    return intl.formatMessage({ id: `market.error.${reason.code}` }, { status: reason.status ?? '' });
+  }
   return reason instanceof Error ? reason.message : String(reason);
 }
 

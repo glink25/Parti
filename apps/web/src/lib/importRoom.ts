@@ -59,10 +59,10 @@ export async function buildPackageInputFromFiles(
   return input;
 }
 
-/** 从 ZIP 导入：自动剥离可能的一层包裹文件夹。返回保存后的模版 id。 */
-export async function importRoomFromZip(file: File): Promise<string> {
+/** 解包房间 ZIP：自动剥离可能的一层包裹文件夹，返回路径到文件字节的映射。 */
+export async function unzipRoomPackage(data: Blob | ArrayBuffer | Uint8Array): Promise<Record<string, Uint8Array>> {
   const { default: JSZip } = await import('jszip');
-  const zip = await JSZip.loadAsync(file);
+  const zip = await JSZip.loadAsync(data);
   const entries = Object.values(zip.files).filter((e) => !e.dir);
 
   const manifestEntries = entries
@@ -81,7 +81,12 @@ export async function importRoomFromZip(file: File): Promise<string> {
     if (!rel) continue;
     files[rel] = await entry.async('uint8array');
   }
+  return files;
+}
 
+/** 从 ZIP 导入：自动剥离可能的一层包裹文件夹。返回保存后的模版 id。 */
+export async function importRoomFromZip(file: File): Promise<string> {
+  const files = await unzipRoomPackage(file);
   const input = await buildPackageInputFromFiles(files);
   return saveImportedTemplate(input, { type: 'zip', ref: file.name });
 }

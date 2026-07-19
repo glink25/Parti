@@ -1,0 +1,50 @@
+name: 发布房间到市场 / Publish a room to the market
+description: 将你的 Parti 房间仓库登记到房间市场 / Register your Parti room in the Room Market
+title: "[parti-room] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢分享你的房间！提交前请确认已经阅读发布指南：
+        [docs/room-market.md](https://github.com/glink25/Parti/blob/main/docs/room-market.md)。
+
+        **标题格式**：`[parti-room] <owner>/<repo>`（可选 `@<tag>` 锁定某个 release，缺省使用 latest release）。
+        例如 `[parti-room] alice/game-a`。
+
+        提交后 triage 机器人会自动检查 release 资产；通过后会打上 `parti-room`（上架）和 `beta` 标签。
+  - type: input
+    id: repository
+    attributes:
+      label: 房间仓库 / Room repository
+      description: 形如 owner/repo。仓库必须公开，且 release 中包含 parti.room.zip 与 parti.room.json。
+      placeholder: alice/game-a
+    validations:
+      required: true
+  - type: input
+    id: release-tag
+    attributes:
+      label: Release tag（可选 / optional）
+      description: 锁定某个 release tag；留空则始终使用 latest release（推荐）。
+      placeholder: v1.0.0
+    validations:
+      required: false
+  - type: textarea
+    id: introduction
+    attributes:
+      label: 游戏简介 / Game introduction
+      description: 简单介绍玩法、玩家人数等，帮助审核与其他玩家了解你的房间。
+      placeholder: 2-4 人的聚会猜词游戏……
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 发布前确认 / Pre-flight checklist
+      options:
+        - label: release 中包含 parti.room.zip 和 parti.room.json 两个资产，且文件名完全一致
+          required: true
+        - label: parti.room.zip 已在 Parti web 的「从 ZIP 导入」中验证可正常导入和游玩
+          required: true
+        - label: zip 内的 parti.room.json 与单独上传的 parti.room.json 内容一致
+          required: true

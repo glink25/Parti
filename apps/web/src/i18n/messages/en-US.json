@@ -161,11 +161,33 @@
       "emptyTitle": "No templates in this category",
       "emptyDescription": "Try another category or import a room above."
     },
+    "market": {
+      "description": "Online room templates published by the community via GitHub. Install one to create a room.",
+      "publishGuide": "Learn how to publish your room →",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing…",
+      "install": "Install",
+      "installing": "Installing…",
+      "reinstall": "Reinstall",
+      "emptyTitle": "No rooms in the market yet",
+      "emptyDescription": "Rooms published by community authors and approved by maintainers will appear here.",
+      "staleWarning": "Failed to refresh the market. Showing previously cached content.",
+      "loadingMore": "Loading more…",
+      "loadMoreRetry": "Retry",
+      "allLoaded": "All listed rooms loaded",
+      "manifestUnavailable": "Package info unavailable; cannot install right now",
+      "manifestInvalid": "Package info invalid; cannot install right now",
+      "badges": {
+        "beta": "Beta",
+        "recommend": "Recommended"
+      }
+    },
     "categories": {
       "ariaLabel": "Room template categories",
       "all": "All",
       "imported": "Imported",
       "simple": "Simple templates",
+      "market": "Room Market",
       "tags": {
         "tabletop": "Tabletop",
         "party": "Party",
@@ -439,6 +461,13 @@
       "GITHUB_DIR_READ_FAILED": "Failed to read GitHub directory ({status}).",
       "GITHUB_MANIFEST_NOT_FOUND": "parti.room.json not found in the folder for this URL.",
       "DOWNLOAD_FAILED": "Failed to download file: {path}"
+    }
+  },
+  "market": {
+    "error": {
+      "REGISTRY_FETCH_FAILED": "Failed to load the room market ({status}). Please try again later.",
+      "REGISTRY_RATE_LIMITED": "GitHub API rate limit reached. The room market cannot refresh right now, please try again later.",
+      "PACKAGE_DOWNLOAD_FAILED": "Failed to download the room package ({status}). Make sure the repository release contains parti.room.zip."
     }
   },
   "template": {

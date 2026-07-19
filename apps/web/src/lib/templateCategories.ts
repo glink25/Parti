@@ -1,6 +1,6 @@
 import type { TemplateListEntry } from './rooms';
 
-export type TemplateCategoryId = 'all' | 'imported' | 'simple' | `tag:${string}`;
+export type TemplateCategoryId = 'all' | 'imported' | 'simple' | 'market' | `tag:${string}`;
 
 export const KNOWN_TAG_ORDER = [
   'tabletop', 'party', 'role-playing', 'action', 'turn-based', 'co-op',
@@ -22,6 +22,8 @@ export function templatesInCategory(templates: TemplateListEntry[], categoryId: 
   if (categoryId === 'all') return templates;
   if (categoryId === 'imported') return templates.filter((template) => template.imported);
   if (categoryId === 'simple') return templates.filter((template) => isSimpleTemplateId(template.id));
+  // 市场条目不是本地 TemplateListEntry，由 MarketSection 单独加载渲染。
+  if (categoryId === 'market') return [];
   const tagId = categoryId.slice(4);
   return templates.filter((template) => template.tags.includes(tagId));
 }
@@ -29,6 +31,7 @@ export function templatesInCategory(templates: TemplateListEntry[], categoryId: 
 export function buildTemplateCategories(
   templates: TemplateListEntry[],
   displayTag: (tagId: string) => string,
+  marketCount = 0,
 ): TemplateCategory[] {
   const tags = new Set(templates.flatMap((template) => template.tags));
   const knownIndex = new Map<string, number>(KNOWN_TAG_ORDER.map((tag, index) => [tag, index]));
@@ -59,10 +62,14 @@ export function buildTemplateCategories(
       return displayTag(a.tagId!).localeCompare(displayTag(b.tagId!));
     });
 
+  const marketCategory: TemplateCategory = { id: 'market', count: marketCount };
+
+  // 固定顺序：全部 → 已导入 → 市场 → 各标签 → 简易模板；
+  // 已导入为 0 时移到末尾区，市场仍保持在第二位。
   if (importedCategory.count > 0) {
-    return [allCategory, importedCategory, ...tagCategories, simpleCategory];
+    return [allCategory, importedCategory, marketCategory, ...tagCategories, simpleCategory];
   }
-  return [allCategory, ...tagCategories, importedCategory, simpleCategory];
+  return [allCategory, marketCategory, ...tagCategories, importedCategory, simpleCategory];
 }
 
 export function normalizeTemplateCategory(categoryId: TemplateCategoryId, categories: TemplateCategory[]) {

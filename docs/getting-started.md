@@ -215,6 +215,13 @@ apps/web/public/rooms/my-room/
 > ⚠️ **只有在 `parti.room.json` 的 `entry` 里声明过的文件才会被加载**。加了
 > `style.css` / `client.js` 也要写进 `entry.style` / `entry.client`，否则不会被 fetch。
 
+### 把房间发布到房间市场
+
+不想并入主仓库，也可以把房间发布到在线「房间市场」供所有 Parti web 用户一键安装：
+在自己仓库的 release 中上传 `parti.room.zip` 和 `parti.room.json`，再到主仓库 issue
+区按 `[parti-room] owner/repo` 格式登记。完整发布指南与打包格式规范见
+[room-market.md](./room-market.md)。
+
 ## 6. 下一步
 
 - 想要一个比计数器更完整、带回合 / 胜负判断的范例 → [示例：井字棋](./example-tic-tac-toe.md)

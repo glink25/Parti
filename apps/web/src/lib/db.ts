@@ -5,6 +5,7 @@ import type { RoomManifest } from '@parti/room-packager';
 export type PackageSourceInfo =
   | { type: 'zip'; ref?: string }
   | { type: 'github'; ref?: string }
+  | { type: 'market'; ref?: string }
   | { type: 'editor'; basedOn?: string }
   | { type: 'builtin'; id: string }
   | { type: 'custom'; id: string };

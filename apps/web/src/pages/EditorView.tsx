@@ -40,6 +40,7 @@ import {
   type AiImportHandoff,
 } from '@/components/editor/AiCreationEntry';
 import { EditorActionDock } from '@/components/editor/EditorActionDock';
+import { MarketSection } from '@/components/editor/MarketSection';
 import type { AiRoomFiles } from '@/components/editor/parseAiRoomMarkdown';
 import {
   buildTemplateCategories,
@@ -79,6 +80,7 @@ export function EditorView() {
   const [activeFile, setActiveFile] = useState<EditorFile>('manifest');
   const [templates, setTemplates] = useState<TemplateListEntry[]>([]);
   const [activeCategory, setActiveCategory] = useState<TemplateCategoryId>('all');
+  const [marketCount, setMarketCount] = useState(0);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('blank');
   const [loadedTemplateId, setLoadedTemplateId] = useState<string>('blank');
   const [templateLoadStates, setTemplateLoadStates] = useState<Record<string, TemplateLoadState>>({});
@@ -313,6 +315,12 @@ export function EditorView() {
     }
   }
 
+  async function onMarketInstalled(templateId: string): Promise<void> {
+    const list = await reloadTemplates();
+    const entry = list.find((t) => t.id === templateId);
+    if (entry) await commitTemplateSelection(entry);
+  }
+
   function openBlankEditor(): void {
     if (selectedTemplateId !== 'blank' || loadedTemplateId !== 'blank') {
       void commitTemplateSelection(blankTemplate);
@@ -376,7 +384,7 @@ export function EditorView() {
     const known = new Set(['tabletop', 'party', 'role-playing', 'action', 'turn-based', 'co-op']);
     return known.has(tagId) ? intl.formatMessage({ id: `editor.categories.tags.${tagId}` }) : tagId;
   };
-  const categories = buildTemplateCategories(templates, tagLabel);
+  const categories = buildTemplateCategories(templates, tagLabel, marketCount);
   const normalizedCategory = normalizeTemplateCategory(activeCategory, categories);
   const visibleTemplates = templatesInCategory(templates, normalizedCategory);
 
@@ -422,7 +430,13 @@ export function EditorView() {
             </div>
           </Tabs>
 
-          {visibleTemplates.length === 0 && normalizedCategory !== 'all' ? (
+          {normalizedCategory === 'market' ? (
+            <MarketSection
+              onInstalled={(templateId) => void onMarketInstalled(templateId)}
+              onError={setError}
+              onEntriesChange={setMarketCount}
+            />
+          ) : visibleTemplates.length === 0 && normalizedCategory !== 'all' ? (
             <div className="flex min-h-48 flex-col items-center justify-center rounded-[20px] border border-dashed border-border-strong bg-card/55 p-8 text-center">
               <SparklesIcon className="mb-3 size-8 text-primary-bright/70" aria-hidden="true" />
               <b><FormattedMessage id="editor.library.emptyTitle" /></b>

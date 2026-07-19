@@ -161,11 +161,33 @@
       "emptyTitle": "这个分类还没有模板",
       "emptyDescription": "可以切换其他分类，或从上方导入一个房间。"
     },
+    "market": {
+      "description": "社区通过 GitHub 发布的在线房间模版，安装后即可创建房间。",
+      "publishGuide": "了解如何发布你的房间 →",
+      "refresh": "刷新",
+      "refreshing": "刷新中…",
+      "install": "安装",
+      "installing": "安装中…",
+      "reinstall": "重新安装",
+      "emptyTitle": "市场暂时没有上架的房间",
+      "emptyDescription": "社区作者发布并通过审核的房间会显示在这里。",
+      "staleWarning": "市场列表刷新失败，当前展示的是之前缓存的内容。",
+      "loadingMore": "正在加载更多…",
+      "loadMoreRetry": "重试",
+      "allLoaded": "已加载全部上架房间",
+      "manifestUnavailable": "产物信息不可用，暂时无法安装",
+      "manifestInvalid": "产物信息无效，暂时无法安装",
+      "badges": {
+        "beta": "测试版",
+        "recommend": "推荐"
+      }
+    },
     "categories": {
       "ariaLabel": "房间模板分类",
       "all": "全部",
       "imported": "已导入",
       "simple": "简易模板",
+      "market": "房间市场",
       "tags": {
         "tabletop": "棋牌",
         "party": "聚会",
@@ -439,6 +461,13 @@
       "GITHUB_DIR_READ_FAILED": "读取 GitHub 目录失败（{status}）。",
       "GITHUB_MANIFEST_NOT_FOUND": "该地址对应的文件夹下未找到 parti.room.json。",
       "DOWNLOAD_FAILED": "下载文件失败：{path}"
+    }
+  },
+  "market": {
+    "error": {
+      "REGISTRY_FETCH_FAILED": "房间市场列表获取失败（{status}），请稍后重试。",
+      "REGISTRY_RATE_LIMITED": "GitHub API 请求受限，房间市场暂时无法刷新，请稍后再试。",
+      "PACKAGE_DOWNLOAD_FAILED": "房间包下载失败（{status}），请确认该仓库的 release 中包含 parti.room.zip。"
     }
   },
   "template": {

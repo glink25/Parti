@@ -1,0 +1,68 @@
+# 房间市场登记 issue 的自动预检：校验 release 资产格式，通过后打上 parti-room（上架）+ beta 标签。
+# 规则详见 docs/room-market.md。维护者可随时手动调整标签（如改打 recommend）或关闭 issue 下架。
+name: room-issue-triage
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    if: startsWith(github.event.issue.title, '[parti-room]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release assets and apply labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            gh issue comment "$ISSUE_NUMBER" --body "$1"
+            exit 0
+          }
+
+          ref="${ISSUE_TITLE#'[parti-room]'}"
+          ref="$(echo "$ref" | xargs)"
+          repo_part="${ref%%@*}"
+          tag=""
+          if [[ "$ref" == *@* ]]; then tag="${ref##*@}"; fi
+
+          if [[ "$repo_part" != */* ]]; then
+            fail "标题格式不正确，应为 \`[parti-room] owner/repo\`（可选 \`@tag\`）。详见 docs/room-market.md。"
+          fi
+          owner="${repo_part%%/*}"
+          repo="${repo_part##*/}"
+
+          if [[ -n "$tag" ]]; then
+            base="https://github.com/$owner/$repo/releases/download/$tag"
+          else
+            base="https://github.com/$owner/$repo/releases/latest/download"
+          fi
+
+          for asset in parti.room.json parti.room.zip; do
+            code="$(curl -sIL -o /dev/null -w '%{http_code}' "$base/$asset")"
+            if [[ "$code" != "200" ]]; then
+              fail "未找到 release 资产 \`$asset\`（HTTP $code）：\`$base/$asset\`。请按 docs/room-market.md 的格式规范上传后，编辑本 issue 触发重新检查。"
+            fi
+          done
+
+          manifest="$(curl -sL "$base/parti.room.json")"
+          if ! echo "$manifest" | jq -e '.id and .name and .version and .entry.ui and .entry.worker' >/dev/null 2>&1; then
+            fail "\`parti.room.json\` 校验失败：必须是合法 JSON，且包含 \`id\` / \`name\` / \`version\` / \`entry.ui\` / \`entry.worker\` 字段。详见 docs/manifest.md。"
+          fi
+
+          gh label create parti-room --color 0E8A16 --description "房间市场：已上架" --force >/dev/null
+          gh label create beta --color FBCA04 --description "房间市场：测试版，未经充分测试" --force >/dev/null
+          gh label create recommend --color 1D76DB --description "房间市场：维护者推荐" --force >/dev/null
+
+          if gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name' | grep -qx 'parti-room'; then
+            gh issue edit "$ISSUE_NUMBER" --remove-label "beta" 2>/dev/null || true
+          fi
+          gh issue edit "$ISSUE_NUMBER" --add-label "parti-room,beta"
+          gh issue comment "$ISSUE_NUMBER" --body "✅ release 资产检查通过，已上架房间市场（\`$owner/$repo\`）。默认标记为 \`beta\`，维护者试玩后可改为 \`recommend\`。"
