@@ -188,7 +188,13 @@ export class UISandboxBridge {
     window.addEventListener('message', this.messageListener);
 
     this.unsubscribers.push(
-      port.onState((state) => this.post({ __parti: true, type: 'state', state })),
+      // init 之前的 state 不得转发：iframe 侧收到 state 会立即触发 onState，
+      // 而 playerId 要随 init 才就绪（docs/client-api.md 契约）。init 消息本身
+      // 携带 port.getState() 的最新状态，丢弃 init 前的转发不会丢状态。
+      port.onState((state) => {
+        if (!this.initSent) return;
+        this.post({ __parti: true, type: 'state', state });
+      }),
       port.onEvent((event, payload) =>
         this.post({ __parti: true, type: 'event', event, payload }),
       ),

@@ -56,25 +56,6 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@26.0.1)(lightningcss@1.32.0)
 
-  apps/room-dart-roulette:
-    dependencies:
-      '@parti/worker-sdk':
-        specifier: workspace:*
-        version: link:../../packages/worker-sdk
-    devDependencies:
-      esbuild:
-        specifier: ^0.21.5
-        version: 0.21.5
-      typescript:
-        specifier: ^5.6.3
-        version: 5.9.3
-      vite:
-        specifier: ^5.4.21
-        version: 5.4.21(@types/node@26.0.1)(lightningcss@1.32.0)
-      vitest:
-        specifier: ^2.1.9
-        version: 2.1.9(@types/node@26.0.1)(lightningcss@1.32.0)
-
   apps/room-doudizhu:
     dependencies:
       '@parti/worker-sdk':
