@@ -1,4 +1,8 @@
-# 房间市场登记 issue 的自动预检：校验 release 资产格式，通过后打上 parti-room（上架）+ beta 标签。
+# 房间市场登记 issue 的自动预检：
+#   1. 在发布者仓库中定位房间包（最浅的 parti.room.json 所在目录），下载并校验 manifest；
+#   2. 软检查 release 资产（parti.room.zip / parti.room.json，缺失仅提醒，不阻止上架）；
+#   3. 把 manifest 与包目录写入 issue 正文的标记区块（web 端列表直接读取，零额外请求）；
+#   4. 通过后打上 parti-room（上架）+ beta 标签。
 # 规则详见 docs/room-market.md。维护者可随时手动调整标签（如改打 recommend）或关闭 issue 下架。
 name: room-issue-triage
 
@@ -14,7 +18,7 @@ jobs:
     if: startsWith(github.event.issue.title, '[parti-room]')
     runs-on: ubuntu-latest
     steps:
-      - name: Validate release assets and apply labels
+      - name: Validate room package and embed manifest into issue body
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -40,23 +44,61 @@ jobs:
           repo="${repo_part##*/}"
 
           if [[ -n "$tag" ]]; then
+            git_ref="$tag"
+          else
+            git_ref="$(gh api "repos/$owner/$repo" --jq .default_branch)" || fail "无法访问仓库 \`$owner/$repo\`（必须为公开仓库）。"
+          fi
+
+          # 1. 在仓库文件树中定位最浅的 parti.room.json
+          gh api "repos/$owner/$repo/git/trees/$git_ref?recursive=1" --jq '.tree[].path' > /tmp/tree.txt \
+            || fail "无法读取 \`$owner/$repo@$git_ref\` 的文件树。"
+          manifest_path="$(grep -E '(^|/)parti\.room\.json$' /tmp/tree.txt | awk -F/ '{print NF, $0}' | sort -n | head -1 | cut -d' ' -f2-)"
+          if [[ -z "$manifest_path" ]]; then
+            fail "仓库 \`$owner/$repo@$git_ref\` 中未找到 \`parti.room.json\`。市场安装直接读取仓库中的房间包文件，请把 parti.room.json 与入口文件提交到仓库（根目录或某个子目录），详见 docs/room-market.md。"
+          fi
+          package_dir="$(dirname "$manifest_path")"
+
+          manifest="$(curl -sfL "https://raw.githubusercontent.com/$owner/$repo/$git_ref/$manifest_path")" \
+            || fail "无法下载 \`$manifest_path\`。"
+          if ! echo "$manifest" | jq -e '.id and .name and .version and .entry.ui and .entry.worker' >/dev/null 2>&1; then
+            fail "\`$manifest_path\` 校验失败：必须是合法 JSON，且包含 \`id\` / \`name\` / \`version\` / \`entry.ui\` / \`entry.worker\` 字段。详见 docs/manifest.md。"
+          fi
+
+          # 2. release 资产软检查（仅提醒）
+          if [[ -n "$tag" ]]; then
             base="https://github.com/$owner/$repo/releases/download/$tag"
           else
             base="https://github.com/$owner/$repo/releases/latest/download"
           fi
-
+          missing_assets=""
           for asset in parti.room.json parti.room.zip; do
             code="$(curl -sIL -o /dev/null -w '%{http_code}' "$base/$asset")"
-            if [[ "$code" != "200" ]]; then
-              fail "未找到 release 资产 \`$asset\`（HTTP $code）：\`$base/$asset\`。请按 docs/room-market.md 的格式规范上传后，编辑本 issue 触发重新检查。"
-            fi
+            if [[ "$code" != "200" ]]; then missing_assets="$missing_assets $asset"; fi
           done
 
-          manifest="$(curl -sL "$base/parti.room.json")"
-          if ! echo "$manifest" | jq -e '.id and .name and .version and .entry.ui and .entry.worker' >/dev/null 2>&1; then
-            fail "\`parti.room.json\` 校验失败：必须是合法 JSON，且包含 \`id\` / \`name\` / \`version\` / \`entry.ui\` / \`entry.worker\` 字段。详见 docs/manifest.md。"
-          fi
+          # 3. 把 manifest 与包目录写入 issue 正文标记区块
+          gh issue view "$ISSUE_NUMBER" --json body --jq .body > /tmp/body.md
+          echo "$manifest" > /tmp/manifest.json
+          PKG_DIR="$package_dir" python3 - <<'PY'
+          import os, pathlib, re
+          START = '<!-- parti-room:manifest:start -->'
+          END = '<!-- parti-room:manifest:end -->'
+          body = pathlib.Path('/tmp/body.md').read_text()
+          manifest = pathlib.Path('/tmp/manifest.json').read_text().strip()
+          pkg_dir = os.environ['PKG_DIR']
+          block = f"{START}\n```json\n{manifest}\n```\n{END}\n<!-- parti-room:package-dir:{pkg_dir} -->"
+          pattern = re.compile(
+              re.escape(START) + r'[\s\S]*?' + re.escape(END)
+              + r'(\s*<!--\s*parti-room:package-dir:[^\s>]+\s*-->)?')
+          if pattern.search(body):
+              body = pattern.sub(lambda _: block, body, count=1)
+          else:
+              body = body.rstrip() + '\n\n---\n' + block + '\n'
+          pathlib.Path('/tmp/body.md').write_text(body)
+          PY
+          gh issue edit "$ISSUE_NUMBER" --body-file /tmp/body.md
 
+          # 4. 打标与评论
           gh label create parti-room --color 0E8A16 --description "房间市场：已上架" --force >/dev/null
           gh label create beta --color FBCA04 --description "房间市场：测试版，未经充分测试" --force >/dev/null
           gh label create recommend --color 1D76DB --description "房间市场：维护者推荐" --force >/dev/null
@@ -65,4 +107,11 @@ jobs:
             gh issue edit "$ISSUE_NUMBER" --remove-label "beta" 2>/dev/null || true
           fi
           gh issue edit "$ISSUE_NUMBER" --add-label "parti-room,beta"
-          gh issue comment "$ISSUE_NUMBER" --body "✅ release 资产检查通过，已上架房间市场（\`$owner/$repo\`）。默认标记为 \`beta\`，维护者试玩后可改为 \`recommend\`。"
+
+          comment="✅ 检查通过，已上架房间市场（\`$owner/$repo@$git_ref\`，包目录 \`$package_dir\`）。默认标记为 \`beta\`，维护者试玩后可改为 \`recommend\`。"
+          if [[ -n "$missing_assets" ]]; then
+            formatted=""
+            for a in $missing_assets; do formatted="$formatted\`$a\` "; done
+            comment="$comment"$'\n\n'"⚠️ 建议：release 中缺少资产：${formatted}。release zip 是存档与手动导入的降级通道，建议补齐（见 docs/room-market.md）。"
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body "$comment"

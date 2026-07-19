@@ -1,23 +1,30 @@
 /**
- * 在线房间市场：以 Parti 主仓库 GitHub issue 区为注册表，以发布者仓库的
- * release 资产（parti.room.json + parti.room.zip）为产物来源。
+ * 在线房间市场：以 Parti 主仓库 GitHub issue 区为注册表。
  *
- * 只有带 `parti-room` label 的 open issue 才会上架；issue 关闭即下架。
- * 资产下载走 github.com/.../releases/.../download/... 重定向，不消耗 API 配额。
+ * - 列表：issues API 一次请求（body 内嵌 manifest，由 triage workflow 写入），
+ *   只有带 `parti-room` label 的 open issue 才会上架；issue 关闭即下架。
+ * - 安装：经 jsdelivr（data.jsdelivr.com 列文件树 + cdn.jsdelivr.net 拉文件）
+ *   直接读取发布者仓库中的房间包文件，不占 GitHub API 配额、无 CORS 限制。
+ *   release 中的 parti.room.zip 仅作为存档与手动导入的降级通道。
  */
-import { decodeText, validateManifest, type RoomManifest } from '@parti/room-packager';
-import { buildPackageInputFromFiles, unzipRoomPackage } from './importRoom';
+import type { RoomManifest } from '@parti/room-packager';
+import { buildPackageInputFromFiles } from './importRoom';
 import { saveImportedTemplate } from './templates';
 import { getDb } from './db';
 import {
+  findPackageDirInPaths,
+  joinPackagePath,
+  jsdelivrFileUrl,
+  jsdelivrTreeUrl,
   MARKET_GATE_LABEL,
-  MARKET_MANIFEST_ASSET,
-  MARKET_PACKAGE_ASSET,
   marketBadgesFromLabels,
   marketRefString,
+  parseManifestFromIssueBody,
   parseMarketIssueTitle,
-  releaseAssetUrl,
+  parsePackageDirFromIssueBody,
+  resolveMarketCover,
   type MarketBadge,
+  type MarketManifestError,
   type MarketRepoRef,
 } from './marketFormat';
 
@@ -39,6 +46,7 @@ export const MARKET_DOCS_URL = `https://github.com/${MARKET_REGISTRY.owner}/${MA
 export type MarketErrorCode =
   | 'REGISTRY_FETCH_FAILED'
   | 'REGISTRY_RATE_LIMITED'
+  | 'RATE_LIMITED'
   | 'PACKAGE_DOWNLOAD_FAILED';
 
 export class MarketError extends Error {
@@ -59,8 +67,11 @@ export interface MarketTemplateEntry extends MarketRepoRef {
   issueNumber: number;
   issueUrl: string;
   badges: MarketBadge[];
+  /** 房间包在仓库中的目录（`.` 表示根目录）。 */
+  packageDir: string;
+  cover?: string;
   manifest?: RoomManifest;
-  manifestError?: 'MANIFEST_UNAVAILABLE' | 'MANIFEST_INVALID';
+  manifestError?: MarketManifestError;
 }
 
 export interface MarketListResult {
@@ -80,6 +91,7 @@ interface GitHubIssueItem {
   number: number;
   title: string;
   html_url: string;
+  body?: string | null;
   pull_request?: unknown;
   labels: Array<string | { name?: string }>;
 }
@@ -123,11 +135,15 @@ export function cacheMarketState(entries: MarketTemplateEntry[], nextPage: numbe
   }
 }
 
+function isRateLimited(res: Response): boolean {
+  return res.status === 403 || res.status === 429;
+}
+
 async function fetchMarketIssues(page: number): Promise<GitHubIssueItem[]> {
   const { owner, repo } = MARKET_REGISTRY;
   const url = `https://api.github.com/repos/${owner}/${repo}/issues?state=open&labels=${MARKET_GATE_LABEL}&per_page=${MARKET_PAGE_SIZE}&page=${page}`;
   const res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
-  if (res.status === 403 || res.status === 429) {
+  if (isRateLimited(res)) {
     throw new MarketError('REGISTRY_RATE_LIMITED', { status: res.status });
   }
   if (!res.ok) {
@@ -136,28 +152,12 @@ async function fetchMarketIssues(page: number): Promise<GitHubIssueItem[]> {
   return (await res.json()) as GitHubIssueItem[];
 }
 
-async function fetchEntryManifest(ref: MarketRepoRef): Promise<Pick<MarketTemplateEntry, 'manifest' | 'manifestError'>> {
-  let res: Response;
-  try {
-    res = await fetch(releaseAssetUrl(ref, MARKET_MANIFEST_ASSET));
-  } catch {
-    return { manifestError: 'MANIFEST_UNAVAILABLE' };
-  }
-  if (!res.ok) return { manifestError: 'MANIFEST_UNAVAILABLE' };
-  try {
-    const manifest = validateManifest(JSON.parse(decodeText(new Uint8Array(await res.arrayBuffer()))));
-    return { manifest };
-  } catch {
-    return { manifestError: 'MANIFEST_INVALID' };
-  }
-}
-
-async function buildMarketEntries(
+function buildMarketEntries(
   issues: GitHubIssueItem[],
   excludeRefs: ReadonlySet<string> = new Set(),
-): Promise<MarketTemplateEntry[]> {
+): MarketTemplateEntry[] {
   const seen = new Set<string>();
-  const refs: Array<{ ref: MarketRepoRef; issue: GitHubIssueItem }> = [];
+  const entries: MarketTemplateEntry[] = [];
   for (const issue of issues) {
     if (issue.pull_request) continue;
     const ref = parseMarketIssueTitle(issue.title);
@@ -165,21 +165,23 @@ async function buildMarketEntries(
     const key = marketRefString(ref);
     if (seen.has(key) || excludeRefs.has(key)) continue;
     seen.add(key);
-    refs.push({ ref, issue });
+
+    const labels = issue.labels.map((label) => (typeof label === 'string' ? label : label.name ?? ''));
+    const parsed = parseManifestFromIssueBody(issue.body);
+    const packageDir = parsePackageDirFromIssueBody(issue.body);
+    const manifest = 'manifest' in parsed ? parsed.manifest : undefined;
+    entries.push({
+      ...ref,
+      ref: key,
+      issueNumber: issue.number,
+      issueUrl: issue.html_url,
+      badges: marketBadgesFromLabels(labels),
+      packageDir,
+      ...(manifest ? { manifest, cover: resolveMarketCover(ref, packageDir, manifest.cover) } : {}),
+      ...('manifestError' in parsed ? { manifestError: parsed.manifestError } : {}),
+    });
   }
-  return Promise.all(
-    refs.map(async ({ ref, issue }) => {
-      const labels = issue.labels.map((label) => (typeof label === 'string' ? label : label.name ?? ''));
-      const base: MarketTemplateEntry = {
-        ...ref,
-        ref: marketRefString(ref),
-        issueNumber: issue.number,
-        issueUrl: issue.html_url,
-        badges: marketBadgesFromLabels(labels),
-      };
-      return { ...base, ...(await fetchEntryManifest(ref)) };
-    }),
-  );
+  return entries;
 }
 
 function toPageResult(entries: MarketTemplateEntry[], rawCount: number, page: number) {
@@ -198,7 +200,7 @@ export async function listMarketTemplates(options: { forceRefresh?: boolean } = 
   }
   try {
     const issues = await fetchMarketIssues(1);
-    const page = toPageResult(await buildMarketEntries(issues), issues.length, 1);
+    const page = toPageResult(buildMarketEntries(issues), issues.length, 1);
     cacheMarketState(page.entries, page.nextPage, page.hasMore);
     return { ...page, fromCache: false, stale: false };
   } catch (reason) {
@@ -226,7 +228,7 @@ export async function loadMarketPage(
   excludeRefs: ReadonlySet<string>,
 ): Promise<{ entries: MarketTemplateEntry[]; hasMore: boolean; nextPage: number }> {
   const issues = await fetchMarketIssues(page);
-  return toPageResult(await buildMarketEntries(issues, excludeRefs), issues.length, page);
+  return toPageResult(buildMarketEntries(issues, excludeRefs), issues.length, page);
 }
 
 /** 已安装到本地（IndexedDB）的市场模版 ref 集合。 */
@@ -237,18 +239,70 @@ export async function listInstalledMarketRefs(): Promise<Set<string>> {
   );
 }
 
-/** 下载并安装市场模版，返回保存后的模版 id。 */
-export async function installMarketTemplate(entry: MarketRepoRef): Promise<string> {
-  let res: Response;
-  try {
-    res = await fetch(releaseAssetUrl(entry, MARKET_PACKAGE_ASSET));
-  } catch {
-    throw new MarketError('PACKAGE_DOWNLOAD_FAILED');
+/** issue 未锁定 ref 时，解析仓库默认分支（安装时唯一一次 GitHub API 调用）。 */
+async function resolveDefaultBranch(entry: MarketRepoRef): Promise<string> {
+  const url = `https://api.github.com/repos/${entry.owner}/${entry.repo}`;
+  const res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
+  if (isRateLimited(res)) {
+    throw new MarketError('RATE_LIMITED', { status: res.status });
   }
   if (!res.ok) {
     throw new MarketError('PACKAGE_DOWNLOAD_FAILED', { status: res.status });
   }
-  const files = await unzipRoomPackage(await res.arrayBuffer());
+  const data = (await res.json()) as { default_branch?: string };
+  if (!data.default_branch) throw new MarketError('PACKAGE_DOWNLOAD_FAILED');
+  return data.default_branch;
+}
+
+interface JsdelivrTreeNode {
+  type: 'file' | 'directory';
+  name: string;
+  files?: JsdelivrTreeNode[];
+}
+
+function flattenJsdelivrPaths(nodes: JsdelivrTreeNode[], prefix = ''): string[] {
+  const paths: string[] = [];
+  for (const node of nodes) {
+    const path = prefix ? `${prefix}/${node.name}` : node.name;
+    if (node.type === 'file') {
+      paths.push(path);
+    } else if (node.files) {
+      paths.push(...flattenJsdelivrPaths(node.files, path));
+    }
+  }
+  return paths;
+}
+
+/**
+ * 下载并安装市场模版：经 jsdelivr 读取发布仓库中的房间包文件
+ * （不消耗 GitHub API 配额），返回保存后的模版 id。
+ */
+export async function installMarketTemplate(entry: MarketRepoRef & { packageDir?: string }): Promise<string> {
+  const gitRef = entry.tag ?? (await resolveDefaultBranch(entry));
+
+  const treeRes = await fetch(jsdelivrTreeUrl(entry, gitRef));
+  if (!treeRes.ok) {
+    throw new MarketError('PACKAGE_DOWNLOAD_FAILED', { status: treeRes.status });
+  }
+  const tree = (await treeRes.json()) as { files?: JsdelivrTreeNode[] };
+  const paths = flattenJsdelivrPaths(tree.files ?? []);
+
+  const packageDir = entry.packageDir ?? findPackageDirInPaths(paths);
+  if (!packageDir || !paths.includes(joinPackagePath(packageDir, 'parti.room.json'))) {
+    throw new MarketError('PACKAGE_DOWNLOAD_FAILED');
+  }
+
+  const prefix = packageDir === '.' ? '' : `${packageDir}/`;
+  const packagePaths = paths.filter((path) => (prefix ? path.startsWith(prefix) : true));
+  const files: Record<string, Uint8Array> = {};
+  await Promise.all(
+    packagePaths.map(async (path) => {
+      const res = await fetch(jsdelivrFileUrl(entry, gitRef, path));
+      if (!res.ok) throw new MarketError('PACKAGE_DOWNLOAD_FAILED', { status: res.status });
+      files[path.slice(prefix.length)] = new Uint8Array(await res.arrayBuffer());
+    }),
+  );
+
   const input = await buildPackageInputFromFiles(files);
   return saveImportedTemplate(input, { type: 'market', ref: marketRefString(entry) });
 }

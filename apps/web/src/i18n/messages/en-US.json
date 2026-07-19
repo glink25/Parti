@@ -175,8 +175,10 @@
       "loadingMore": "Loading more…",
       "loadMoreRetry": "Retry",
       "allLoaded": "All listed rooms loaded",
-      "manifestUnavailable": "Package info unavailable; cannot install right now",
+      "manifestUnavailable": "Package info not written yet; waiting for the registry check",
       "manifestInvalid": "Package info invalid; cannot install right now",
+      "downloadFallback": "Download in browser",
+      "downloadFallbackHint": "After the download finishes, use “Import from ZIP” above to install it.",
       "badges": {
         "beta": "Beta",
         "recommend": "Recommended"
@@ -467,7 +469,8 @@
     "error": {
       "REGISTRY_FETCH_FAILED": "Failed to load the room market ({status}). Please try again later.",
       "REGISTRY_RATE_LIMITED": "GitHub API rate limit reached. The room market cannot refresh right now, please try again later.",
-      "PACKAGE_DOWNLOAD_FAILED": "Failed to download the room package ({status}). Make sure the repository release contains parti.room.zip."
+      "RATE_LIMITED": "GitHub API rate limit reached. Cannot install right now; try again later or download directly in your browser.",
+      "PACKAGE_DOWNLOAD_FAILED": "Failed to download the room package ({status}). Make sure the repository contains the room package files (parti.room.json and entry files)."
     }
   },
   "template": {

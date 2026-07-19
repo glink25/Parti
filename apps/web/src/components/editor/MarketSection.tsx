@@ -1,4 +1,4 @@
-/** 房间市场区块：展示 GitHub issue 注册表中上架的在线房间模版，支持一键安装与滚动分页加载。 */
+/** 房间市场面板：展示 GitHub issue 注册表中上架的在线房间模版，支持一键安装与滚动分页加载。 */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { DownloadIcon, Loader2Icon, RefreshCwIcon, StoreIcon } from 'lucide-react';
@@ -12,13 +12,14 @@ import {
   listMarketTemplates,
   loadMarketPage,
   MARKET_DOCS_URL,
+  MARKET_PACKAGE_ASSET,
+  releaseAssetUrl,
   type MarketError,
   type MarketTemplateEntry,
 } from '@/lib/market';
 
 interface MarketSectionProps {
   onInstalled: (templateId: string) => void;
-  onError: (message: string) => void;
   /** 已加载的市场条目数变化时上报（用于分类 tab 计数）。 */
   onEntriesChange?: (count: number) => void;
 }
@@ -37,7 +38,7 @@ function badgeClass(badge: string): string {
     : 'bg-primary-bright/15 text-primary-bright';
 }
 
-export function MarketSection({ onInstalled, onError, onEntriesChange }: MarketSectionProps) {
+export function MarketSection({ onInstalled, onEntriesChange }: MarketSectionProps) {
   const intl = useIntl();
   const [state, setState] = useState<MarketViewState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,7 @@ export function MarketSection({ onInstalled, onError, onEntriesChange }: MarketS
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [installedRefs, setInstalledRefs] = useState<Set<string>>(new Set());
   const [installingRef, setInstallingRef] = useState<string | null>(null);
+  const [installErrors, setInstallErrors] = useState<Record<string, string>>({});
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -110,12 +112,17 @@ export function MarketSection({ onInstalled, onError, onEntriesChange }: MarketS
 
   async function install(entry: MarketTemplateEntry): Promise<void> {
     setInstallingRef(entry.ref);
+    setInstallErrors((previous) => {
+      const next = { ...previous };
+      delete next[entry.ref];
+      return next;
+    });
     try {
       const id = await installMarketTemplate(entry);
       setInstalledRefs(await listInstalledMarketRefs());
       onInstalled(id);
     } catch (reason) {
-      onError(formatResolveError(intl, reason));
+      setInstallErrors((previous) => ({ ...previous, [entry.ref]: formatResolveError(intl, reason) }));
     } finally {
       setInstallingRef(null);
     }
@@ -179,59 +186,89 @@ export function MarketSection({ onInstalled, onError, onEntriesChange }: MarketS
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] md:gap-[18px]">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-[18px]">
             {entries.map((entry) => {
               const installed = installedRefs.has(entry.ref);
               const installing = installingRef === entry.ref;
               const unavailable = Boolean(entry.manifestError);
+              const installError = installErrors[entry.ref];
               return (
                 <div
                   key={entry.ref}
-                  className="flex flex-col gap-2 rounded-[18px] border border-border bg-surface p-[18px] shadow-[0_10px_28px_rgba(91,72,15,0.07)]"
+                  className="relative flex flex-col items-stretch overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_10px_28px_rgba(91,72,15,0.07)] transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-[3px] hover:border-border-strong hover:shadow-[0_20px_46px_rgba(91,72,15,0.16)]"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <b className="text-sm md:text-base">{entry.manifest?.name ?? entry.ref}</b>
-                    {entry.badges.length > 0 && (
-                      <span className="flex flex-none gap-1.5">
-                        {entry.badges.map((badge) => (
-                          <span
-                            key={badge}
-                            className={cn('rounded-full px-2.5 py-[3px] text-[10px] font-bold', badgeClass(badge))}
-                          >
-                            {intl.formatMessage({ id: `editor.market.badges.${badge}` })}
-                          </span>
-                        ))}
+                  <span
+                    className="relative block aspect-[16/10] w-full bg-[linear-gradient(135deg,rgba(155,113,0,0.22),rgba(139,92,246,0.18)_55%,rgba(81,219,147,0.2))] bg-cover bg-center"
+                    aria-hidden="true"
+                    style={entry.cover ? { backgroundImage: `url(${entry.cover})` } : undefined}
+                  >
+                    {installing && (
+                      <span className="absolute inset-0 z-[1] flex items-center justify-center gap-2 bg-black/45 text-[11px] font-semibold text-white">
+                        <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+                        <FormattedMessage id="editor.market.installing" />
                       </span>
                     )}
-                  </div>
-                  <small className="text-xs font-medium leading-[1.55] text-muted-foreground">
-                    {entry.manifestError
-                      ? intl.formatMessage({ id: `editor.market.${entry.manifestError === 'MANIFEST_INVALID' ? 'manifestInvalid' : 'manifestUnavailable'}` })
-                      : entry.manifest?.description ?? ''}
-                  </small>
-                  <a
-                    className="mt-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                    href={entry.issueUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {entry.ref}
-                  </a>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={unavailable || installingRef !== null}
-                    onClick={() => void install(entry)}
-                  >
-                    <DownloadIcon data-icon="inline-start" />
-                    {installing
-                      ? intl.formatMessage({ id: 'editor.market.installing' })
-                      : installed
-                        ? intl.formatMessage({ id: 'editor.market.reinstall' })
-                        : intl.formatMessage({ id: 'editor.market.install' })}
-                  </Button>
+                  </span>
+                  {entry.badges.length > 0 && (
+                    <span className="absolute top-3 left-3 z-[2] flex gap-1.5">
+                      {entry.badges.map((badge) => (
+                        <span
+                          key={badge}
+                          className={cn('rounded-full px-2.5 py-[3px] text-[10px] font-bold', badgeClass(badge))}
+                        >
+                          {intl.formatMessage({ id: `editor.market.badges.${badge}` })}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  <span className="flex flex-1 flex-col gap-2 px-[13px] pt-3 pb-3.5 md:px-5 md:pt-[18px] md:pb-5">
+                    <b className="text-sm md:text-base">{entry.manifest?.name ?? entry.ref}</b>
+                    <small className="text-xs font-medium leading-[1.55] text-muted-foreground">
+                      {entry.manifestError
+                        ? intl.formatMessage({ id: `editor.market.${entry.manifestError === 'MANIFEST_INVALID' ? 'manifestInvalid' : 'manifestUnavailable'}` })
+                        : entry.manifest?.description ?? ''}
+                    </small>
+                    <span className="mt-auto flex items-center justify-between gap-2 pt-1">
+                      <a
+                        className="min-w-0 truncate text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        href={entry.issueUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {entry.ref}
+                      </a>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-none gap-1.5"
+                        disabled={unavailable || installingRef !== null}
+                        onClick={() => void install(entry)}
+                      >
+                        <DownloadIcon data-icon="inline-start" />
+                        {installed
+                          ? intl.formatMessage({ id: 'editor.market.reinstall' })
+                          : intl.formatMessage({ id: 'editor.market.install' })}
+                      </Button>
+                    </span>
+                    {installError && (
+                      <span className="flex flex-col gap-1.5 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive">
+                        {installError}
+                        <a
+                          className="inline-flex w-max items-center gap-1 font-semibold text-foreground underline-offset-2 hover:underline"
+                          href={releaseAssetUrl(entry, MARKET_PACKAGE_ASSET)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <DownloadIcon className="size-3" aria-hidden="true" />
+                          <FormattedMessage id="editor.market.downloadFallback" />
+                        </a>
+                        <span className="text-muted-foreground">
+                          <FormattedMessage id="editor.market.downloadFallbackHint" />
+                        </span>
+                      </span>
+                    )}
+                  </span>
                 </div>
               );
             })}

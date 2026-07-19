@@ -106,7 +106,7 @@ export default defineRoom({
 </script>
 ```
 
-将三个文件放入 `apps/web/public/rooms/<room-id>/`，或打包为 ZIP 后在 Parti 中导入；也可以按[房间市场](./docs/room-market.md)的格式发布 release 并登记，让其他用户在市场中一键安装。完整开发流程和约束见[房间开发文档](./docs/README.md)。
+将三个文件放入 `apps/web/public/rooms/<room-id>/`，或打包为 ZIP 后在 Parti 中导入；也可以把房间包提交到自己的公开仓库并按[房间市场](./docs/room-market.md)登记，让其他用户在市场中一键安装。完整开发流程和约束见[房间开发文档](./docs/README.md)。
 
 ## 本地开发
 

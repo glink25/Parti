@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import {
+  findPackageDirInPaths,
+  joinPackagePath,
+  jsdelivrFileUrl,
+  jsdelivrTreeUrl,
   marketBadgesFromLabels,
   marketRefString,
+  parseManifestFromIssueBody,
   parseMarketIssueTitle,
+  parsePackageDirFromIssueBody,
+  resolveMarketCover,
   releaseAssetUrl,
 } from './marketFormat';
+
+const VALID_MANIFEST = JSON.stringify({
+  partiVersion: '0.1.0',
+  protocolVersion: 1,
+  id: 'game-a',
+  name: 'Game A',
+  version: '1.0.0',
+  packageMode: 'blob',
+  entry: { ui: 'index.html', worker: 'room.worker.js' },
+});
 
 describe('parseMarketIssueTitle', () => {
   it('parses owner/repo without tag', () => {
@@ -61,5 +78,83 @@ describe('marketRefString', () => {
   it('renders owner/repo with optional tag', () => {
     expect(marketRefString({ owner: 'alice', repo: 'game-a' })).toBe('alice/game-a');
     expect(marketRefString({ owner: 'alice', repo: 'game-a', tag: 'v2' })).toBe('alice/game-a@v2');
+  });
+});
+
+describe('parseManifestFromIssueBody', () => {
+  it('parses the triage-written marker block and package dir', () => {
+    const body = `介绍文字\n\n<!-- parti-room:manifest:start -->\n\`\`\`json\n${VALID_MANIFEST}\n\`\`\`\n<!-- parti-room:manifest:end -->\n<!-- parti-room:package-dir:dist -->`;
+    const result = parseManifestFromIssueBody(body);
+    expect(result).toMatchObject({ manifest: { id: 'game-a' }, packageDir: 'dist' });
+  });
+
+  it('falls back to a parti.room.json fenced block and defaults packageDir to root', () => {
+    const body = `一些说明\n\`\`\`parti.room.json\n${VALID_MANIFEST}\n\`\`\``;
+    const result = parseManifestFromIssueBody(body);
+    expect(result).toMatchObject({ manifest: { id: 'game-a' }, packageDir: '.' });
+  });
+
+  it('reports MANIFEST_UNAVAILABLE when no manifest is present', () => {
+    expect(parseManifestFromIssueBody(undefined)).toEqual({ manifestError: 'MANIFEST_UNAVAILABLE' });
+    expect(parseManifestFromIssueBody('没有清单')).toEqual({ manifestError: 'MANIFEST_UNAVAILABLE' });
+  });
+
+  it('reports MANIFEST_INVALID for broken JSON or failed validation', () => {
+    const broken = `<!-- parti-room:manifest:start -->\n\`\`\`json\n{oops\n\`\`\`\n<!-- parti-room:manifest:end -->`;
+    expect(parseManifestFromIssueBody(broken)).toEqual({ manifestError: 'MANIFEST_INVALID' });
+    const invalid = `<!-- parti-room:manifest:start -->\n\`\`\`json\n{"id":"x"}\n\`\`\`\n<!-- parti-room:manifest:end -->`;
+    expect(parseManifestFromIssueBody(invalid)).toEqual({ manifestError: 'MANIFEST_INVALID' });
+  });
+});
+
+describe('parsePackageDirFromIssueBody', () => {
+  it('reads the package-dir marker and defaults to root', () => {
+    expect(parsePackageDirFromIssueBody('<!-- parti-room:package-dir:packages/room -->')).toBe('packages/room');
+    expect(parsePackageDirFromIssueBody('no marker')).toBe('.');
+    expect(parsePackageDirFromIssueBody(null)).toBe('.');
+  });
+});
+
+describe('findPackageDirInPaths', () => {
+  it('locates the shallowest parti.room.json directory', () => {
+    expect(findPackageDirInPaths(['parti.room.json', 'index.html'])).toBe('.');
+    expect(findPackageDirInPaths(['dist/parti.room.json', 'dist/index.html', 'src/x.ts'])).toBe('dist');
+    expect(findPackageDirInPaths(['a/b/parti.room.json', 'dist/parti.room.json'])).toBe('dist');
+    expect(findPackageDirInPaths(['README.md'])).toBeNull();
+  });
+});
+
+describe('joinPackagePath', () => {
+  it('joins unless the package dir is the repo root', () => {
+    expect(joinPackagePath('.', 'index.html')).toBe('index.html');
+    expect(joinPackagePath('dist', 'index.html')).toBe('dist/index.html');
+  });
+});
+
+describe('jsdelivr urls', () => {
+  const ref = { owner: 'alice', repo: 'game-a' };
+  it('builds tree and file urls', () => {
+    expect(jsdelivrTreeUrl(ref, 'main')).toBe('https://data.jsdelivr.com/v1/packages/gh/alice/game-a@main');
+    expect(jsdelivrFileUrl(ref, 'v1.0', 'dist/index.html')).toBe(
+      'https://cdn.jsdelivr.net/gh/alice/game-a@v1.0/dist/index.html',
+    );
+  });
+});
+
+describe('resolveMarketCover', () => {
+  const ref = { owner: 'alice', repo: 'game-a' };
+  it('passes through absolute urls', () => {
+    expect(resolveMarketCover(ref, '.', 'https://cdn.example.com/c.png')).toBe('https://cdn.example.com/c.png');
+  });
+  it('resolves relative paths against the package dir and ref', () => {
+    expect(resolveMarketCover(ref, '.', 'cover.png')).toBe(
+      'https://github.com/alice/game-a/raw/HEAD/cover.png',
+    );
+    expect(resolveMarketCover({ ...ref, tag: 'v1.0' }, 'dist', 'cover.png')).toBe(
+      'https://github.com/alice/game-a/raw/v1.0/dist/cover.png',
+    );
+  });
+  it('returns undefined without cover', () => {
+    expect(resolveMarketCover(ref, '.', undefined)).toBeUndefined();
   });
 });

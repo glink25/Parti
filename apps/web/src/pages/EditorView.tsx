@@ -430,13 +430,14 @@ export function EditorView() {
             </div>
           </Tabs>
 
-          {normalizedCategory === 'market' ? (
+          {/* 市场面板始终挂载：进入页面即开始加载，切到市场 tab 时无需等待。 */}
+          <div className={cn(normalizedCategory !== 'market' && 'hidden')}>
             <MarketSection
               onInstalled={(templateId) => void onMarketInstalled(templateId)}
-              onError={setError}
               onEntriesChange={setMarketCount}
             />
-          ) : visibleTemplates.length === 0 && normalizedCategory !== 'all' ? (
+          </div>
+          {normalizedCategory !== 'market' && (visibleTemplates.length === 0 && normalizedCategory !== 'all' ? (
             <div className="flex min-h-48 flex-col items-center justify-center rounded-[20px] border border-dashed border-border-strong bg-card/55 p-8 text-center">
               <SparklesIcon className="mb-3 size-8 text-primary-bright/70" aria-hidden="true" />
               <b><FormattedMessage id="editor.library.emptyTitle" /></b>
@@ -565,7 +566,7 @@ export function EditorView() {
                 );
               })}
             </div>
-          )}
+          ))}
         </section>
       )}
 

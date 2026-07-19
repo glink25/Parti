@@ -105,7 +105,7 @@ export default defineRoom({
 </script>
 ```
 
-Place the files in `apps/web/public/rooms/<room-id>/`, or package them as a ZIP and import it in Parti; or publish a release in the [Room Market](./docs/room-market.en.md) format so other users can install your room in one click. See the [room development documentation](./docs/README.md) for the complete workflow and constraints.
+Place the files in `apps/web/public/rooms/<room-id>/`, or package them as a ZIP and import it in Parti; or commit the package to your own public repository and register it in the [Room Market](./docs/room-market.en.md) so other users can install it in one click. See the [room development documentation](./docs/README.md) for the complete workflow and constraints.
 
 ## Local development
 

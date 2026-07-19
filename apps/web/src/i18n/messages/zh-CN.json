@@ -175,8 +175,10 @@
       "loadingMore": "正在加载更多…",
       "loadMoreRetry": "重试",
       "allLoaded": "已加载全部上架房间",
-      "manifestUnavailable": "产物信息不可用，暂时无法安装",
+      "manifestUnavailable": "产物信息尚未写入，等待登记检查完成",
       "manifestInvalid": "产物信息无效，暂时无法安装",
+      "downloadFallback": "浏览器直接下载",
+      "downloadFallbackHint": "下载完成后，可使用上方「从 ZIP 导入」完成安装。",
       "badges": {
         "beta": "测试版",
         "recommend": "推荐"
@@ -467,7 +469,8 @@
     "error": {
       "REGISTRY_FETCH_FAILED": "房间市场列表获取失败（{status}），请稍后重试。",
       "REGISTRY_RATE_LIMITED": "GitHub API 请求受限，房间市场暂时无法刷新，请稍后再试。",
-      "PACKAGE_DOWNLOAD_FAILED": "房间包下载失败（{status}），请确认该仓库的 release 中包含 parti.room.zip。"
+      "RATE_LIMITED": "GitHub API 请求受限，暂时无法安装，请稍后再试或使用浏览器直接下载。",
+      "PACKAGE_DOWNLOAD_FAILED": "房间包下载失败（{status}），请确认该仓库中包含房间包文件（parti.room.json 与入口文件）。"
     }
   },
   "template": {

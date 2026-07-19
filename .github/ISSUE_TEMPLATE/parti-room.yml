@@ -9,23 +9,28 @@ body:
         感谢分享你的房间！提交前请确认已经阅读发布指南：
         [docs/room-market.md](https://github.com/glink25/Parti/blob/main/docs/room-market.md)。
 
-        **标题格式**：`[parti-room] <owner>/<repo>`（可选 `@<tag>` 锁定某个 release，缺省使用 latest release）。
+        **标题格式**：`[parti-room] <owner>/<repo>`（可选 `@<ref>` 锁定某个 tag 或分支，缺省使用默认分支）。
         例如 `[parti-room] alice/game-a`。
 
-        提交后 triage 机器人会自动检查 release 资产；通过后会打上 `parti-room`（上架）和 `beta` 标签。
+        **要求**：仓库（公开）中必须包含房间包文件——`parti.room.json` 与 manifest 声明的入口文件，
+        位于根目录或某个子目录。市场安装直接读取仓库文件；release 中的 `parti.room.zip` 是可选的
+        存档与手动导入降级通道。
+
+        提交后 triage 机器人会自动检查仓库中的房间包，并把 manifest 写入本 issue 正文
+        （请勿删除正文中的 `parti-room:manifest` 标记区块）；通过后打上 `parti-room`（上架）和 `beta` 标签。
   - type: input
     id: repository
     attributes:
       label: 房间仓库 / Room repository
-      description: 形如 owner/repo。仓库必须公开，且 release 中包含 parti.room.zip 与 parti.room.json。
+      description: 形如 owner/repo。仓库必须公开，且包含 parti.room.json 与入口文件。
       placeholder: alice/game-a
     validations:
       required: true
   - type: input
     id: release-tag
     attributes:
-      label: Release tag（可选 / optional）
-      description: 锁定某个 release tag；留空则始终使用 latest release（推荐）。
+      label: Git ref（可选 / optional）
+      description: 锁定某个 tag 或分支；留空则始终使用默认分支（推荐，更新仓库即更新市场内容）。
       placeholder: v1.0.0
     validations:
       required: false
@@ -42,9 +47,9 @@ body:
     attributes:
       label: 发布前确认 / Pre-flight checklist
       options:
-        - label: release 中包含 parti.room.zip 和 parti.room.json 两个资产，且文件名完全一致
+        - label: 仓库中包含 parti.room.json 和 manifest entry 声明的全部文件，且已在 Parti web 中验证可正常游玩
           required: true
-        - label: parti.room.zip 已在 Parti web 的「从 ZIP 导入」中验证可正常导入和游玩
+        - label: manifest 的 id、name、version、description 填写完整（市场列表直接展示）
           required: true
-        - label: zip 内的 parti.room.json 与单独上传的 parti.room.json 内容一致
-          required: true
+        - label:（建议）release 中包含 parti.room.zip 与 parti.room.json 两个资产，作为存档与手动导入降级
+          required: false
