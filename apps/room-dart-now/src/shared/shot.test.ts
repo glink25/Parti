@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SHOT_FLIGHT_MS } from './constants';
+import { MULTISHOT_MAX, SHOT_FLIGHT_MS } from './constants';
 import type {
   ActiveEvent,
   BoardDart,
@@ -264,7 +264,7 @@ describe('zone effects', () => {
   it('wide / multishot zones set next-turn modifiers', () => {
     for (const [kind, effect, check] of [
       ['wide_zone', 'wide', (p: GamePlayer) => p.nextTurnWidth === 1.5],
-      ['multishot_zone', 'multishot', (p: GamePlayer) => p.nextTurnShots === 3],
+      ['multishot_zone', 'multishot', (p: GamePlayer) => p.nextTurnShots === MULTISHOT_MAX],
     ] as const) {
       const ctx = zoneCtx({ kind, zoneAngle: 1.0 });
       const sim = shootIntoZone(ctx, 1.0);
@@ -279,6 +279,20 @@ describe('zone effects', () => {
       applyShotOutcome(target, 'p1', commit);
       expect(check(target.players.p1)).toBe(true);
     }
+  });
+
+  it('multishot zone honors the worker-ruled shot count (2~3)', () => {
+    const ctx = zoneCtx({ kind: 'multishot_zone', zoneAngle: 1.0 });
+    const sim = shootIntoZone(ctx, 1.0);
+    const commit = commitFromSimulation(ctx.turn!, sim, 1000);
+    const target: ShotApplyTarget = {
+      players: { p1: makePlayer('p1') },
+      darts: [],
+      rotation: { ...BASE_ROTATION },
+      turn: makeTurn(),
+    };
+    applyShotOutcome(target, 'p1', commit, { multishotShots: 2 });
+    expect(target.players.p1.nextTurnShots).toBe(2);
   });
 
   it('shots outside the zone carry no effect', () => {

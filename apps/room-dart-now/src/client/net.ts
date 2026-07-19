@@ -22,7 +22,7 @@ const ZONE_EFFECT_TEXT: Record<ZoneEffect['kind'], string> = {
   heal: '暖炉祝福：+1♥',
   slow: '冰镇时刻：标靶减速',
   wide: '笨重镖区：下回合镖变宽',
-  multishot: '三镖罚单：下回合射 3 镖',
+  multishot: '多镖罚单：下回合连射 2~3 镖',
 };
 
 export interface NetDeps {

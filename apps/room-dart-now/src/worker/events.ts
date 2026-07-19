@@ -8,6 +8,8 @@
 import {
   EVENT_INTERVAL_MAX,
   EVENT_INTERVAL_MIN,
+  MULTISHOT_MAX,
+  MULTISHOT_MIN,
   SPEED_UP_FACTOR,
 } from '../shared/constants';
 import type { EventKind } from '../shared/protocol';
@@ -25,6 +27,11 @@ const EVENT_KINDS: readonly EventKind[] = [
 
 export function rollEventInterval(random: () => number): number {
   return EVENT_INTERVAL_MIN + Math.floor(random() * (EVENT_INTERVAL_MAX - EVENT_INTERVAL_MIN + 1));
+}
+
+/** 多镖罚单裁定：下回合连续发射 2 或 3 支飞镖 */
+export function rollMultishotCount(random: () => number): number {
+  return MULTISHOT_MIN + Math.floor(random() * (MULTISHOT_MAX - MULTISHOT_MIN + 1));
 }
 
 /** 在 advanceTurn 中调用：rotation 已被归一到新时间轴起点（anchorElapsed = 0） */
@@ -64,5 +71,5 @@ export const EVENT_COPY: Record<EventKind, string> = {
   heal_zone: '暖炉祝福',
   slow_zone: '冰镇时刻',
   wide_zone: '笨重镖区',
-  multishot_zone: '三镖罚单',
+  multishot_zone: '多镖罚单',
 };

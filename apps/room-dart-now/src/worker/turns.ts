@@ -8,7 +8,7 @@ import type { GamePlayer, GameState, ShotCommit, TimeoutCommit } from '../shared
 import { angularDistance, clampHealth, rotationAngleAt, turnDurationForRound } from '../shared/rules';
 import { applyShotOutcome, timeoutDamage } from '../shared/shot';
 import type { WorkerContext } from './context';
-import { triggerRandomEvent } from './events';
+import { triggerRandomEvent, rollMultishotCount } from './events';
 
 const WATCHDOG_TIMER = 'turn-watchdog';
 
@@ -136,7 +136,13 @@ export function applyAcceptedShot(ctx: WorkerContext, playerId: string, commit: 
   const turn = state.turn;
   if (!turn) return;
 
-  const effects = applyShotOutcome(state, playerId, commit);
+  const effects = applyShotOutcome(state, playerId, commit, {
+    // 多镖支数由 Worker 随机裁定（2~3），客户端预测值随下回合快照覆盖
+    multishotShots:
+      commit.outcome.zoneEffect?.kind === 'multishot'
+        ? rollMultishotCount(ctx.random)
+        : undefined,
+  });
   state.boardRevision += 1;
 
   // 随机事件节奏：达到 nextEventAt 时置 eventDue，下一回合间隙触发

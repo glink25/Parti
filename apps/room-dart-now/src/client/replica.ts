@@ -456,15 +456,43 @@ export class LocalReplica {
     const { commit } = this.flight;
     this.flight = null;
 
-    const target = {
-      players: this.players,
-      darts: this.darts,
-      rotation: this.rotation,
-      turn: this.turn,
-    };
-    const effects = applyShotOutcome(target, this.myId, commit);
-    this.rotation = target.rotation;
-    if (!commit.outcome.collision) this.predictedIds.add(commit.shotId);
+    // 快照可能已抢先确认这支镖（Worker accept 快于 520ms 飞行）：committed/计分/
+    // 扣血已随快照并入，再次 applyShotOutcome 会重复计数——多镖回合会因此提前
+    // 进入 done，剩余的镖无法出手、回合卡死（回归：三镖回合只能射两镖）
+    const alreadyConfirmed = this.turn.acceptedShotIds.includes(commit.shotId);
+    let effects: AppliedShotEffects;
+    if (alreadyConfirmed) {
+      if (!commit.outcome.collision && !this.darts.some((d) => d.id === commit.shotId)) {
+        this.darts.push({
+          id: commit.shotId,
+          ownerId: this.myId,
+          boardAngle: commit.boardAngle,
+          widthFactor: commit.widthFactor,
+        });
+      }
+      this.rotation = { ...commit.rotationAfter };
+      const me = this.players[this.myId];
+      effects = {
+        playerId: this.myId,
+        collisionTargetId: commit.outcome.collision?.targetShotId ?? null,
+        scoreDelta: commit.outcome.collision ? 0 : commit.outcome.score,
+        zoneEffect: commit.outcome.zoneEffect,
+        healthBefore: me?.health ?? 0,
+        healthAfter: me?.health ?? 0,
+        healthReason: null,
+        eliminated: me?.status === 'eliminated',
+      };
+    } else {
+      const target = {
+        players: this.players,
+        darts: this.darts,
+        rotation: this.rotation,
+        turn: this.turn,
+      };
+      effects = applyShotOutcome(target, this.myId, commit);
+      this.rotation = target.rotation;
+      if (!commit.outcome.collision) this.predictedIds.add(commit.shotId);
+    }
     // 多镖回合里快照可能已抢先包含这支镖（accept 快于 520ms 飞行）——按 id 去重
     const seen = new Set<string>();
     this.darts = this.darts.filter((d) => {

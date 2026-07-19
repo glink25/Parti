@@ -44,5 +44,6 @@ export const SLOW_SPEED_FACTOR = 0.7;
 export const SPEED_UP_FACTOR = 1.5;
 /** wide_zone 命中者下回合镖宽 */
 export const WIDE_WIDTH_FACTOR = 1.5;
-/** multishot_zone 命中者下回合镖数 */
-export const MULTISHOT_COUNT = 3;
+/** multishot_zone 命中者下回合镖数范围（含端点），Worker 在命中时随机裁定 */
+export const MULTISHOT_MIN = 2;
+export const MULTISHOT_MAX = 3;

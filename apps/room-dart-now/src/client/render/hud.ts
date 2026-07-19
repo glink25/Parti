@@ -11,7 +11,7 @@ export const EVENT_TEXT: Record<EventKind, string> = {
   heal_zone: '暖炉祝福',
   slow_zone: '冰镇时刻',
   wide_zone: '笨重镖区',
-  multishot_zone: '三镖罚单',
+  multishot_zone: '多镖罚单',
 };
 
 export interface HudView {

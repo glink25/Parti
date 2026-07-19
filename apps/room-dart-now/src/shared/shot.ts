@@ -10,7 +10,7 @@ import {
   SHOT_FLIGHT_MS,
   SLOW_SPEED_FACTOR,
   TIMING_TOLERANCE_MS,
-  MULTISHOT_COUNT,
+  MULTISHOT_MAX,
   WIDE_WIDTH_FACTOR,
 } from './constants';
 import type {
@@ -245,11 +245,15 @@ export interface AppliedShotEffects {
  * 规则变化只需改这里（消除双份逻辑漂移）。
  *
  * 前置：commit 已通过 validateShotCommit（Worker）或来自本地 simulateShot（预测）。
+ *
+ * opts.multishotShots：多镖罚单的权威裁定支数（2~3），由 Worker 在命中时随机
+ * 给出；客户端预测不传，先按上限 MULTISHOT_MAX 展示，下一回合快照会覆盖为权威值。
  */
 export function applyShotOutcome(
   target: ShotApplyTarget,
   playerId: string,
   commit: ShotCommit,
+  opts?: { multishotShots?: number },
 ): AppliedShotEffects {
   const player = target.players[playerId];
   if (!player || !target.turn) {
@@ -296,7 +300,7 @@ export function applyShotOutcome(
         player.nextTurnWidth = WIDE_WIDTH_FACTOR;
         break;
       case 'multishot':
-        player.nextTurnShots = MULTISHOT_COUNT;
+        player.nextTurnShots = opts?.multishotShots ?? MULTISHOT_MAX;
         break;
       case 'slow':
         // 减速由 commit.rotationAfter 体现，无额外状态

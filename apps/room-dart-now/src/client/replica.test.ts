@@ -357,6 +357,57 @@ describe('multi-shot turn sync', () => {
     expect(Math.abs(rep.logicalNow(600) - commit1.impactElapsed)).toBeLessThan(100);
   });
 
+  it('shooter: snapshot-confirmed shots land without double counting (3-shot turn completes)', () => {
+    const hooks = makeHooks();
+    const rep = new LocalReplica('p1', () => 2, hooks);
+
+    // 我自己的三镖回合
+    const state1 = makeState(makeTurn({ required: 3 }));
+    rep.handleSnapshot(state1, 0);
+    rep.tick(REBASE_MS + 10);
+    expect(rep.phase).toBe('active');
+
+    // 每支镖都模拟「Worker accept 快于飞行」：快照先于落定确认该镖
+    const dartIds: string[] = [];
+    const darts: GameState['darts'] = [];
+    let rotation = state1.rotation;
+    let fireAt = 1000;
+    for (let i = 1; i <= 3; i += 1) {
+      expect(rep.shoot(fireAt)).toBe(true);
+      const commit = hooks.commitShots[i - 1];
+      dartIds.push(commit.shotId);
+      darts.push({
+        id: commit.shotId,
+        ownerId: 'p1',
+        boardAngle: commit.boardAngle,
+        widthFactor: 1,
+      });
+      rotation = commit.rotationAfter;
+
+      // Worker 接受后的同回合快照（镖还在飞）
+      const midTurn = makeTurn({ required: 3 });
+      midTurn.committed = i;
+      midTurn.lastAcceptedSeq = i;
+      midTurn.acceptedShotIds = [...dartIds];
+      midTurn.logicalElapsed = commit.impactElapsed;
+      rep.handleSnapshot(
+        makeState(midTurn, { rotation, darts: darts.map((d) => ({ ...d })) }),
+        fireAt + 50,
+      );
+
+      // 落定：committed 不得重复计数（旧实现会 +2，第三镖前回合就被误判 done）
+      rep.tick(fireAt + SHOT_FLIGHT_MS + 10);
+      expect(rep.turn?.committed).toBe(i);
+      expect(rep.darts.filter((d) => d.id === commit.shotId)).toHaveLength(1);
+
+      fireAt += SHOT_FLIGHT_MS + 500;
+    }
+
+    // 三镖射满：回合才结束，等待权威快照推进到下一玩家
+    expect(rep.phase).toBe('done');
+    expect(rep.darts).toHaveLength(3);
+  });
+
   it('shooter: early same-turn snapshot does not corrupt the clock, second commit validates', () => {
     const hooks = makeHooks();
     const rep = new LocalReplica('p1', () => 2, hooks);
