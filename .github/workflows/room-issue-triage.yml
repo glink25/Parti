@@ -21,6 +21,8 @@ jobs:
       - name: Validate room package and embed manifest into issue body
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # gh 的 issue/label 命令需要目标仓库上下文；没有 checkout，用 GH_REPO 显式指定。
+          GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
