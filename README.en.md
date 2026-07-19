@@ -15,7 +15,7 @@ Parti is a web platform and runtime for creating and playing multiplayer interac
 
 ## What Parti provides
 
-- **Create and import**: Start with a blank room or a built-in template, edit room files in the editor; generate a room with AI and import it in one click; or import a room package from ZIP or GitHub.
+- **Create and import**: Start with a blank room or a built-in template, edit room files in the editor; generate a room with AI and import it in one click; or import a room package from ZIP or GitHub. You can also browse the "Room Market" tab and install community rooms published on GitHub in one click.
 - **Instant multiplayer**: A host creates a room in the browser and connects to players over WebRTC; room code can be distributed peer to peer by the host.
 - **Simple invitations**: Share a link or QR code, protect a room with a four-digit password, or optionally publish it in the online lobby.
 - **Gameplay-first APIs**: Creators submit actions and update authoritative state; the runtime handles the protocol, full-state snapshots, and event broadcasts.
@@ -105,7 +105,7 @@ export default defineRoom({
 </script>
 ```
 
-Place the files in `apps/web/public/rooms/<room-id>/`, or package them as a ZIP and import it in Parti. See the [room development documentation](./docs/README.md) for the complete workflow and constraints.
+Place the files in `apps/web/public/rooms/<room-id>/`, or package them as a ZIP and import it in Parti; or publish a release in the [Room Market](./docs/room-market.en.md) format so other users can install your room in one click. See the [room development documentation](./docs/README.md) for the complete workflow and constraints.
 
 ## Local development
 
@@ -128,6 +128,9 @@ Copy [`.env.example`](./.env.example) and set the values you need:
 ```bash
 # Enable the public online lobby
 VITE_LOBBY_SERVICE_URL=https://<project-ref>.supabase.co/functions/v1/parti-lobby
+
+# Override the Room Market's GitHub issue registry (default glink25/Parti)
+VITE_MARKET_REGISTRY=<owner>/<repo>
 
 # Optionally inject a GA4 gtag HTML snippet at build time
 GA_MEASUREMENT_SNIPPET=<script>...</script>
@@ -170,6 +173,7 @@ The runtime follows these core principles: Runtime First, Protocol Stable, User 
 | [Worker API](./docs/worker-api.md) | `defineRoom`, actions, context, and lifecycle |
 | [Client API](./docs/client-api.md) | The `parti.*` API available inside an iframe |
 | [Manifest](./docs/manifest.md) | `parti.room.json` fields and constraints |
+| [Room Market](./docs/room-market.en.md) | Publishing flow, `parti.room.zip` packaging format, and label rules |
 | [Host Runtime](./docs/host-runtime.md) | Admission, capacity, recovery, and security boundaries |
 | [Protocol reference](./docs/protocol-reference.md) | Low-level messages, synchronization, and error codes |
 | [Lobby service](./docs/lobby-service.md) | REST API, leases, deployment, and CORS |
