@@ -94,8 +94,8 @@ cp dist/parti.room.json ./parti.room.json
   - 例：`[parti-room] alice/game-a`
   - 锁定 git ref：`[parti-room] alice/game-a@parti-package`。构建型房间推荐使用专用
     `parti-package` 分支；缺省时读取默认分支。
-  - ref 同时约束 Release 降级：缺省使用 latest release；指定 `@ref` 时只检查同名
-    release tag，绝不会静默切换到其他 latest 版本。
+  - Release 人工降级按 ref 类型匹配：缺省分支或显式分支（如 `parti-package`）使用
+    latest release；显式 tag（如 `v1.2.0`）只检查同名 release，绝不跨版本切换。
 - 正文按模板填写仓库地址、游戏简介、玩家人数等。
 
 ### 2.5 等待审核打标
@@ -137,9 +137,9 @@ cp dist/parti.room.json ./parti.room.json
 1. 将完整 `dist/` 强制更新到专用 `parti-package` 分支，供市场一键安装；
 2. 创建或更新对应 tag 的 Release，并上传 `parti.room.zip` / `parti.room.json` 作人工兜底。
 
-登记 issue 标题使用 `[parti-room] owner/repo@parti-package`。由于显式 `@ref` 只匹配
-同名 Release tag，常规 `parti-package` 分支模式下的版本 Release 主要作为仓库 Releases
-页面中的人工存档；它不会被错误关联成该分支的自动降级版本。
+登记 issue 标题使用 `[parti-room] owner/repo@parti-package`。triage 会把该分支识别为
+滚动的一键安装源，并校验 latest release 中的 `parti.room.zip` 作为人工下载兜底；Release
+仍使用正常的版本 tag（如 `v1.2.0`），不需要创建名为 `parti-package` 的 Release。
 
 ```yaml
 name: release

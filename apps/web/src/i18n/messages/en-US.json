@@ -483,6 +483,7 @@
       "GITHUB_REF_NOT_FOUND": "The branch or tag in this GitHub URL does not exist.",
       "GITHUB_RATE_LIMITED": "GitHub API rate limited (60/hour unauthenticated). Please try again later.",
       "GITHUB_TREE_FAILED": "Failed to read the GitHub repository tree ({status}).",
+      "GITHUB_TREE_FAILED_UNKNOWN": "Failed to read the GitHub repository tree. Check your connection and try again.",
       "GITHUB_TREE_TRUNCATED": "GitHub truncated the repository tree, so a complete room package cannot be located safely.",
       "GITHUB_DOWNLOAD_FAILED": "Failed to download a room package file from GitHub: {path}",
       "GITHUB_DIR_READ_FAILED": "Failed to read GitHub directory ({status}).",
@@ -490,7 +491,7 @@
       "DOWNLOAD_FAILED": "Failed to download file: {path}",
       "RELEASE_NOT_FOUND": "No matching GitHub release was found.",
       "RELEASE_ASSET_MISSING": "The release does not contain parti.room.zip.",
-      "RELEASE_MANUAL_REQUIRED": "The branch does not contain a complete one-click package, but a matching release ZIP exists. Download it and use “Import from ZIP”."
+      "RELEASE_MANUAL_REQUIRED": "One-click import from the branch failed. Try downloading the Release ZIP, then install it with “Import from ZIP”."
     }
   },
   "market": {

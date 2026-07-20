@@ -3,6 +3,7 @@ import {
   joinPackagePath,
   marketBadgesFromLabels,
   marketRefString,
+  marketReleaseUrl,
   parseManifestFromIssueBody,
   parseMarketSourceFromIssueBody,
   parseMarketIssueTitle,
@@ -68,6 +69,39 @@ describe('releaseAssetUrl', () => {
   it('uses the tagged release when a tag is given', () => {
     expect(releaseAssetUrl({ owner: 'alice', repo: 'game-a', tag: 'v1.0' }, 'parti.room.json')).toBe(
       'https://github.com/alice/game-a/releases/download/v1.0/parti.room.json',
+    );
+  });
+});
+
+describe('marketReleaseUrl', () => {
+  const ref = { owner: 'alice', repo: 'game-a' };
+
+  it('uses validated release metadata when available', () => {
+    expect(marketReleaseUrl({
+      schema: 1,
+      primary: { kind: 'git-folder', ref: 'parti-package', refKind: 'branch', packageDir: '.' },
+      fallback: { kind: 'release-zip', tag: 'v2', asset: 'parti.room.zip', url: 'https://x/v2.zip', manual: true },
+    }, ref)).toBe('https://x/v2.zip');
+  });
+
+  it('gives legacy entries and branch sources a latest-release manual fallback', () => {
+    expect(marketReleaseUrl(undefined, ref)).toBe(
+      'https://github.com/alice/game-a/releases/latest/download/parti.room.zip',
+    );
+    expect(marketReleaseUrl({
+      schema: 1,
+      primary: { kind: 'git-folder', ref: 'parti-package', packageDir: '.' },
+    }, { ...ref, tag: 'parti-package' })).toBe(
+      'https://github.com/alice/game-a/releases/latest/download/parti.room.zip',
+    );
+  });
+
+  it('locks a tagged git source to the same release tag', () => {
+    expect(marketReleaseUrl({
+      schema: 1,
+      primary: { kind: 'git-folder', ref: 'v1.0', refKind: 'tag', packageDir: '.' },
+    }, { ...ref, tag: 'v1.0' })).toBe(
+      'https://github.com/alice/game-a/releases/download/v1.0/parti.room.zip',
     );
   });
 });

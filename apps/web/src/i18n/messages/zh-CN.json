@@ -483,6 +483,7 @@
       "GITHUB_REF_NOT_FOUND": "GitHub 地址中的分支或 tag 不存在。",
       "GITHUB_RATE_LIMITED": "GitHub API 请求受限（未认证限速 60 次/时），请稍后再试。",
       "GITHUB_TREE_FAILED": "读取 GitHub 仓库文件树失败（{status}）。",
+      "GITHUB_TREE_FAILED_UNKNOWN": "读取 GitHub 仓库文件树失败，请检查网络后重试。",
       "GITHUB_TREE_TRUNCATED": "GitHub 仓库文件树被截断，无法安全定位房间包。",
       "GITHUB_DOWNLOAD_FAILED": "从 GitHub 下载房间包文件失败：{path}",
       "GITHUB_DIR_READ_FAILED": "读取 GitHub 目录失败（{status}）。",
@@ -490,7 +491,7 @@
       "DOWNLOAD_FAILED": "下载文件失败：{path}",
       "RELEASE_NOT_FOUND": "未找到匹配的 GitHub Release。",
       "RELEASE_ASSET_MISSING": "Release 中没有 parti.room.zip。",
-      "RELEASE_MANUAL_REQUIRED": "分支中没有可一键安装的完整产物，但找到了匹配的 Release ZIP；请下载后使用「从 ZIP 导入」。"
+      "RELEASE_MANUAL_REQUIRED": "无法从分支一键导入；可尝试下载 Release ZIP，再使用「从 ZIP 导入」完成安装。"
     }
   },
   "market": {

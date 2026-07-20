@@ -12,6 +12,9 @@ export function formatLobbyStatus(intl: IntlShape, status: LobbyStatusKey): stri
 }
 
 export function formatImportError(intl: IntlShape, error: ImportRoomError): string {
+  if (error.code === 'GITHUB_TREE_FAILED' && error.status === undefined) {
+    return intl.formatMessage({ id: 'import.error.GITHUB_TREE_FAILED_UNKNOWN' });
+  }
   return intl.formatMessage(
     { id: `import.error.${error.code}` },
     { status: error.status ?? '', path: error.path ?? '' },

@@ -192,7 +192,7 @@ export function MarketSection({ onInstalled, onEntriesChange }: MarketSectionPro
               const unavailable = Boolean(entry.manifestError);
               const installError = installErrors[entry.ref];
               const releaseOnly = entry.source?.primary.kind === 'release-zip';
-              const fallbackUrl = marketReleaseUrl(entry.source);
+              const fallbackUrl = marketReleaseUrl(entry.source, entry);
               return (
                 <div
                   key={entry.ref}

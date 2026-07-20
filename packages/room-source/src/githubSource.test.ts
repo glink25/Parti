@@ -1,7 +1,13 @@
 import JSZip from 'jszip';
 import { describe, expect, it, vi } from 'vitest';
 import { RoomSourceError } from './packageSource';
-import { GitHubSourceClient, parseGitHubRoomUrl, resolveForTriage, resolveGitHubImport } from './githubSource';
+import {
+  GitHubSourceClient,
+  parseGitHubRoomUrl,
+  releaseDownloadUrl,
+  resolveForTriage,
+  resolveGitHubImport,
+} from './githubSource';
 
 const manifest = {
   partiVersion: '0.1.0', protocolVersion: 1, id: 'room', name: 'Room', version: '1.0.0',
@@ -41,6 +47,21 @@ describe('GitHub room URLs', () => {
 
 describe('GitHub repository trees', () => {
   const repo = { owner: 'a', repo: 'room' };
+
+  it('calls the native global fetch with the correct receiver', async () => {
+    const originalFetch = globalThis.fetch;
+    const receiverFetch = vi.fn(function (this: typeof globalThis) {
+      if (this !== globalThis) throw new TypeError('invalid fetch receiver');
+      return Promise.resolve(new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 }));
+    });
+    globalThis.fetch = receiverFetch as typeof fetch;
+    try {
+      await expect(new GitHubSourceClient().defaultBranch(repo)).resolves.toBe('main');
+      expect(receiverFetch).toHaveBeenCalledOnce();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 
   it('uses the jsDelivr tree when available', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -96,6 +117,50 @@ describe('GitHub release fallback', () => {
     await expect(resolveGitHubImport('https://github.com/a/room', client)).rejects.toMatchObject({
       code: 'RELEASE_MANUAL_REQUIRED', releaseUrl: 'https://example/room.zip',
     });
+  });
+
+  it('synthesizes a navigable fallback when release discovery fails', async () => {
+    const client = {
+      resolveUrl: vi.fn().mockResolvedValue({
+        owner: 'a', repo: 'room', ref: 'parti-package', scope: '.', explicitRef: true, refKind: 'branch',
+      }),
+      resolveRepository: vi.fn().mockRejectedValue(new Error('missing')),
+      releaseFallback: vi.fn().mockRejectedValue(new TypeError('network failed')),
+    } as unknown as GitHubSourceClient;
+    await expect(resolveGitHubImport('https://github.com/a/room/tree/parti-package', client)).rejects.toMatchObject({
+      code: 'RELEASE_MANUAL_REQUIRED',
+      releaseUrl: 'https://github.com/a/room/releases/latest/download/parti.room.zip',
+    });
+  });
+
+  it('uses latest for a branch and the matching release for a tag during triage', async () => {
+    const repository = {
+      request: {},
+      candidate: { manifestPath: 'parti.room.json', packageDir: '.', manifest },
+      input: { manifest, files: {} },
+    };
+    for (const [ref, refKind, expectedReleaseRef] of [
+      ['parti-package', 'branch', undefined],
+      ['v1.2.0', 'tag', 'v1.2.0'],
+    ] as const) {
+      const client = {
+        resolveRefKind: vi.fn().mockResolvedValue(refKind),
+        resolveRepository: vi.fn().mockResolvedValue(repository),
+        releaseFallback: vi.fn().mockResolvedValue(null),
+      } as unknown as GitHubSourceClient;
+      const result = await resolveForTriage({ owner: 'a', repo: 'room', ref }, client, async () => releaseZip());
+      expect(client.releaseFallback).toHaveBeenCalledWith(expect.anything(), expectedReleaseRef);
+      expect(result.metadata.primary).toMatchObject({ kind: 'git-folder', ref, refKind });
+    }
+  });
+
+  it('builds direct latest and tagged download URLs without an API request', () => {
+    expect(releaseDownloadUrl({ owner: 'a', repo: 'room' })).toBe(
+      'https://github.com/a/room/releases/latest/download/parti.room.zip',
+    );
+    expect(releaseDownloadUrl({ owner: 'a', repo: 'room' }, 'v1')).toBe(
+      'https://github.com/a/room/releases/download/v1/parti.room.zip',
+    );
   });
 
   it('allows triage to list a valid release-only package', async () => {

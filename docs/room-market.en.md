@@ -109,8 +109,9 @@ the **"Publish a room / 发布房间到市场"** template:
   - Pin a git ref: `[parti-room] alice/game-a@parti-package`. A dedicated
     `parti-package` branch is recommended for built rooms; without `@ref`, the default
     branch is used.
-  - The ref also constrains release fallback: without a ref triage checks the latest
-    release; with `@ref`, only a release tag with the same name is accepted.
+  - Release fallback follows the ref kind: the default branch or an explicit branch
+    such as `parti-package` uses the latest release; an explicit tag such as `v1.2.0`
+    only accepts the release with that same tag.
 - Fill in the repository URL, a short game description, player counts, etc.
 
 ### 2.5 Review and labels
@@ -154,6 +155,8 @@ the **"Publish a room / 发布房间到市场"** template:
 For rooms with a build step, a `v*` tag builds once, then updates the dedicated
 `parti-package` branch for one-click installation and creates or updates a Release with
 the ZIP/manual fallback assets. Register with `[parti-room] owner/repo@parti-package`.
+Triage treats that branch as a rolling install source and validates the latest versioned
+Release as its fallback; no Release named `parti-package` is needed.
 
 ```yaml
 name: release

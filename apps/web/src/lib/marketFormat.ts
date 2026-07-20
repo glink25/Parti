@@ -15,7 +15,7 @@ export interface MarketRepoRef {
   tag?: string;
 }
 
-/** 解析 issue 标题：`[parti-room] owner/repo` 或 `[parti-room] owner/repo@tag`。 */
+/** 解析 issue 标题：`[parti-room] owner/repo` 或 `[parti-room] owner/repo@ref`。 */
 export function parseMarketIssueTitle(title: string): MarketRepoRef | null {
   const parsed = parseMarketRepositoryTitle(title);
   if (!parsed) return null;
@@ -74,6 +74,7 @@ export function parseMarketSourceFromIssueBody(
     }
     if (value.primary.kind === 'git-folder') {
       if (!value.primary.ref || !value.primary.packageDir) return undefined;
+      if (value.primary.refKind && value.primary.refKind !== 'branch' && value.primary.refKind !== 'tag') return undefined;
     } else if (!value.primary.tag || !value.primary.url || value.primary.asset !== MARKET_PACKAGE_ASSET) {
       return undefined;
     }
@@ -138,7 +139,16 @@ export function resolveMarketCover(
 }
 
 /** 来源标记中已由 triage 校验过的 release ZIP 下载地址。 */
-export function marketReleaseUrl(source: MarketRoomSourceMetadata | undefined): string | undefined {
-  if (!source) return undefined;
-  return source.primary.kind === 'release-zip' ? source.primary.url : source.fallback?.url;
+export function marketReleaseUrl(
+  source: MarketRoomSourceMetadata | undefined,
+  ref: MarketRepoRef,
+): string {
+  if (!source) return releaseAssetUrl(ref, MARKET_PACKAGE_ASSET);
+  if (source.primary.kind === 'release-zip') return source.primary.url;
+  if (source.fallback) return source.fallback.url;
+  // 旧版 git source 标记没有 refKind；专用发布源通常是分支，按 latest 兜底。
+  return releaseAssetUrl(
+    source.primary.refKind === 'tag' ? { ...ref, tag: source.primary.ref } : { owner: ref.owner, repo: ref.repo },
+    MARKET_PACKAGE_ASSET,
+  );
 }

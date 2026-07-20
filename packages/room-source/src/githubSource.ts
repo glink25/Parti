@@ -40,7 +40,10 @@ export interface ResolvedGitHubRoomRequest {
   ref: string;
   scope: string;
   explicitRef: boolean;
+  refKind?: GitHubRefKind;
 }
+
+export type GitHubRefKind = 'branch' | 'tag';
 
 export interface GitHubReleaseAsset {
   name: string;
@@ -59,6 +62,8 @@ export interface GitFolderRoomSource {
   kind: 'git-folder';
   ref: string;
   packageDir: string;
+  /** 新标记会写入 ref 类型；缺失表示旧版标记。 */
+  refKind?: GitHubRefKind;
 }
 
 export interface ReleaseZipRoomSource {
@@ -154,7 +159,8 @@ export class GitHubSourceClient {
   private readonly apiFirst: boolean;
 
   constructor(options: GitHubSourceClientOptions = {}) {
-    this.request = options.fetch ?? fetch;
+    // WebKit 要求原生 Window.fetch 以 Window 为 receiver。不要保存未绑定的方法引用。
+    this.request = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.token = options.token;
     this.apiFirst = options.apiFirst ?? false;
   }
@@ -171,15 +177,19 @@ export class GitHubSourceClient {
     return data.default_branch;
   }
 
-  async refExists(repo: GitHubRepoRef, ref: string): Promise<boolean> {
-    for (const namespace of ['heads', 'tags']) {
+  async resolveRefKind(repo: GitHubRepoRef, ref: string): Promise<GitHubRefKind | null> {
+    for (const [namespace, kind] of [['heads', 'branch'], ['tags', 'tag']] as const) {
       const url = `https://api.github.com/repos/${repo.owner}/${repo.repo}/git/ref/${namespace}/${encodeURIComponent(ref)}`;
       const response = await this.request(url, { headers: apiHeaders(this.token) });
       if (rateLimited(response)) throw new RoomSourceError('GITHUB_RATE_LIMITED', { status: response.status });
-      if (response.ok) return true;
+      if (response.ok) return kind;
       if (response.status !== 404) throw new RoomSourceError('GITHUB_TREE_FAILED', { status: response.status });
     }
-    return false;
+    return null;
+  }
+
+  async refExists(repo: GitHubRepoRef, ref: string): Promise<boolean> {
+    return (await this.resolveRefKind(repo, ref)) !== null;
   }
 
   async resolveUrl(value: string): Promise<ResolvedGitHubRoomRequest> {
@@ -191,11 +201,13 @@ export class GitHubSourceClient {
         ref: await this.defaultBranch(parsed),
         scope: '.',
         explicitRef: false,
+        refKind: 'branch',
       };
     }
     for (let length = parsed.refAndPath.length; length >= 1; length -= 1) {
       const ref = parsed.refAndPath.slice(0, length).join('/');
-      if (!(await this.refExists(parsed, ref))) continue;
+      const refKind = await this.resolveRefKind(parsed, ref);
+      if (!refKind) continue;
       const remainder = parsed.refAndPath.slice(length);
       const scopeParts = parsed.kind === 'blob' ? remainder.slice(0, -1) : remainder;
       return {
@@ -204,6 +216,7 @@ export class GitHubSourceClient {
         ref,
         scope: scopeParts.join('/') || '.',
         explicitRef: true,
+        refKind,
       };
     }
     throw new RoomSourceError('GITHUB_REF_NOT_FOUND');
@@ -317,8 +330,15 @@ export function releaseSource(fallback: GitHubReleaseFallback): ReleaseZipRoomSo
   };
 }
 
-export function gitSource(ref: string, packageDir: string): GitFolderRoomSource {
-  return { kind: 'git-folder', ref, packageDir };
+export function releaseDownloadUrl(repo: GitHubRepoRef, tag?: string): string {
+  const base = `https://github.com/${repo.owner}/${repo.repo}/releases`;
+  return tag
+    ? `${base}/download/${encodeURIComponent(tag)}/${ROOM_RELEASE_ASSET}`
+    : `${base}/latest/download/${ROOM_RELEASE_ASSET}`;
+}
+
+export function gitSource(ref: string, packageDir: string, refKind?: GitHubRefKind): GitFolderRoomSource {
+  return { kind: 'git-folder', ref, packageDir, ...(refKind ? { refKind } : {}) };
 }
 
 export interface TriageResolution {
@@ -336,6 +356,8 @@ export async function resolveForTriage(
 ): Promise<TriageResolution> {
   const explicitRef = repo.ref;
   const ref = explicitRef ?? await client.defaultBranch(repo);
+  const refKind = explicitRef ? await client.resolveRefKind(repo, explicitRef) : 'branch';
+  if (!refKind) throw new RoomSourceError('GITHUB_REF_NOT_FOUND');
   let repository: ResolvedRepositoryPackage | undefined;
   let gitError: RoomSourceError | undefined;
   try {
@@ -348,7 +370,7 @@ export async function resolveForTriage(
   let releaseInput: RoomPackageInput | undefined;
   let releaseError: RoomSourceError | undefined;
   try {
-    fallback = await client.releaseFallback(repo, explicitRef);
+    fallback = await client.releaseFallback(repo, refKind === 'tag' ? ref : undefined);
     if (fallback) {
       releaseInput = (await resolveRoomPackageZip(await downloadRelease(fallback.asset))).input;
     }
@@ -362,7 +384,7 @@ export async function resolveForTriage(
       manifest: repository.input.manifest as RoomManifest,
       metadata: {
         schema: 1,
-        primary: gitSource(ref, repository.candidate.packageDir),
+        primary: gitSource(ref, repository.candidate.packageDir, refKind),
         ...(fallback && releaseInput ? { fallback: releaseSource(fallback) } : {}),
       },
       ...(releaseError ? { releaseError } : {}),
@@ -398,10 +420,20 @@ export async function resolveGitHubImport(
   try {
     return await client.resolveRepository(request);
   } catch (reason) {
-    const fallback = await client.releaseFallback(request, request.explicitRef ? request.ref : undefined);
-    if (fallback) {
-      throw new RoomSourceError('RELEASE_MANUAL_REQUIRED', { releaseUrl: fallback.asset.url });
+    const releaseTag = request.refKind === 'tag' ? request.ref : undefined;
+    try {
+      const fallback = await client.releaseFallback(request, releaseTag);
+      if (fallback) {
+        throw new RoomSourceError('RELEASE_MANUAL_REQUIRED', { releaseUrl: fallback.asset.url });
+      }
+    } catch (fallbackReason) {
+      if (fallbackReason instanceof RoomSourceError && fallbackReason.code === 'RELEASE_MANUAL_REQUIRED') {
+        throw fallbackReason;
+      }
     }
-    throw reason;
+    // Release API 可能限流或跨域失败；浏览器导航仍可走 GitHub 的直接下载重定向。
+    throw new RoomSourceError('RELEASE_MANUAL_REQUIRED', {
+      releaseUrl: releaseDownloadUrl(request, releaseTag),
+    });
   }
 }

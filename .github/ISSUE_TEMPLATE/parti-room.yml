@@ -15,7 +15,8 @@ body:
         **要求**：仓库（公开）中必须包含房间包文件——`parti.room.json` 与 manifest 声明的入口文件，
         位于根目录或某个子目录。构建型房间推荐由 GitHub Actions 将完整产物发布到
         `parti-package` 分支，标题使用 `@parti-package`。release 中的 `parti.room.zip`
-        只作为下载后手动导入的兜底；只有 release 合法时会以“仅 ZIP”方式降级上架。
+        只作为下载后手动导入的兜底：分支源匹配 latest release，tag 源匹配同名 release；
+        不需要创建名为 `parti-package` 的 release。只有 release 合法时会以“仅 ZIP”方式降级上架。
 
         提交后 triage 机器人会自动检查仓库分支与 Release ZIP，并把 manifest、安装源元数据
         和可点击的房间包源码分支链接写入本 issue 正文；通过后打上 `parti-room`（上架）和 `beta` 标签。
