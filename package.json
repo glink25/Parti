@@ -2,6 +2,7 @@
   "name": "parti",
   "version": "0.1.0",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "description": "Parti — Web 多人互动房间 Runtime",
   "scripts": {

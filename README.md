@@ -180,6 +180,12 @@ Runtime 的核心原则是：Runtime First、Protocol Stable、User Code Untrust
 | [大厅服务](./docs/lobby-service.md) | REST API、租约、部署与 CORS |
 | [局域网直连](./docs/lan-direct.md) | LocalSend 发现、网络边界、自建服务与隐私说明 |
 
+## 许可证
+
+Parti 采用 [PolyForm Noncommercial License 1.0.0](./LICENSE.md)。任何人均可出于非商业目的使用、修改和分发 Parti；将 Parti 用于商业经营或其他营利目的，需要事先取得 Parti 作者的书面许可。
+
+发布到 Parti 房间市场的第三方游戏房间，其版权仍归各自作者所有。Parti 的许可证仅适用于 Parti 本身，不取得第三方游戏房间的版权，也不替代游戏作者为其作品选择的许可证。
+
 ---
 
 ## ☕️ 请我喝杯咖啡

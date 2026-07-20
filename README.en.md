@@ -179,6 +179,12 @@ The runtime follows these core principles: Runtime First, Protocol Stable, User 
 | [Lobby service](./docs/lobby-service.md) | REST API, leases, deployment, and CORS |
 | [LAN direct mode](./docs/lan-direct.en.md) | LocalSend discovery, network boundaries, self-hosting, and privacy |
 
+## License
+
+Parti is licensed under the [PolyForm Noncommercial License 1.0.0](./LICENSE.md). You may use, modify, and distribute Parti for noncommercial purposes. Using Parti for commercial operations or any other profit-making purpose requires prior written permission from the Parti author.
+
+Third-party game rooms published through the Parti Room Market remain the property of their respective authors. Parti's license applies only to Parti itself: it does not claim ownership of third-party game rooms or replace the license chosen by a game room author.
+
 ---
 
 ## ☕️ Buy Me a Coffee
