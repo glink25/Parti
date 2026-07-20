@@ -178,3 +178,21 @@ The runtime follows these core principles: Runtime First, Protocol Stable, User 
 | [Protocol reference](./docs/protocol-reference.md) | Low-level messages, synchronization, and error codes |
 | [Lobby service](./docs/lobby-service.md) | REST API, leases, deployment, and CORS |
 | [LAN direct mode](./docs/lan-direct.en.md) | LocalSend discovery, network boundaries, self-hosting, and privacy |
+
+---
+
+## ☕️ Buy Me a Coffee
+
+Thank you for supporting Parti! Parti is currently maintained by a single developer, and your donation will support maintenance and continued development.
+
+### Alipay
+
+![Alipay payment QR code](./apps/web/public/donation/alipay.png)
+
+### Solana (SOL)
+
+Wallet address:
+
+`vEzM9jmxChx2AoMMDpHARHZcUjmUCHdBShwF9eJYGEg`
+
+![Solana wallet QR code](./apps/web/public/donation/solana.png)

@@ -179,3 +179,21 @@ Runtime 的核心原则是：Runtime First、Protocol Stable、User Code Untrust
 | [协议参考](./docs/protocol-reference.md) | 底层消息、状态同步与错误码 |
 | [大厅服务](./docs/lobby-service.md) | REST API、租约、部署与 CORS |
 | [局域网直连](./docs/lan-direct.md) | LocalSend 发现、网络边界、自建服务与隐私说明 |
+
+---
+
+## ☕️ 请我喝杯咖啡
+
+感谢你对 Parti 的支持！Parti 目前由单人维护，你的捐赠将用于项目维护和持续开发。
+
+### 支付宝 (Alipay)
+
+![支付宝收款码](./apps/web/public/donation/alipay.png)
+
+### Solana (SOL)
+
+钱包地址：
+
+`vEzM9jmxChx2AoMMDpHARHZcUjmUCHdBShwF9eJYGEg`
+
+![Solana 钱包二维码](./apps/web/public/donation/solana.png)
