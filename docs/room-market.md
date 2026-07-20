@@ -55,8 +55,9 @@ beta/推荐徽章）→ 点击「安装」→ 经 jsdelivr 拉取房间包、校
 
 - 位于仓库**根目录**，或某个**子目录**（如 `dist/`）；
 - 目录中必须有 `parti.room.json` 和 manifest `entry` 声明的全部文件；
-- 如果仓库中存在多个 `parti.room.json`，以**路径最浅**的那个为房间包位置
-  （与 ZIP 导入的剥前缀规则一致）。
+- 如果仓库中存在多个 `parti.room.json`，预检会按路径由浅到深检查，并选择第一个
+  **manifest 合法且声明的全部入口文件均存在**的目录。只有 manifest、没有构建入口的
+  `public/` 不会遮蔽同仓库中的完整 `dist/` 包。
 
 两种常见形态：
 
@@ -96,8 +97,8 @@ cp dist/parti.room.json ./parti.room.json
 
 ### 2.5 等待审核打标
 
-- triage workflow 自动检查：在仓库文件树中定位最浅的 `parti.room.json`，下载并校验
-  manifest，然后把 manifest 和包目录**写入 issue 正文的标记区块**（请勿删除），
+- triage workflow 自动检查：按路径由浅到深寻找 manifest 与声明入口均齐全的完整包，
+  然后把 manifest 和包目录**写入 issue 正文的标记区块**（请勿删除），
   打上 `parti-room`（上架）+ `beta`；release 资产缺失只会在评论中提醒，不阻止上架。
 - 检查失败会在 issue 中评论原因；修复后**编辑 issue**（改一个字即可）会重新触发检查。
 - 维护者人工复核后可把 `beta` 换成 `recommend`（表示经过测试、质量可靠）。
@@ -180,7 +181,8 @@ jobs:
 | --- | --- |
 | 市场卡片显示「产物信息尚未写入」 | triage 尚未运行或检查未通过：看 issue 评论；修复后编辑 issue 重新触发 |
 | 市场卡片显示「产物信息无效」 | 写入正文的 manifest 不是合法 JSON 或未通过校验（对照 [manifest.md](./manifest.md)） |
-| 安装失败「房间包下载失败」 | 仓库中缺少 `parti.room.json` 或 `entry` 声明的文件；仓库为私有；jsdelivr 单文件超过 20MB |
+| 安装失败「登记的仓库包目录缺少文件」 | issue 中记录的包目录已过期或构建产物不完整；提交完整产物后编辑 issue 重新触发预检。该错误与 release ZIP 内容无关 |
+| 安装失败「房间包下载失败」 | 仓库为私有，或 jsdelivr 单文件超过 20MB；可下载 release ZIP 后手动导入 |
 | 安装失败「GitHub API 请求受限」 | 解析默认分支的 API 调用被限流（60 次/小时/IP），稍后重试或用卡片上的「浏览器直接下载」+「从 ZIP 导入」 |
 | 封面上不显示图片 | `cover` 相对路径按包目录解析，确认图片已提交到仓库同一目录；或改用绝对 URL |
 | 更新后内容没变 | jsdelivr 对分支 ref 有数小时缓存；锁定 tag 可保证内容不可变。另需编辑一次 issue 刷新正文 manifest |

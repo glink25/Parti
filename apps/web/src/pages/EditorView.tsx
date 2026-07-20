@@ -318,7 +318,10 @@ export function EditorView() {
   async function onMarketInstalled(templateId: string): Promise<void> {
     const list = await reloadTemplates();
     const entry = list.find((t) => t.id === templateId);
-    if (entry) await commitTemplateSelection(entry);
+    if (entry) {
+      setActiveCategory('imported');
+      await commitTemplateSelection(entry);
+    }
   }
 
   function openBlankEditor(): void {

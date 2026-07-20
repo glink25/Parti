@@ -470,6 +470,9 @@
       "REGISTRY_FETCH_FAILED": "房间市场列表获取失败（{status}），请稍后重试。",
       "REGISTRY_RATE_LIMITED": "GitHub API 请求受限，房间市场暂时无法刷新，请稍后再试。",
       "RATE_LIMITED": "GitHub API 请求受限，暂时无法安装，请稍后再试或使用浏览器直接下载。",
+      "PACKAGE_TREE_FAILED": "无法读取市场登记仓库的文件树（{status}），请稍后重试或下载 release ZIP 后手动导入。",
+      "PACKAGE_TREE_TRUNCATED": "市场登记仓库的文件树过大，无法安全确定完整房间包；请下载 release ZIP 后手动导入。",
+      "PACKAGE_ENTRY_MISSING": "市场登记的仓库包目录缺少文件：{path}。这不是 release ZIP 解析错误，请重新触发登记检查或手动导入 ZIP。",
       "PACKAGE_DOWNLOAD_FAILED": "房间包下载失败（{status}），请确认该仓库中包含房间包文件（parti.room.json 与入口文件）。"
     }
   },

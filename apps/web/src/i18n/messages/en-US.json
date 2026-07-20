@@ -470,6 +470,9 @@
       "REGISTRY_FETCH_FAILED": "Failed to load the room market ({status}). Please try again later.",
       "REGISTRY_RATE_LIMITED": "GitHub API rate limit reached. The room market cannot refresh right now, please try again later.",
       "RATE_LIMITED": "GitHub API rate limit reached. Cannot install right now; try again later or download directly in your browser.",
+      "PACKAGE_TREE_FAILED": "Failed to read the registered repository tree ({status}). Try again later or download the release ZIP and import it manually.",
+      "PACKAGE_TREE_TRUNCATED": "The registered repository tree is too large to locate a complete room package safely. Download the release ZIP and import it manually.",
+      "PACKAGE_ENTRY_MISSING": "The registered repository package directory is missing: {path}. This is not a release ZIP parsing error; rerun registry validation or import the ZIP manually.",
       "PACKAGE_DOWNLOAD_FAILED": "Failed to download the room package ({status}). Make sure the repository contains the room package files (parti.room.json and entry files)."
     }
   },

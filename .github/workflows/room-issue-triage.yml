@@ -1,5 +1,5 @@
 # 房间市场登记 issue 的自动预检：
-#   1. 在发布者仓库中定位房间包（最浅的 parti.room.json 所在目录），下载并校验 manifest；
+#   1. 在发布者仓库中定位最浅的完整房间包（manifest 与声明的入口文件齐全）；
 #   2. 软检查 release 资产（parti.room.zip / parti.room.json，缺失仅提醒，不阻止上架）；
 #   3. 把 manifest 与包目录写入 issue 正文的标记区块（web 端列表直接读取，零额外请求）；
 #   4. 通过后打上 parti-room（上架）+ beta 标签。
@@ -33,6 +33,13 @@ jobs:
             exit 0
           }
 
+          reject() {
+            # 确定性的包格式错误必须让旧条目下架；临时网络/API 错误仍走 fail，避免误下架。
+            gh issue edit "$ISSUE_NUMBER" --remove-label "parti-room" >/dev/null 2>&1 || true
+            gh issue comment "$ISSUE_NUMBER" --body "$1"
+            exit 0
+          }
+
           ref="${ISSUE_TITLE#'[parti-room]'}"
           ref="$(echo "$ref" | xargs)"
           repo_part="${ref%%@*}"
@@ -40,7 +47,7 @@ jobs:
           if [[ "$ref" == *@* ]]; then tag="${ref##*@}"; fi
 
           if [[ "$repo_part" != */* ]]; then
-            fail "标题格式不正确，应为 \`[parti-room] owner/repo\`（可选 \`@tag\`）。详见 docs/room-market.md。"
+            reject "标题格式不正确，应为 \`[parti-room] owner/repo\`（可选 \`@tag\`）。详见 docs/room-market.md。"
           fi
           owner="${repo_part%%/*}"
           repo="${repo_part##*/}"
@@ -51,19 +58,65 @@ jobs:
             git_ref="$(gh api "repos/$owner/$repo" --jq .default_branch)" || fail "无法访问仓库 \`$owner/$repo\`（必须为公开仓库）。"
           fi
 
-          # 1. 在仓库文件树中定位最浅的 parti.room.json
-          gh api "repos/$owner/$repo/git/trees/$git_ref?recursive=1" --jq '.tree[].path' > /tmp/tree.txt \
+          # 1. 按路径深度检查所有 manifest，选择第一个入口文件齐全的包目录。
+          gh api "repos/$owner/$repo/git/trees/$git_ref?recursive=1" > /tmp/tree.json \
             || fail "无法读取 \`$owner/$repo@$git_ref\` 的文件树。"
-          manifest_path="$(grep -E '(^|/)parti\.room\.json$' /tmp/tree.txt | awk -F/ '{print NF, $0}' | sort -n | head -1 | cut -d' ' -f2-)"
-          if [[ -z "$manifest_path" ]]; then
-            fail "仓库 \`$owner/$repo@$git_ref\` 中未找到 \`parti.room.json\`。市场安装直接读取仓库中的房间包文件，请把 parti.room.json 与入口文件提交到仓库（根目录或某个子目录），详见 docs/room-market.md。"
+          if jq -e '.truncated == true' /tmp/tree.json >/dev/null; then
+            reject "仓库 \`$owner/$repo@$git_ref\` 的文件树过大，GitHub 返回了截断结果，无法安全定位完整房间包。"
           fi
-          package_dir="$(dirname "$manifest_path")"
+          jq -r '.tree[] | select(.type == "blob") | .path' /tmp/tree.json > /tmp/tree.txt
+          grep -E '(^|/)parti\.room\.json$' /tmp/tree.txt \
+            | awk -F/ '{print NF "\t" $0}' \
+            | sort -k1,1n -k2,2 \
+            | cut -f2- > /tmp/manifest-paths.txt || true
+          if [[ ! -s /tmp/manifest-paths.txt ]]; then
+            reject "仓库 \`$owner/$repo@$git_ref\` 中未找到 \`parti.room.json\`。市场安装直接读取仓库中的房间包文件，请把 manifest 与入口文件提交到同一个目录，详见 docs/room-market.md。"
+          fi
 
-          manifest="$(curl -sfL "https://raw.githubusercontent.com/$owner/$repo/$git_ref/$manifest_path")" \
-            || fail "无法下载 \`$manifest_path\`。"
-          if ! echo "$manifest" | jq -e '.id and .name and .version and .entry.ui and .entry.worker' >/dev/null 2>&1; then
-            fail "\`$manifest_path\` 校验失败：必须是合法 JSON，且包含 \`id\` / \`name\` / \`version\` / \`entry.ui\` / \`entry.worker\` 字段。详见 docs/manifest.md。"
+          manifest_path=""
+          package_dir=""
+          manifest=""
+          while IFS= read -r candidate_path; do
+            candidate_manifest="$(curl -sfL "https://raw.githubusercontent.com/$owner/$repo/$git_ref/$candidate_path")" || continue
+            if ! echo "$candidate_manifest" | jq -e '
+              (.id | type == "string" and length > 0) and
+              (.name | type == "string" and length > 0) and
+              (.version | type == "string" and length > 0) and
+              (.entry.ui | type == "string" and length > 0) and
+              (.entry.worker | type == "string" and length > 0)
+            ' >/dev/null 2>&1; then
+              continue
+            fi
+
+            candidate_dir="$(dirname "$candidate_path")"
+            complete=true
+            while IFS= read -r entry_path; do
+              # 与 web 的 Package 路径约束保持一致，避免绝对路径、反斜杠和目录穿越。
+              if [[ -z "$entry_path" || "$entry_path" == /* || "$entry_path" == *\\* || "$entry_path" == *\?* || "$entry_path" == *\#* || "$entry_path" == *//* || "/$entry_path/" == *"/./"* || "/$entry_path/" == *"/../"* ]]; then
+                complete=false
+                break
+              fi
+              if [[ "$candidate_dir" == "." ]]; then
+                package_path="$entry_path"
+              else
+                package_path="$candidate_dir/$entry_path"
+              fi
+              if ! grep -Fxq "$package_path" /tmp/tree.txt; then
+                complete=false
+                break
+              fi
+            done < <(echo "$candidate_manifest" | jq -r '.entry | to_entries[] | select(.value | type == "string" and length > 0) | .value')
+
+            if [[ "$complete" == true ]]; then
+              manifest_path="$candidate_path"
+              package_dir="$candidate_dir"
+              manifest="$candidate_manifest"
+              break
+            fi
+          done < /tmp/manifest-paths.txt
+
+          if [[ -z "$manifest_path" ]]; then
+            reject "仓库 \`$owner/$repo@$git_ref\` 中找到了 \`parti.room.json\`，但没有任何候选目录同时包含 manifest 声明的全部入口文件。请提交完整构建产物后重试。"
           fi
 
           # 2. release 资产软检查（仅提醒）

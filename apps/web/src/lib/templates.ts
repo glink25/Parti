@@ -1,5 +1,10 @@
 /** 准备态自定义 Package 存储。内置模板只由 rooms.ts 从静态目录加载。 */
-import { createPackage, type RoomPackageInput } from '@parti/room-packager';
+import {
+  createPackage,
+  encodeFilesBase64,
+  mimeTypeForPath,
+  type RoomPackageInput,
+} from '@parti/room-packager';
 import { rooms as registry } from 'virtual:room-registry';
 import { getDb, type CustomPackageRecord } from './db';
 import { createDraftId } from './ids';
@@ -15,6 +20,27 @@ export interface TemplateMeta {
   source: CustomPackageRecord['source'];
   tags: string[];
   imported: boolean;
+  cover?: string;
+}
+
+function isExternalCover(cover: string): boolean {
+  return /^(https?:)?\/\//.test(cover) || cover.startsWith('/');
+}
+
+/** 将持久化包内的相对封面转为无需生命周期管理的 data URL。 */
+export function resolveImportedCover(
+  cover: string | undefined,
+  files: Record<string, Uint8Array>,
+): string | undefined {
+  if (!cover) return undefined;
+  if (isExternalCover(cover)) return cover;
+  const path = cover.replace(/^(\.\/)+/, '');
+  const bytes = files[path];
+  if (!bytes) return undefined;
+  const mime = mimeTypeForPath(path);
+  if (!mime.startsWith('image/')) return undefined;
+  const encoded = encodeFilesBase64({ [path]: bytes })[path];
+  return `data:${mime};base64,${encoded}`;
 }
 
 export async function listImportedTemplates(): Promise<TemplateMeta[]> {
@@ -27,6 +53,7 @@ export async function listImportedTemplates(): Promise<TemplateMeta[]> {
     source: item.source,
     tags: item.manifest.tags ?? [],
     imported: isImportedTemplateSource(item.source),
+    cover: resolveImportedCover(item.manifest.cover, item.files),
   }));
 }
 

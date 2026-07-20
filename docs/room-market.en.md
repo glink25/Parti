@@ -66,8 +66,10 @@ complete room package**:
 - At the repository **root**, or inside a **subdirectory** (e.g. `dist/`);
 - The directory must contain `parti.room.json` and every file declared in the manifest
   `entry`;
-- If multiple `parti.room.json` files exist, the **shallowest** one marks the package
-  location (same rule as ZIP import's prefix stripping).
+- If multiple `parti.room.json` files exist, triage checks them from shallowest to
+  deepest and selects the first directory whose manifest is valid and whose declared
+  entry files all exist. A manifest-only `public/` directory cannot hide a complete
+  `dist/` package in the same repository.
 
 Two common shapes:
 
@@ -109,8 +111,8 @@ the **"Publish a room / 发布房间到市场"** template:
 
 ### 2.5 Review and labels
 
-- The triage workflow automatically: locates the shallowest `parti.room.json` in the
-  repository tree, downloads and validates the manifest, **embeds the manifest and the
+- The triage workflow automatically searches from shallowest to deepest for a complete
+  package with a valid manifest and all declared entries, then **embeds the manifest and the
   package directory into the issue body's marker block** (do not delete it), and applies
   `parti-room` (listing) + `beta`. Missing release assets only trigger a reminder
   comment — they don't block listing.
@@ -199,7 +201,8 @@ files on the default branch.
 | --- | --- |
 | Market card shows "Package info not written yet" | Triage hasn't run or its check failed: read the issue comments; fix and edit the issue to re-trigger |
 | Market card shows "Package info invalid" | The embedded manifest is not valid JSON or fails validation (see [manifest.md](./manifest.md)) |
-| Install fails with "Failed to download the room package" | The repository lacks `parti.room.json` or files declared in `entry`; the repository is private; a single file exceeds jsdelivr's 20MB limit |
+| Installation says the registered package directory is missing a file | The issue contains a stale package directory or the committed build is incomplete. Push the complete package and edit the issue to rerun triage. This is unrelated to the release ZIP contents |
+| Install fails with "Failed to download the room package" | The repository is private or a single file exceeds jsdelivr's 20MB limit; download the release ZIP and import it manually |
 | Install fails with "GitHub API rate limit reached" | The default-branch lookup call was throttled (60/hour/IP); retry later or use the card's "Download in browser" + "Import from ZIP" |
 | Cover image doesn't show | Relative `cover` paths resolve against the package directory — commit the image next to the manifest, or use an absolute URL |
 | Content didn't change after an update | jsdelivr caches branch refs for hours; pin a tag for immutable content. Also edit the issue once to refresh the embedded manifest |

@@ -13,6 +13,7 @@ export default defineConfig({
       '@parti/transport-lan': pkg('transport-lan'),
       '@parti/worker-sdk': pkg('worker-sdk'),
       '@parti/room-packager': pkg('room-packager'),
+      'virtual:room-registry': fileURLToPath(new URL('./apps/web/src/test/roomRegistryStub.ts', import.meta.url)),
     },
   },
   test: {

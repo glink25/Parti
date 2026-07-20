@@ -115,6 +115,7 @@ export async function listPackageSources(): Promise<TemplateListEntry[]> {
     ...custom.map((item) => ({
       id: item.id, name: item.name, description: item.description,
       ...(item.descriptionFallback ? { descriptionFallback: item.descriptionFallback } : {}),
+      ...(item.cover ? { cover: item.cover } : {}),
       removable: true, usageCount: usage[item.id] ?? 0,
       tags: item.tags,
       imported: item.imported,

@@ -53,7 +53,10 @@ export function formatResolveError(intl: IntlShape, reason: unknown): string {
   }
   if (reason instanceof ImportRoomError) return formatImportError(intl, reason);
   if (reason instanceof MarketError) {
-    return intl.formatMessage({ id: `market.error.${reason.code}` }, { status: reason.status ?? '' });
+    return intl.formatMessage(
+      { id: `market.error.${reason.code}` },
+      { status: reason.status ?? '', path: reason.path ?? '' },
+    );
   }
   return reason instanceof Error ? reason.message : String(reason);
 }
