@@ -58,7 +58,7 @@ export function JoinLinkInput() {
             }
           }}
           placeholder={intl.formatMessage({ id: 'lobby.hero.joinPlaceholder' })}
-          className="min-w-[200px] flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          className="min-w-[160px] flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           aria-invalid={showError && !joinRoute && !!value.trim()}
         />
         {!value.trim() ? (

@@ -5,7 +5,8 @@
       "tagline": "Create and play together with friends",
       "backToLobby": "Back to Parti lobby",
       "back": "Back to lobby",
-      "github": "View Parti source on GitHub"
+      "github": "View Parti source on GitHub",
+      "syncMethod": "Sync method: {method}"
     }
   },
   "user": {

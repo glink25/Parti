@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { Lobby } from './pages/Lobby';
 import { loadLocalUser } from './lib/localUser';
 import { UserSettings } from './components/UserSettings';
+import { TransportIndicator } from './components/TransportIndicator';
 import { PageFullscreenProvider, usePageFullscreen } from './components/PageFullscreen';
 import { useLocale } from './i18n/LocaleProvider';
 import { ENABLE_REPLAYS } from './lib/featureFlags';
@@ -114,6 +115,17 @@ function AppLayout() {
               <Logo />
               <span className="hidden sm:inline">Parti</span>
             </a>
+            <Button asChild variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground hover:text-foreground">
+              <a
+                href="https://github.com/glink25/Parti"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={intl.formatMessage({ id: 'app.header.github' })}
+                title={intl.formatMessage({ id: 'app.header.github' })}
+              >
+                <GithubIcon />
+              </a>
+            </Button>
             {!isLobbyRoute && (
               <Button asChild variant="ghost" size="sm" className="ml-1 gap-1.5 text-muted-foreground sm:ml-4">
                 <a href="#/">
@@ -123,17 +135,7 @@ function AppLayout() {
               </Button>
             )}
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              <Button asChild variant="ghost" size="sm" className="gap-1.5 px-2 text-muted-foreground hover:text-foreground sm:px-3">
-                <a
-                  href="https://github.com/glink25/Parti"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={intl.formatMessage({ id: 'app.header.github' })}
-                >
-                  <GithubIcon />
-                  <span>GitHub</span>
-                </a>
-              </Button>
+              <TransportIndicator />
               {isLobbyRoute && <UserSettings user={user} onChange={setUser} />}
             </div>
           </div>

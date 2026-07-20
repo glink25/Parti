@@ -102,15 +102,16 @@ export function Lobby() {
             <JoinLinkInput />
             <ScanJoinButton />
           </div>
+          <Button asChild size="lg" className="h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
+            <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
+          </Button>
+
           <AiCreationEntry
             onGoAdd={(handoff) => {
               saveAiImportHandoff(handoff);
               window.location.hash = '#/editor/ai-import';
             }}
           />
-          <Button asChild size="lg" className="h-12 rounded-xl px-5 shadow-lg shadow-amber-500/15 max-md:w-full">
-            <a href="#/editor"><PlusIcon data-icon="inline-start" /><FormattedMessage id="lobby.hero.createRoom" /></a>
-          </Button>
           {ENABLE_REPLAYS && <Button asChild variant="outline" className="max-md:w-full"><a href="#/replays"><FormattedMessage id="replays.nav" /></a></Button>}
         </div>
       </section>

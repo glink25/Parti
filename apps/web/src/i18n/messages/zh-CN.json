@@ -5,7 +5,8 @@
       "tagline": "和朋友一起创造，一起游玩",
       "backToLobby": "返回 Parti 大厅",
       "back": "返回大厅",
-      "github": "在 GitHub 上查看 Parti 源码"
+      "github": "在 GitHub 上查看 Parti 源码",
+      "syncMethod": "同步方式：{method}"
     }
   },
   "user": {
