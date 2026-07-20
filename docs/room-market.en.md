@@ -19,8 +19,8 @@ public GitHub facilities and the jsdelivr CDN — no extra server-side service:
   ├─ parti.room.json  ─┐                       [parti-room] alice/game-a
   ├─ index.html        │ triage embeds in body labels: parti-room, beta, recommend
   └─ room.worker.js    ▼                       body: <!-- parti-room:manifest --> block
-  Release (optional archive)
-  ├─ parti.room.zip    ← manual-import fallback
+  Release (manual fallback)
+  ├─ parti.room.zip    ← download, then import from ZIP
   └─ parti.room.json
 ```
 
@@ -34,9 +34,11 @@ public GitHub facilities and the jsdelivr CDN — no extra server-side service:
 - **Install = reading the author's repository files via jsdelivr**:
   `data.jsdelivr.com` lists the file tree, `cdn.jsdelivr.net` serves each file — CORS
   enabled and no GitHub API quota consumed.
-- **`parti.room.zip` in a release = optional archive.** If online installation fails
-  (e.g. network issues), users can "Download in browser" from the card and install
-  manually via "Import from ZIP".
+- **`parti.room.zip` in a release = manual fallback.** The static web app cannot
+  reliably read GitHub Release assets across origins, so release assets are never an
+  automatic install source. Users download the ZIP and then use "Import from ZIP".
+- Triage really downloads and parses the ZIP with the same resolver used by the web app.
+  If the git ref is incomplete but the ZIP is valid, the entry is listed as "ZIP only".
 - **Closing the issue delists the room.** Copies already installed in a user's browser
   are unaffected.
 
@@ -76,15 +78,15 @@ Two common shapes:
 | Shape | How |
 | --- | --- |
 | Plain HTML/JS room (no build) | Put the three files at the repository root and push to the default branch |
-| Room with a build step | Commit the build output to a directory/branch (see the CI example in Appendix A, which pushes `dist/` to a `parti-package` branch; pin it in the issue title via `@parti-package`) |
+| Room with a build step | Use GitHub Actions to publish `dist/` to a dedicated `parti-package` branch and create a Release; pin the issue title with `@parti-package` (Appendix A) |
 
 Cover (optional): the manifest `cover` may be an absolute URL or a package-relative path
 (e.g. `"cover.png"`); market cards resolve it against the package directory.
 
-### 2.3 Build the release assets (optional, recommended)
+### 2.3 Build the release assets (recommended manual fallback)
 
-The release zip is an archive and the manual-import fallback. From the package
-directory:
+The release ZIP is an archive and manual-import fallback; the static web app does not
+unpack it automatically. From the package directory:
 
 ```bash
 cd dist   # or your package directory
@@ -104,18 +106,20 @@ the **"Publish a room / 发布房间到市场"** template:
 
 - Title (the template pre-fills the prefix): `[parti-room] <owner>/<repo>`
   - Example: `[parti-room] alice/game-a`
-  - Pin a git ref: `[parti-room] alice/game-a@v1.0.0` (tag or branch; without `@ref` the
-    default branch is always used — recommended, so pushing updates refreshes the market
-    entry. Note jsdelivr caches branch refs for hours; a pinned tag is immutable)
+  - Pin a git ref: `[parti-room] alice/game-a@parti-package`. A dedicated
+    `parti-package` branch is recommended for built rooms; without `@ref`, the default
+    branch is used.
+  - The ref also constrains release fallback: without a ref triage checks the latest
+    release; with `@ref`, only a release tag with the same name is accepted.
 - Fill in the repository URL, a short game description, player counts, etc.
 
 ### 2.5 Review and labels
 
-- The triage workflow automatically searches from shallowest to deepest for a complete
-  package with a valid manifest and all declared entries, then **embeds the manifest and the
-  package directory into the issue body's marker block** (do not delete it), and applies
-  `parti-room` (listing) + `beta`. Missing release assets only trigger a reminder
-  comment — they don't block listing.
+- Triage uses the same resolver as the web app for both the git ref and Release ZIP. It
+  embeds the manifest, versioned source metadata, and a clickable link to the resolved
+  source branch/directory in the issue body.
+- A complete git package is listed with one-click installation. If only the Release ZIP
+  passes, the entry is listed as "ZIP only". If both fail, the `parti-room` label is removed.
 - On failure it comments with the reason; after fixing, **edit the issue** (any small
   change) to re-trigger the check.
 - A maintainer may replace `beta` with `recommend` after a manual review.
@@ -145,11 +149,11 @@ the **"Publish a room / 发布房间到市场"** template:
 - [ ] Issue title matches `[parti-room] owner/repo` (or `...@ref`)
 - [ ] After triage passes, the `parti-room:manifest` marker block in the issue body is kept intact
 
-## 3. Appendix A: GitHub Actions publishing example
+## 3. Appendix A: Recommended GitHub Actions publishing workflow
 
-For rooms with a build step: on tag push, build → upload archive release assets → push
-the build output to a `parti-package` branch (which the market installs from). Register
-the issue with title `[parti-room] owner/repo@parti-package`.
+For rooms with a build step, a `v*` tag builds once, then updates the dedicated
+`parti-package` branch for one-click installation and creates or updates a Release with
+the ZIP/manual fallback assets. Register with `[parti-room] owner/repo@parti-package`.
 
 ```yaml
 name: release
@@ -178,15 +182,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp dist/parti.room.json parti.room.json
-          gh release create "$GITHUB_REF_NAME" parti.room.zip parti.room.json \
-            --title "$GITHUB_REF_NAME" --generate-notes
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" parti.room.zip parti.room.json --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" parti.room.zip parti.room.json \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
       - name: Publish dist/ to the parti-package branch
         run: |
+          publish_dir="$(mktemp -d)"
+          cp -R dist/. "$publish_dir/"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan parti-package-tmp
+          git checkout --orphan parti-package-publish
           git rm -rf . >/dev/null 2>&1 || true
-          cp -r dist/* .
+          cp -R "$publish_dir/." .
           git add -A
           git commit -m "parti package $GITHUB_REF_NAME"
           git push -f origin HEAD:parti-package
@@ -206,7 +216,8 @@ files on the default branch.
 | Install fails with "GitHub API rate limit reached" | The default-branch lookup call was throttled (60/hour/IP); retry later or use the card's "Download in browser" + "Import from ZIP" |
 | Cover image doesn't show | Relative `cover` paths resolve against the package directory — commit the image next to the manifest, or use an absolute URL |
 | Content didn't change after an update | jsdelivr caches branch refs for hours; pin a tag for immutable content. Also edit the issue once to refresh the embedded manifest |
-| Issue never gets listed | The triage check failed (see the issue comments), or a maintainer has not applied the `parti-room` label yet |
+| Card shows "ZIP only" | The git ref is incomplete but the Release ZIP passed. Publish `dist/` to `parti-package` and update the issue to `@parti-package` to restore one-click installation |
+| Issue never gets listed | Neither the git ref nor Release ZIP passed triage (see the comments), or a maintainer removed the `parti-room` label |
 | Market list fails to refresh | Unauthenticated GitHub API rate limit; try later — the page falls back to cached content |
 
 ## 5. Security and limitations

@@ -12,8 +12,7 @@ import {
   listMarketTemplates,
   loadMarketPage,
   MARKET_DOCS_URL,
-  MARKET_PACKAGE_ASSET,
-  releaseAssetUrl,
+  marketReleaseUrl,
   type MarketError,
   type MarketTemplateEntry,
 } from '@/lib/market';
@@ -192,6 +191,8 @@ export function MarketSection({ onInstalled, onEntriesChange }: MarketSectionPro
               const installing = installingRef === entry.ref;
               const unavailable = Boolean(entry.manifestError);
               const installError = installErrors[entry.ref];
+              const releaseOnly = entry.source?.primary.kind === 'release-zip';
+              const fallbackUrl = marketReleaseUrl(entry.source);
               return (
                 <div
                   key={entry.ref}
@@ -209,8 +210,13 @@ export function MarketSection({ onInstalled, onEntriesChange }: MarketSectionPro
                       </span>
                     )}
                   </span>
-                  {entry.badges.length > 0 && (
+                  {(entry.badges.length > 0 || releaseOnly) && (
                     <span className="absolute top-3 left-3 z-[2] flex gap-1.5">
+                      {releaseOnly && (
+                        <span className="rounded-full bg-surface/90 px-2.5 py-[3px] text-[10px] font-bold text-foreground shadow-sm">
+                          <FormattedMessage id="editor.market.releaseOnly" />
+                        </span>
+                      )}
                       {entry.badges.map((badge) => (
                         <span
                           key={badge}
@@ -237,35 +243,53 @@ export function MarketSection({ onInstalled, onEntriesChange }: MarketSectionPro
                       >
                         {entry.ref}
                       </a>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="flex-none gap-1.5"
-                        disabled={unavailable || installingRef !== null}
-                        onClick={() => void install(entry)}
-                      >
-                        <DownloadIcon data-icon="inline-start" />
-                        {installed
-                          ? intl.formatMessage({ id: 'editor.market.reinstall' })
-                          : intl.formatMessage({ id: 'editor.market.install' })}
-                      </Button>
+                      {releaseOnly && fallbackUrl ? (
+                        <Button asChild variant="outline" size="sm" className="flex-none gap-1.5">
+                          <a href={fallbackUrl} target="_blank" rel="noreferrer">
+                            <DownloadIcon data-icon="inline-start" />
+                            <FormattedMessage id="editor.market.downloadZip" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-none gap-1.5"
+                          disabled={unavailable || installingRef !== null}
+                          onClick={() => void install(entry)}
+                        >
+                          <DownloadIcon data-icon="inline-start" />
+                          {installed
+                            ? intl.formatMessage({ id: 'editor.market.reinstall' })
+                            : intl.formatMessage({ id: 'editor.market.install' })}
+                        </Button>
+                      )}
                     </span>
+                    {releaseOnly && (
+                      <span className="text-[11px] text-muted-foreground">
+                        <FormattedMessage id="editor.market.releaseOnlyHint" />
+                      </span>
+                    )}
                     {installError && (
                       <span className="flex flex-col gap-1.5 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive">
                         {installError}
-                        <a
-                          className="inline-flex w-max items-center gap-1 font-semibold text-foreground underline-offset-2 hover:underline"
-                          href={releaseAssetUrl(entry, MARKET_PACKAGE_ASSET)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <DownloadIcon className="size-3" aria-hidden="true" />
-                          <FormattedMessage id="editor.market.downloadFallback" />
-                        </a>
-                        <span className="text-muted-foreground">
-                          <FormattedMessage id="editor.market.downloadFallbackHint" />
-                        </span>
+                        {fallbackUrl && (
+                          <a
+                            className="inline-flex w-max items-center gap-1 font-semibold text-foreground underline-offset-2 hover:underline"
+                            href={fallbackUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <DownloadIcon className="size-3" aria-hidden="true" />
+                            <FormattedMessage id="editor.market.downloadFallback" />
+                          </a>
+                        )}
+                        {fallbackUrl && (
+                          <span className="text-muted-foreground">
+                            <FormattedMessage id="editor.market.downloadFallbackHint" />
+                          </span>
+                        )}
                       </span>
                     )}
                   </span>

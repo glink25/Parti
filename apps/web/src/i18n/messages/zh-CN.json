@@ -191,6 +191,9 @@
       "manifestInvalid": "产物信息无效，暂时无法安装",
       "downloadFallback": "浏览器直接下载",
       "downloadFallbackHint": "下载完成后，可使用上方「从 ZIP 导入」完成安装。",
+      "downloadZip": "下载 ZIP",
+      "releaseOnly": "仅 ZIP",
+      "releaseOnlyHint": "该条目仅有已校验的 Release ZIP；下载后请使用上方「从 ZIP 导入」。",
       "badges": {
         "beta": "测试版",
         "recommend": "推荐"
@@ -466,26 +469,34 @@
   "import": {
     "error": {
       "MANIFEST_NOT_FOUND": "未找到 parti.room.json，无法识别为有效的房间包。",
+      "MANIFEST_INVALID": "parti.room.json 不是合法的房间 manifest。",
       "MANIFEST_INVALID_JSON": "parti.room.json 不是有效的 JSON。",
+      "ENTRY_MISSING": "房间包缺少 manifest 声明的入口文件：{path}",
+      "NO_COMPLETE_PACKAGE": "指定范围内没有同时包含合法 manifest 和全部入口文件的房间包。",
+      "SOURCE_PATH_INVALID": "房间包包含不安全或不规范的路径：{path}",
+      "SOURCE_READ_FAILED": "读取房间包文件失败：{path}",
+      "ZIP_INVALID": "文件不是可读取的 ZIP 房间包。",
       "UI_ENTRY_MISSING": "缺少 UI 入口文件：{path}",
       "WORKER_ENTRY_MISSING": "缺少 worker 入口文件：{path}",
       "ZIP_MANIFEST_NOT_FOUND": "ZIP 中未找到 parti.room.json。",
-      "GITHUB_URL_INVALID": "无法识别的 GitHub 地址，请提供指向文件或文件夹的 blob/tree 链接。",
+      "GITHUB_URL_INVALID": "无法识别的 GitHub 地址，请提供仓库、tree 文件夹或 blob 文件链接。",
+      "GITHUB_REF_NOT_FOUND": "GitHub 地址中的分支或 tag 不存在。",
       "GITHUB_RATE_LIMITED": "GitHub API 请求受限（未认证限速 60 次/时），请稍后再试。",
+      "GITHUB_TREE_FAILED": "读取 GitHub 仓库文件树失败（{status}）。",
+      "GITHUB_TREE_TRUNCATED": "GitHub 仓库文件树被截断，无法安全定位房间包。",
+      "GITHUB_DOWNLOAD_FAILED": "从 GitHub 下载房间包文件失败：{path}",
       "GITHUB_DIR_READ_FAILED": "读取 GitHub 目录失败（{status}）。",
       "GITHUB_MANIFEST_NOT_FOUND": "该地址对应的文件夹下未找到 parti.room.json。",
-      "DOWNLOAD_FAILED": "下载文件失败：{path}"
+      "DOWNLOAD_FAILED": "下载文件失败：{path}",
+      "RELEASE_NOT_FOUND": "未找到匹配的 GitHub Release。",
+      "RELEASE_ASSET_MISSING": "Release 中没有 parti.room.zip。",
+      "RELEASE_MANUAL_REQUIRED": "分支中没有可一键安装的完整产物，但找到了匹配的 Release ZIP；请下载后使用「从 ZIP 导入」。"
     }
   },
   "market": {
     "error": {
       "REGISTRY_FETCH_FAILED": "房间市场列表获取失败（{status}），请稍后重试。",
-      "REGISTRY_RATE_LIMITED": "GitHub API 请求受限，房间市场暂时无法刷新，请稍后再试。",
-      "RATE_LIMITED": "GitHub API 请求受限，暂时无法安装，请稍后再试或使用浏览器直接下载。",
-      "PACKAGE_TREE_FAILED": "无法读取市场登记仓库的文件树（{status}），请稍后重试或下载 release ZIP 后手动导入。",
-      "PACKAGE_TREE_TRUNCATED": "市场登记仓库的文件树过大，无法安全确定完整房间包；请下载 release ZIP 后手动导入。",
-      "PACKAGE_ENTRY_MISSING": "市场登记的仓库包目录缺少文件：{path}。这不是 release ZIP 解析错误，请重新触发登记检查或手动导入 ZIP。",
-      "PACKAGE_DOWNLOAD_FAILED": "房间包下载失败（{status}），请确认该仓库中包含房间包文件（parti.room.json 与入口文件）。"
+      "REGISTRY_RATE_LIMITED": "GitHub API 请求受限，房间市场暂时无法刷新，请稍后再试。"
     }
   },
   "template": {

@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  findPackageDirInPaths,
   joinPackagePath,
-  jsdelivrFileUrl,
-  jsdelivrTreeUrl,
   marketBadgesFromLabels,
   marketRefString,
   parseManifestFromIssueBody,
+  parseMarketSourceFromIssueBody,
   parseMarketIssueTitle,
   parsePackageDirFromIssueBody,
   resolveMarketCover,
@@ -115,12 +113,23 @@ describe('parsePackageDirFromIssueBody', () => {
   });
 });
 
-describe('findPackageDirInPaths', () => {
-  it('locates the shallowest parti.room.json directory', () => {
-    expect(findPackageDirInPaths(['parti.room.json', 'index.html'])).toBe('.');
-    expect(findPackageDirInPaths(['dist/parti.room.json', 'dist/index.html', 'src/x.ts'])).toBe('dist');
-    expect(findPackageDirInPaths(['a/b/parti.room.json', 'dist/parti.room.json'])).toBe('dist');
-    expect(findPackageDirInPaths(['README.md'])).toBeNull();
+describe('parseMarketSourceFromIssueBody', () => {
+  it('parses git and release-only source markers', () => {
+    const git = {
+      schema: 1,
+      primary: { kind: 'git-folder', ref: 'parti-package', packageDir: '.' },
+      fallback: { kind: 'release-zip', tag: 'parti-package', asset: 'parti.room.zip', url: 'https://x/room.zip', manual: true },
+    };
+    expect(parseMarketSourceFromIssueBody(`<!-- parti-room:source:${JSON.stringify(git)} -->`)).toEqual(git);
+    const release = {
+      schema: 1,
+      primary: { kind: 'release-zip', tag: 'v1', asset: 'parti.room.zip', url: 'https://x/room.zip', manual: true },
+    };
+    expect(parseMarketSourceFromIssueBody(`<!-- parti-room:source:${JSON.stringify(release)} -->`)).toEqual(release);
+  });
+
+  it('ignores malformed source markers', () => {
+    expect(parseMarketSourceFromIssueBody('<!-- parti-room:source:{oops} -->')).toBeUndefined();
   });
 });
 
@@ -128,16 +137,6 @@ describe('joinPackagePath', () => {
   it('joins unless the package dir is the repo root', () => {
     expect(joinPackagePath('.', 'index.html')).toBe('index.html');
     expect(joinPackagePath('dist', 'index.html')).toBe('dist/index.html');
-  });
-});
-
-describe('jsdelivr urls', () => {
-  const ref = { owner: 'alice', repo: 'game-a' };
-  it('builds tree and file urls', () => {
-    expect(jsdelivrTreeUrl(ref, 'main')).toBe('https://data.jsdelivr.com/v1/packages/gh/alice/game-a@main');
-    expect(jsdelivrFileUrl(ref, 'v1.0', 'dist/index.html')).toBe(
-      'https://cdn.jsdelivr.net/gh/alice/game-a@v1.0/dist/index.html',
-    );
   });
 });
 

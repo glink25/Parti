@@ -8,19 +8,20 @@
  *   release 中的 parti.room.zip 仅作为存档与手动导入的降级通道。
  */
 import type { RoomManifest } from '@parti/room-packager';
-import { buildPackageInputFromFiles, ImportRoomError } from './importRoom';
+import {
+  GitHubSourceClient,
+  RoomSourceError,
+  type MarketRoomSourceMetadata,
+} from '@parti/room-source';
 import { saveImportedTemplate } from './templates';
 import { getDb } from './db';
 import {
-  findPackageDirInPaths,
-  joinPackagePath,
-  jsdelivrFileUrl,
-  jsdelivrTreeUrl,
   MARKET_GATE_LABEL,
   marketBadgesFromLabels,
   marketRefString,
   parseManifestFromIssueBody,
   parseMarketIssueTitle,
+  parseMarketSourceFromIssueBody,
   parsePackageDirFromIssueBody,
   resolveMarketCover,
   type MarketBadge,
@@ -45,12 +46,7 @@ export const MARKET_DOCS_URL = `https://github.com/${MARKET_REGISTRY.owner}/${MA
 
 export type MarketErrorCode =
   | 'REGISTRY_FETCH_FAILED'
-  | 'REGISTRY_RATE_LIMITED'
-  | 'RATE_LIMITED'
-  | 'PACKAGE_TREE_FAILED'
-  | 'PACKAGE_TREE_TRUNCATED'
-  | 'PACKAGE_ENTRY_MISSING'
-  | 'PACKAGE_DOWNLOAD_FAILED';
+  | 'REGISTRY_RATE_LIMITED';
 
 export class MarketError extends Error {
   readonly code: MarketErrorCode;
@@ -74,6 +70,8 @@ export interface MarketTemplateEntry extends MarketRepoRef {
   badges: MarketBadge[];
   /** 房间包在仓库中的目录（`.` 表示根目录）。 */
   packageDir: string;
+  /** triage 写入的已解析安装源；缺失时按旧 package-dir 标记兼容。 */
+  source?: MarketRoomSourceMetadata;
   cover?: string;
   manifest?: RoomManifest;
   manifestError?: MarketManifestError;
@@ -174,15 +172,27 @@ function buildMarketEntries(
     const labels = issue.labels.map((label) => (typeof label === 'string' ? label : label.name ?? ''));
     const parsed = parseManifestFromIssueBody(issue.body);
     const packageDir = parsePackageDirFromIssueBody(issue.body);
+    const source = parseMarketSourceFromIssueBody(issue.body);
     const manifest = 'manifest' in parsed ? parsed.manifest : undefined;
+    const gitPrimary = source?.primary.kind === 'git-folder' ? source.primary : undefined;
     entries.push({
       ...ref,
       ref: key,
       issueNumber: issue.number,
       issueUrl: issue.html_url,
       badges: marketBadgesFromLabels(labels),
-      packageDir,
-      ...(manifest ? { manifest, cover: resolveMarketCover(ref, packageDir, manifest.cover) } : {}),
+      packageDir: gitPrimary?.packageDir ?? packageDir,
+      ...(source ? { source } : {}),
+      ...(manifest ? {
+        manifest,
+        cover: source?.primary.kind === 'release-zip' && manifest.cover && !/^(https?:)?\/\//.test(manifest.cover)
+          ? undefined
+          : resolveMarketCover(
+              gitPrimary ? { ...ref, tag: gitPrimary.ref } : ref,
+              gitPrimary?.packageDir ?? packageDir,
+              manifest.cover,
+            ),
+      } : {}),
       ...('manifestError' in parsed ? { manifestError: parsed.manifestError } : {}),
     });
   }
@@ -244,174 +254,26 @@ export async function listInstalledMarketRefs(): Promise<Set<string>> {
   );
 }
 
-/** issue 未锁定 ref 时，解析仓库默认分支（安装时唯一一次 GitHub API 调用）。 */
-async function resolveDefaultBranch(entry: MarketRepoRef): Promise<string> {
-  const url = `https://api.github.com/repos/${entry.owner}/${entry.repo}`;
-  const res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
-  if (isRateLimited(res)) {
-    throw new MarketError('RATE_LIMITED', { status: res.status });
-  }
-  if (!res.ok) {
-    throw new MarketError('PACKAGE_DOWNLOAD_FAILED', { status: res.status });
-  }
-  const data = (await res.json()) as { default_branch?: string };
-  if (!data.default_branch) throw new MarketError('PACKAGE_DOWNLOAD_FAILED');
-  return data.default_branch;
-}
-
-interface JsdelivrTreeNode {
-  type: 'file' | 'directory';
-  name: string;
-  files?: JsdelivrTreeNode[];
-}
-
-export function flattenJsdelivrPaths(nodes: JsdelivrTreeNode[], prefix = ''): string[] {
-  const paths: string[] = [];
-  for (const node of nodes) {
-    const path = prefix ? `${prefix}/${node.name}` : node.name;
-    if (node.type === 'file') {
-      paths.push(path);
-    } else if (node.files) {
-      paths.push(...flattenJsdelivrPaths(node.files, path));
-    }
-  }
-  return paths;
-}
-
-interface GitHubTreeItem {
-  path?: string;
-  type?: string;
-}
-
-interface GitHubTreeResponse {
-  tree?: GitHubTreeItem[];
-  truncated?: boolean;
-}
-
-async function fetchGitHubTreePaths(entry: MarketRepoRef, gitRef: string): Promise<string[]> {
-  const url = `https://api.github.com/repos/${entry.owner}/${entry.repo}/git/trees/${encodeURIComponent(gitRef)}?recursive=1`;
-  let res: Response;
-  try {
-    res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
-  } catch {
-    throw new MarketError('PACKAGE_TREE_FAILED');
-  }
-  if (isRateLimited(res)) throw new MarketError('RATE_LIMITED', { status: res.status });
-  if (!res.ok) throw new MarketError('PACKAGE_TREE_FAILED', { status: res.status });
-  let data: GitHubTreeResponse;
-  try {
-    data = (await res.json()) as GitHubTreeResponse;
-  } catch {
-    throw new MarketError('PACKAGE_TREE_FAILED', { status: res.status });
-  }
-  if (data.truncated) throw new MarketError('PACKAGE_TREE_TRUNCATED');
-  return (data.tree ?? []).flatMap((item) =>
-    item.type === 'blob' && typeof item.path === 'string' ? [item.path] : [],
-  );
-}
-
-/** 优先经 jsDelivr 列目录，失败或响应无效时回退 GitHub recursive tree API。 */
-export async function listMarketPackagePaths(entry: MarketRepoRef, gitRef: string): Promise<string[]> {
-  try {
-    const treeRes = await fetch(jsdelivrTreeUrl(entry, gitRef));
-    if (treeRes.ok) {
-      const tree = (await treeRes.json()) as { files?: JsdelivrTreeNode[] };
-      if (Array.isArray(tree.files)) {
-        const paths = flattenJsdelivrPaths(tree.files);
-        if (paths.length > 0) return paths;
-      }
-    }
-  } catch {
-    // jsDelivr 网络错误或无效 JSON 均交给 GitHub tree API 回退。
-  }
-  return fetchGitHubTreePaths(entry, gitRef);
-}
-
-export function assertMarketPackageEntries(
-  paths: readonly string[],
-  packageDir: string,
-  manifest?: RoomManifest,
-): void {
-  const required = [
-    'parti.room.json',
-    ...Object.values(manifest?.entry ?? {}).filter((path): path is string => typeof path === 'string' && path.length > 0),
-  ];
-  for (const relativePath of required) {
-    const fullPath = joinPackagePath(packageDir, relativePath);
-    if (!paths.includes(fullPath)) {
-      throw new MarketError('PACKAGE_ENTRY_MISSING', { path: relativePath });
-    }
-  }
-}
-
-/**
- * 优先采用登记目录；若它已经过期，则用 issue 内嵌 manifest 的入口声明寻找其他完整候选。
- * 这样旧 marker 指向 manifest-only public/ 时，仍可定位同一 ref 中已提交的 dist/ 包。
- */
-export function findCompleteMarketPackageDir(
-  paths: readonly string[],
-  manifest: RoomManifest,
-  preferredDir?: string,
-): string | null {
-  const candidates = paths
-    .filter((path) => path === 'parti.room.json' || path.endsWith('/parti.room.json'))
-    .map((path) => path.slice(0, path.length - 'parti.room.json'.length).replace(/\/$/, '') || '.')
-    .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
-  const ordered = preferredDir
-    ? [preferredDir, ...candidates.filter((candidate) => candidate !== preferredDir)]
-    : candidates;
-  return ordered.find((candidate) => {
-    try {
-      assertMarketPackageEntries(paths, candidate, manifest);
-      return true;
-    } catch (reason) {
-      if (reason instanceof MarketError && reason.code === 'PACKAGE_ENTRY_MISSING') return false;
-      throw reason;
-    }
-  }) ?? null;
-}
-
 /**
  * 下载并安装市场模版：经 jsdelivr 读取发布仓库中的房间包文件
  * （不消耗 GitHub API 配额），返回保存后的模版 id。
  */
 export async function installMarketTemplate(
-  entry: MarketRepoRef & { packageDir?: string; manifest?: RoomManifest },
+  entry: MarketRepoRef & { packageDir?: string; manifest?: RoomManifest; source?: MarketRoomSourceMetadata },
 ): Promise<string> {
-  const gitRef = entry.tag ?? (await resolveDefaultBranch(entry));
-  const paths = await listMarketPackagePaths(entry, gitRef);
-
-  const packageDir = entry.manifest
-    ? findCompleteMarketPackageDir(paths, entry.manifest, entry.packageDir)
-    : entry.packageDir ?? findPackageDirInPaths(paths);
-  if (!packageDir) throw new MarketError('PACKAGE_ENTRY_MISSING', { path: 'parti.room.json' });
-  assertMarketPackageEntries(paths, packageDir, entry.manifest);
-
-  const prefix = packageDir === '.' ? '' : `${packageDir}/`;
-  const packagePaths = paths.filter((path) => (prefix ? path.startsWith(prefix) : true));
-  const files: Record<string, Uint8Array> = {};
-  await Promise.all(
-    packagePaths.map(async (path) => {
-      const res = await fetch(jsdelivrFileUrl(entry, gitRef, path));
-      if (!res.ok) throw new MarketError('PACKAGE_DOWNLOAD_FAILED', { status: res.status });
-      files[path.slice(prefix.length)] = new Uint8Array(await res.arrayBuffer());
-    }),
-  );
-
-  let input;
-  try {
-    input = await buildPackageInputFromFiles(files);
-  } catch (reason) {
-    if (reason instanceof ImportRoomError && (
-      reason.code === 'MANIFEST_NOT_FOUND' ||
-      reason.code === 'UI_ENTRY_MISSING' ||
-      reason.code === 'WORKER_ENTRY_MISSING'
-    )) {
-      throw new MarketError('PACKAGE_ENTRY_MISSING', {
-        path: reason.path ?? (reason.code === 'MANIFEST_NOT_FOUND' ? 'parti.room.json' : undefined),
-      });
-    }
-    throw reason;
+  if (entry.source?.primary.kind === 'release-zip') {
+    throw new RoomSourceError('RELEASE_MANUAL_REQUIRED', { releaseUrl: entry.source.primary.url });
   }
-  return saveImportedTemplate(input, { type: 'market', ref: marketRefString(entry) });
+  const client = new GitHubSourceClient();
+  const source = entry.source?.primary.kind === 'git-folder' ? entry.source.primary : undefined;
+  const gitRef = source?.ref ?? entry.tag ?? await client.defaultBranch(entry);
+  const scope = source?.packageDir ?? '.';
+  const resolved = await client.resolveRepository({
+    owner: entry.owner,
+    repo: entry.repo,
+    ref: gitRef,
+    scope,
+    explicitRef: Boolean(source?.ref ?? entry.tag),
+  });
+  return saveImportedTemplate(resolved.input, { type: 'market', ref: marketRefString(entry) });
 }

@@ -12,14 +12,10 @@ export function formatLobbyStatus(intl: IntlShape, status: LobbyStatusKey): stri
 }
 
 export function formatImportError(intl: IntlShape, error: ImportRoomError): string {
-  const { code, path } = error;
-  if (code === 'UI_ENTRY_MISSING' || code === 'WORKER_ENTRY_MISSING') {
-    return intl.formatMessage({ id: `import.error.${code}` }, { path: path ?? '' });
-  }
-  if (code === 'GITHUB_DIR_READ_FAILED' || code === 'DOWNLOAD_FAILED') {
-    return intl.formatMessage({ id: `import.error.${code}` }, { status: error.status ?? '', path: path ?? '' });
-  }
-  return intl.formatMessage({ id: `import.error.${code}` });
+  return intl.formatMessage(
+    { id: `import.error.${error.code}` },
+    { status: error.status ?? '', path: error.path ?? '' },
+  );
 }
 
 export function formatFetchPackageError(intl: IntlShape, error: FetchPackageError): string {

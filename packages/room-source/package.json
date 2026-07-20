@@ -1,0 +1,16 @@
+{
+  "name": "@parti/room-source",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@parti/room-packager": "workspace:*",
+    "jszip": "^3.10.1"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  }
+}

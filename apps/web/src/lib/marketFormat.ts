@@ -1,5 +1,6 @@
 /** 房间市场的纯函数部分：issue 标题解析、徽章映射、release 资产地址。独立成模块以便单测。 */
 import { validateManifest, type RoomManifest } from '@parti/room-packager';
+import { parseMarketRepositoryTitle, type MarketRoomSourceMetadata } from '@parti/room-source';
 
 export const MARKET_MANIFEST_ASSET = 'parti.room.json';
 export const MARKET_PACKAGE_ASSET = 'parti.room.zip';
@@ -16,12 +17,11 @@ export interface MarketRepoRef {
 
 /** 解析 issue 标题：`[parti-room] owner/repo` 或 `[parti-room] owner/repo@tag`。 */
 export function parseMarketIssueTitle(title: string): MarketRepoRef | null {
-  const match = title
-    .trim()
-    .match(/^\[parti-room\]\s*([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:@([^\s]+))?\s*$/i);
-  if (!match) return null;
-  const [, owner, repo, tag] = match;
-  return tag ? { owner, repo, tag } : { owner, repo };
+  const parsed = parseMarketRepositoryTitle(title);
+  if (!parsed) return null;
+  return parsed.ref
+    ? { owner: parsed.owner, repo: parsed.repo, tag: parsed.ref }
+    : { owner: parsed.owner, repo: parsed.repo };
 }
 
 /** 从 issue labels 中提取展示徽章（保持 MARKET_BADGE_LABELS 的顺序）。 */
@@ -46,6 +46,8 @@ export const MARKET_MANIFEST_START = '<!-- parti-room:manifest:start -->';
 export const MARKET_MANIFEST_END = '<!-- parti-room:manifest:end -->';
 /** issue 正文中记录房间包所在目录的标记：`<!-- parti-room:package-dir:dist -->`。 */
 export const MARKET_PACKAGE_DIR_PATTERN = /<!--\s*parti-room:package-dir:([^\s>]+)\s*-->/;
+/** triage 写入的版本化安装来源元数据。 */
+export const MARKET_SOURCE_PATTERN = /<!--\s*parti-room:source:(\{[^\r\n]*\})\s*-->/;
 
 export type MarketManifestError = 'MANIFEST_UNAVAILABLE' | 'MANIFEST_INVALID';
 
@@ -57,6 +59,34 @@ export type MarketManifestParseResult =
 export function parsePackageDirFromIssueBody(body: string | null | undefined): string {
   const match = body?.match(MARKET_PACKAGE_DIR_PATTERN);
   return match ? match[1] : '.';
+}
+
+/** 解析 triage 写入的版本化来源标记；旧 issue 没有该标记时返回 undefined。 */
+export function parseMarketSourceFromIssueBody(
+  body: string | null | undefined,
+): MarketRoomSourceMetadata | undefined {
+  const match = body?.match(MARKET_SOURCE_PATTERN);
+  if (!match) return undefined;
+  try {
+    const value = JSON.parse(match[1]) as MarketRoomSourceMetadata;
+    if (value.schema !== 1 || !value.primary || (value.primary.kind !== 'git-folder' && value.primary.kind !== 'release-zip')) {
+      return undefined;
+    }
+    if (value.primary.kind === 'git-folder') {
+      if (!value.primary.ref || !value.primary.packageDir) return undefined;
+    } else if (!value.primary.tag || !value.primary.url || value.primary.asset !== MARKET_PACKAGE_ASSET) {
+      return undefined;
+    }
+    if (value.fallback && (
+      value.fallback.kind !== 'release-zip' ||
+      !value.fallback.tag ||
+      !value.fallback.url ||
+      value.fallback.asset !== MARKET_PACKAGE_ASSET
+    )) return undefined;
+    return value;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -92,29 +122,6 @@ export function joinPackagePath(packageDir: string, name: string): string {
 }
 
 /**
- * 在仓库文件路径列表中定位房间包目录（最浅的 parti.room.json 所在目录），
- * 与 ZIP 导入的剥前缀规则一致；找不到返回 null。
- */
-export function findPackageDirInPaths(paths: string[]): string | null {
-  const candidates = paths
-    .filter((path) => path === MARKET_MANIFEST_ASSET || path.endsWith(`/${MARKET_MANIFEST_ASSET}`))
-    .sort((a, b) => a.split('/').length - b.split('/').length);
-  if (candidates.length === 0) return null;
-  const dir = candidates[0].slice(0, candidates[0].length - MARKET_MANIFEST_ASSET.length).replace(/\/$/, '');
-  return dir === '' ? '.' : dir;
-}
-
-/** jsdelivr 数据 API：列出一个仓库 ref 下的完整文件树（带 CORS，不占 GitHub API 配额）。 */
-export function jsdelivrTreeUrl(ref: MarketRepoRef, gitRef: string): string {
-  return `https://data.jsdelivr.com/v1/packages/gh/${ref.owner}/${ref.repo}@${encodeURIComponent(gitRef)}`;
-}
-
-/** jsdelivr CDN：按仓库 ref + 路径拉取单个文件（带 CORS）。 */
-export function jsdelivrFileUrl(ref: MarketRepoRef, gitRef: string, path: string): string {
-  return `https://cdn.jsdelivr.net/gh/${ref.owner}/${ref.repo}@${encodeURIComponent(gitRef)}/${path}`;
-}
-
-/**
  * 解析市场卡片的封面地址：绝对 URL 原样使用；相对路径按包目录解析到发布仓库
  * （github.com/raw 302 到默认分支，`<img>`/CSS 展示不需要 CORS）。
  */
@@ -128,4 +135,10 @@ export function resolveMarketCover(
   const branch = ref.tag ?? 'HEAD';
   const path = joinPackagePath(packageDir, cover.replace(/^\.?\//, ''));
   return `https://github.com/${ref.owner}/${ref.repo}/raw/${encodeURIComponent(branch)}/${path}`;
+}
+
+/** 来源标记中已由 triage 校验过的 release ZIP 下载地址。 */
+export function marketReleaseUrl(source: MarketRoomSourceMetadata | undefined): string | undefined {
+  if (!source) return undefined;
+  return source.primary.kind === 'release-zip' ? source.primary.url : source.fallback?.url;
 }

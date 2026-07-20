@@ -191,6 +191,9 @@
       "manifestInvalid": "Package info invalid; cannot install right now",
       "downloadFallback": "Download in browser",
       "downloadFallbackHint": "After the download finishes, use “Import from ZIP” above to install it.",
+      "downloadZip": "Download ZIP",
+      "releaseOnly": "ZIP only",
+      "releaseOnlyHint": "Only a validated release ZIP is available. Download it, then use “Import from ZIP” above.",
       "badges": {
         "beta": "Beta",
         "recommend": "Recommended"
@@ -466,26 +469,34 @@
   "import": {
     "error": {
       "MANIFEST_NOT_FOUND": "parti.room.json not found. This does not look like a valid room package.",
+      "MANIFEST_INVALID": "parti.room.json is not a valid room manifest.",
       "MANIFEST_INVALID_JSON": "parti.room.json is not valid JSON.",
+      "ENTRY_MISSING": "The room package is missing a manifest entry file: {path}",
+      "NO_COMPLETE_PACKAGE": "No package in the requested scope has both a valid manifest and every declared entry file.",
+      "SOURCE_PATH_INVALID": "The room package contains an unsafe or non-canonical path: {path}",
+      "SOURCE_READ_FAILED": "Failed to read a room package file: {path}",
+      "ZIP_INVALID": "The file is not a readable ZIP room package.",
       "UI_ENTRY_MISSING": "Missing UI entry file: {path}",
       "WORKER_ENTRY_MISSING": "Missing worker entry file: {path}",
       "ZIP_MANIFEST_NOT_FOUND": "parti.room.json not found in ZIP.",
-      "GITHUB_URL_INVALID": "Unrecognized GitHub URL. Provide a blob/tree link to a file or folder.",
+      "GITHUB_URL_INVALID": "Unrecognized GitHub URL. Provide a repository, tree folder, or blob file link.",
+      "GITHUB_REF_NOT_FOUND": "The branch or tag in this GitHub URL does not exist.",
       "GITHUB_RATE_LIMITED": "GitHub API rate limited (60/hour unauthenticated). Please try again later.",
+      "GITHUB_TREE_FAILED": "Failed to read the GitHub repository tree ({status}).",
+      "GITHUB_TREE_TRUNCATED": "GitHub truncated the repository tree, so a complete room package cannot be located safely.",
+      "GITHUB_DOWNLOAD_FAILED": "Failed to download a room package file from GitHub: {path}",
       "GITHUB_DIR_READ_FAILED": "Failed to read GitHub directory ({status}).",
       "GITHUB_MANIFEST_NOT_FOUND": "parti.room.json not found in the folder for this URL.",
-      "DOWNLOAD_FAILED": "Failed to download file: {path}"
+      "DOWNLOAD_FAILED": "Failed to download file: {path}",
+      "RELEASE_NOT_FOUND": "No matching GitHub release was found.",
+      "RELEASE_ASSET_MISSING": "The release does not contain parti.room.zip.",
+      "RELEASE_MANUAL_REQUIRED": "The branch does not contain a complete one-click package, but a matching release ZIP exists. Download it and use “Import from ZIP”."
     }
   },
   "market": {
     "error": {
       "REGISTRY_FETCH_FAILED": "Failed to load the room market ({status}). Please try again later.",
-      "REGISTRY_RATE_LIMITED": "GitHub API rate limit reached. The room market cannot refresh right now, please try again later.",
-      "RATE_LIMITED": "GitHub API rate limit reached. Cannot install right now; try again later or download directly in your browser.",
-      "PACKAGE_TREE_FAILED": "Failed to read the registered repository tree ({status}). Try again later or download the release ZIP and import it manually.",
-      "PACKAGE_TREE_TRUNCATED": "The registered repository tree is too large to locate a complete room package safely. Download the release ZIP and import it manually.",
-      "PACKAGE_ENTRY_MISSING": "The registered repository package directory is missing: {path}. This is not a release ZIP parsing error; rerun registry validation or import the ZIP manually.",
-      "PACKAGE_DOWNLOAD_FAILED": "Failed to download the room package ({status}). Make sure the repository contains the room package files (parti.room.json and entry files)."
+      "REGISTRY_RATE_LIMITED": "GitHub API rate limit reached. The room market cannot refresh right now, please try again later."
     }
   },
   "template": {

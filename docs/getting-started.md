@@ -218,8 +218,9 @@ apps/web/public/rooms/my-room/
 ### 把房间发布到房间市场
 
 不想并入主仓库，也可以把房间发布到在线「房间市场」供所有 Parti web 用户一键安装：
-把房间包文件放进自己的公开仓库，再到主仓库 issue 区按 `[parti-room] owner/repo` 格式
-登记即可（release 中的 `parti.room.zip` 是可选的存档与降级通道）。完整发布指南与格式
+把房间包文件放进自己的公开仓库；需要构建时，推荐用 GitHub Actions 同时发布完整
+`dist/` 到 `parti-package` 分支并创建 Release，然后按
+`[parti-room] owner/repo@parti-package` 登记。Release ZIP 仅供下载后手动导入。完整发布指南与格式
 规范见 [room-market.md](./room-market.md)。
 
 ## 6. 下一步

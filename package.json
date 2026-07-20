@@ -14,6 +14,9 @@
     "typecheck": "tsc -b"
   },
   "devDependencies": {
+    "@parti/room-source": "workspace:*",
+    "@types/node": "^26.0.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   },

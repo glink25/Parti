@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { createRoomSnapshot } from '../lib/customRooms';
-import { importRoomFromGitHub, importRoomFromZip } from '../lib/importRoom';
+import { importRoomFromGitHub, importRoomFromZip, releaseFallbackFromError } from '../lib/importRoom';
 import { deleteImportedTemplate } from '../lib/templates';
 import { getTemplateList, loadPackageSourceWithProgress, type TemplateListEntry } from '../lib/rooms';
 import { useLocale } from '@/i18n/LocaleProvider';
@@ -92,6 +92,7 @@ export function EditorView() {
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [githubUrl, setGithubUrl] = useState('');
+  const [githubFallbackUrl, setGithubFallbackUrl] = useState<string | null>(null);
   const [aiImportLoaded, setAiImportLoaded] = useState(false);
   const [aiImportOpen, setAiImportOpen] = useState(false);
   const [aiImportSession, setAiImportSession] = useState<{
@@ -275,6 +276,7 @@ export function EditorView() {
   async function runImport(task: () => Promise<string>): Promise<void> {
     setImporting(true);
     setError(null);
+    setGithubFallbackUrl(null);
     try {
       const id = await task();
       const list = await reloadTemplates();
@@ -282,6 +284,7 @@ export function EditorView() {
       if (entry) await commitTemplateSelection(entry);
     } catch (reason) {
       setError(formatError(intl, reason));
+      setGithubFallbackUrl(releaseFallbackFromError(reason) ?? null);
     } finally {
       setImporting(false);
     }
@@ -417,7 +420,16 @@ export function EditorView() {
 
       {!showEditor && (
         <section className="mb-[42px]">
-          {error && <div className="mb-3 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">{error}</div>}
+          {error && (
+            <div className="mb-3 flex flex-col gap-2 rounded-[11px] border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">
+              <span>{error}</span>
+              {githubFallbackUrl && (
+                <a className="w-max font-semibold text-foreground underline" href={githubFallbackUrl} target="_blank" rel="noreferrer">
+                  <FormattedMessage id="editor.market.downloadFallback" />
+                </a>
+              )}
+            </div>
+          )}
           <Tabs className="w-full min-w-0" value={normalizedCategory} onValueChange={(value) => setActiveCategory(value as TemplateCategoryId)}>
             <div className="mb-5 w-full min-w-0 overflow-hidden rounded-xl bg-secondary/65 p-1">
               <div className="scrollbar-hidden w-full min-w-0 touch-pan-x overflow-x-auto overflow-y-hidden">
