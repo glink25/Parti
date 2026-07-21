@@ -190,11 +190,14 @@ Parti 采用 [PolyForm Noncommercial License 1.0.0](./LICENSE.md)。任何人均
 
 ## ☕️ 请我喝杯咖啡
 
+<details>
+<summary>点击查看捐赠方式</summary>
+
 感谢你对 Parti 的支持！Parti 目前由单人维护，你的捐赠将用于项目维护和持续开发。
 
 ### 支付宝 (Alipay)
 
-![支付宝收款码](./apps/web/public/donation/alipay.png)
+<img src="./apps/web/public/donation/alipay.png" alt="支付宝收款码" width="320">
 
 ### Solana (SOL)
 
@@ -202,4 +205,6 @@ Parti 采用 [PolyForm Noncommercial License 1.0.0](./LICENSE.md)。任何人均
 
 `vEzM9jmxChx2AoMMDpHARHZcUjmUCHdBShwF9eJYGEg`
 
-![Solana 钱包二维码](./apps/web/public/donation/solana.png)
+<img src="./apps/web/public/donation/solana.png" alt="Solana 钱包二维码" width="320">
+
+</details>

@@ -189,11 +189,14 @@ Third-party game rooms published through the Parti Room Market remain the proper
 
 ## ☕️ Buy Me a Coffee
 
+<details>
+<summary>View donation options</summary>
+
 Thank you for supporting Parti! Parti is currently maintained by a single developer, and your donation will support maintenance and continued development.
 
 ### Alipay
 
-![Alipay payment QR code](./apps/web/public/donation/alipay.png)
+<img src="./apps/web/public/donation/alipay.png" alt="Alipay payment QR code" width="320">
 
 ### Solana (SOL)
 
@@ -201,4 +204,6 @@ Wallet address:
 
 `vEzM9jmxChx2AoMMDpHARHZcUjmUCHdBShwF9eJYGEg`
 
-![Solana wallet QR code](./apps/web/public/donation/solana.png)
+<img src="./apps/web/public/donation/solana.png" alt="Solana wallet QR code" width="320">
+
+</details>
