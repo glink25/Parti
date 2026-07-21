@@ -12,6 +12,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
+function formatErrorDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  try {
+    return JSON.stringify(detail, null, 2) ?? String(detail);
+  } catch {
+    return String(detail);
+  }
+}
+
 /** 房间调试面板 (GOAL.md §15.1) —— 订阅 HostRuntime 的事件总线。 */
 export function DevTools({
   host,
@@ -44,9 +53,10 @@ export function DevTools({
       host.logs.on((args) =>
         setLogs((prev) => [...prev, args.map(String).join(' ')].slice(-100)),
       ),
-      host.errors.on((e) => setErrors((prev) => [...prev, e].slice(-50))),
-      // host.errors.on(e => console.error(e)),
-      // host.logs.on(e => console.error(e)),
+      host.errors.on((e) => {
+        console.error('[DevTools]', e.code, e.message, e.detail ?? e);
+        setErrors((prev) => [...prev, e].slice(-50));
+      }),
     ];
     return () => offs.forEach((off) => off());
   }, [host]);
@@ -140,7 +150,14 @@ export function DevTools({
           <div className="flex max-h-[220px] flex-col-reverse overflow-auto font-mono text-[10px]">
             {errors.map((e, i) => (
               <div className="border-b border-dashed border-border py-0.5 text-danger" key={`e${i}`}>
-                ✖ {e.code}: {e.message}
+                <div>
+                  ✖ {e.code}: {e.message}
+                </div>
+                {e.detail !== undefined && (
+                  <pre className="m-0 mt-0.5 max-h-[120px] overflow-auto whitespace-pre-wrap text-[9px] opacity-80">
+                    {formatErrorDetail(e.detail)}
+                  </pre>
+                )}
               </div>
             ))}
             {logs.map((l, i) => (
