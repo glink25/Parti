@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
-import { CheckIcon, DatabaseIcon, NetworkIcon, Share2Icon } from 'lucide-react';
+import { CheckIcon, DatabaseIcon, WifiIcon, RouteIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   getSelectedTransportProfile,
@@ -21,8 +21,8 @@ function transportKind(config: TransportConfig): TransportKind {
 }
 
 const transportIcons = {
-  peerjs: Share2Icon,
-  lan: NetworkIcon,
+  peerjs: RouteIcon,
+  lan: WifiIcon,
   supabase: DatabaseIcon,
 } as const;
 
