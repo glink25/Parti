@@ -13,6 +13,8 @@ export const CLIENT_SDK_SCRIPT = String.raw`
   var ready = false;
   var stateHandlers = [];
   var eventHandlers = {}; // event -> [fn]
+  var agentMode = false;      // 是否有 AI agent 正在通过本客户端游玩
+  var agentGuideFn = null;    // 房间 UI 注册的"转述"函数 (state) => guide
   var orientationStatus = 'unsupported';
   var orientationStatusHandlers = [];
   var orientationDataHandlers = [];
@@ -37,6 +39,21 @@ export const CLIENT_SDK_SCRIPT = String.raw`
     }
   }
 
+  // agent 模式下，每次状态变化就把房间自己"转述"出的说明推给宿主页，
+  // 供 window.__partiAgent.describe() 读取。非 agent 模式下永不执行，
+  // 因此对普通玩家零开销、对游戏流程零影响。
+  function emitAgentGuide() {
+    if (!agentMode || !agentGuideFn || currentState === null) return;
+    var guide;
+    try {
+      guide = agentGuideFn(currentState);
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+    postToHost({ type: 'agent-guide', guide: guide === undefined ? null : guide });
+  }
+
   function notifyOrientationStatus(status) {
     orientationStatus = status;
     for (var i = 0; i < orientationStatusHandlers.length; i++) {
@@ -57,12 +74,15 @@ export const CLIENT_SDK_SCRIPT = String.raw`
       case 'init':
         playerId = msg.playerId;
         currentState = msg.state;
+        agentMode = msg.agent === true;
         window.parti.playerId = playerId;
         notifyState();
+        emitAgentGuide();
         break;
       case 'state':
         currentState = msg.state;
         notifyState();
+        emitAgentGuide();
         break;
       case 'event':
         notifyEvent(msg.event, msg.payload);
@@ -121,6 +141,15 @@ export const CLIENT_SDK_SCRIPT = String.raw`
     },
 
     leave: function () { postToHost({ type: 'leave' }); },
+
+    // 无障碍式"转述"：房间可注册一个 (state) => guide 函数，把当前局面翻译成
+    // 面向 AI 的文字/结构化说明（规则、当前阶段、可用操作、取值范围等）。仅在
+    // AI agent 通过 agent 路由接入时才会被调用；普通玩家永不触发，不影响游戏流程。
+    // 不注册也没关系——agent 会退化为直接读 state 自行推断。
+    exposeToAgent: function (fn) {
+      agentGuideFn = typeof fn === 'function' ? fn : null;
+      emitAgentGuide();
+    },
 
     orientation: {
       getStatus: function () { return orientationStatus; },

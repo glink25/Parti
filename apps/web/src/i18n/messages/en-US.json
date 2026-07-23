@@ -1,4 +1,9 @@
 {
+  "agent": {
+    "page": {
+      "hint": "This page is for AI agents. The top-level window.__partiAgent exposes getState()/describe()/action() and more, callable from the console or a headless browser evaluate; the text below mirrors it for screenshots or DOM reading."
+    }
+  },
   "app": {
     "documentTitle": "Parti — Create and play together with friends",
     "header": {
@@ -344,6 +349,9 @@
       "copy": "Copy",
       "copied": "Copied",
       "qr": "QR code",
+      "inviteAi": "Invite AI",
+      "inviteAiCopied": "Prompt copied",
+      "inviteAiHint": "Copy a prompt that lets an AI agent join and play through a headless browser.",
       "joinable": "Joinable now",
       "full": "Room is full",
       "qrTitle": "Scan to join",

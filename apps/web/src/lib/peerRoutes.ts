@@ -1,7 +1,7 @@
 import { validateTransportConfig, type TransportConfig } from './transportConfig';
 
 export interface PeerRoute {
-  mode: 'host' | 'join'; roomId?: string; hostPeerId?: string; credential?: string; transportConfig: TransportConfig;
+  mode: 'host' | 'join' | 'agent'; roomId?: string; hostPeerId?: string; credential?: string; transportConfig: TransportConfig;
 }
 
 function configFromQuery(query: URLSearchParams, legacy: boolean): TransportConfig {
@@ -25,8 +25,9 @@ export function parsePeerRoute(hash: string): PeerRoute {
   const legacy = parts[0] === 'peer';
   const online = parts[0] === 'online';
   const params = new URLSearchParams(query);
-  if ((legacy || online) && parts[1] === 'join') return {
-    mode: 'join', roomId: parts[2] ? decodeURIComponent(parts[2]) : undefined,
+  if ((legacy || online) && (parts[1] === 'join' || parts[1] === 'agent')) return {
+    mode: parts[1] === 'agent' ? 'agent' : 'join',
+    roomId: parts[2] ? decodeURIComponent(parts[2]) : undefined,
     hostPeerId: parts[3] ? decodeURIComponent(parts[3]) : undefined,
     credential: params.get('password') ?? undefined, transportConfig: configFromQuery(params, legacy),
   };
@@ -50,6 +51,11 @@ export function buildInviteUrl(origin: string, pathname: string, roomId: string,
 
 export function buildJoinHashRoute(roomId: string, connectionInfo: string, credential?: string, config: TransportConfig = { adapter: 'peerjs' }): string {
   return `/online/join/${encodeURIComponent(roomId)}/${encodeURIComponent(connectionInfo)}?${configParams(config, credential).toString()}`;
+}
+
+/** AI agent 专用加入链接：与普通加入同参数，仅路由段不同，用于 agent 模式渲染。 */
+export function buildAgentInviteUrl(origin: string, pathname: string, roomId: string, connectionInfo: string, password = '', config: TransportConfig = { adapter: 'peerjs' }): string {
+  return `${origin}${pathname}#/online/agent/${encodeURIComponent(roomId)}/${encodeURIComponent(connectionInfo)}?${configParams(config, password).toString()}`;
 }
 
 function parseHash(hash: string): string | null {

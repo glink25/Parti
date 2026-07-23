@@ -55,6 +55,8 @@ export function RoomFrame({
   exitAriaLabelId,
   exitTitleId,
   onSensorPermissionChange,
+  agent = false,
+  onAgentGuide,
 }: {
   pkg: RoomPackage;
   port: RoomClientPort;
@@ -71,6 +73,10 @@ export function RoomFrame({
   exitAriaLabelId?: string;
   exitTitleId?: string;
   onSensorPermissionChange?: (control: SensorPermissionControl | null) => void;
+  /** 本 frame 供 AI agent 游玩，触发房间的 parti.exposeToAgent 转述。 */
+  agent?: boolean;
+  /** 房间转述出的 agent guide 更新时回调。 */
+  onAgentGuide?: (guide: unknown) => void;
 }) {
   const intl = useIntl();
   const ref = useRef<HTMLIFrameElement>(null);
@@ -107,6 +113,8 @@ export function RoomFrame({
           requestPermission: () => bridgeRef.current?.requestOrientationPermission(),
         });
       },
+      ...(agent ? { agent: true } : {}),
+      ...(onAgentGuide ? { onAgentGuide } : {}),
     });
     bridgeRef.current = bridge;
     return () => {
@@ -114,7 +122,7 @@ export function RoomFrame({
       onSensorPermissionChange?.(null);
       bridge.dispose();
     };
-  }, [frameUrl, port, onLog, onSensorPermissionChange, sensors]);
+  }, [frameUrl, port, onLog, onSensorPermissionChange, sensors, agent, onAgentGuide]);
 
   useEffect(() => {
     if (!fullscreen || !onExitFullscreen) return;

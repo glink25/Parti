@@ -19,6 +19,9 @@ interface Parti {
   ready(): void;
   leave(): void;
   log(...args: unknown[]): void;
+
+  // 可选：为 AI agent 提供"转述"（无障碍式），详见 §4 与 agent-access.md
+  exposeToAgent(describe: (state: unknown) => unknown): void;
 }
 ```
 
@@ -118,3 +121,31 @@ parti.ready();
 ```
 
 完整的、可运行的 UI 范例见 [示例：井字棋](./example-tic-tac-toe.md)。
+
+## 4. `parti.exposeToAgent(describe)` —— 为 AI agent 提供转述（可选）
+
+当有 AI agent 通过 **agent 路由**接入房间时，它默认只能读到 `getState()` 的原始
+状态并靠推断游玩。你可以像写「无障碍说明」一样，注册一个把当前局面翻译成面向 AI 的
+文字/结构化说明的函数，大幅降低 agent 的理解成本与试错：
+
+```js
+parti.exposeToAgent((state) => ({
+  summary: '井字棋。X 先手，三连即胜。',
+  phase: state.phase,          // 'playing' | 'finished'
+  yourMark: state.marks[parti.playerId],
+  yourTurn: state.turn === parti.playerId,
+  availableActions: [
+    { name: 'mark', when: '轮到你且格子为空', payload: '{ cell: 0..8 }' },
+  ],
+}));
+```
+
+- **完全可选**：不注册也能被 agent 游玩（退化为读 `state` 推断）。
+- **只在 agent 模式下执行**：普通人类玩家永不触发，对游戏流程零影响、零开销。
+- 每次状态变化都会用最新 `state` 重新调用，结果推送给 agent 的 `describe()`。
+- 运行在**本玩家视角**的 UI 里，因此只应描述该玩家可见的信息；由于 UI 本就拿不到
+  别人的隐藏状态（谜底、身份、底牌），转述天然不会泄露秘密——但仍请勿把通过私密
+  事件收到的他人信息写进去。
+- 返回值必须可 JSON 序列化（对象或字符串皆可）。
+
+agent 侧如何读取这份转述、以及房主如何邀请 AI，见 [agent-access.md](./agent-access.md)。

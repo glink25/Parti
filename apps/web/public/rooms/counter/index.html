@@ -40,6 +40,16 @@
 
     document.getElementById('inc').onclick = () => parti.action('increment');
 
+    // 可选：为 AI agent 提供"转述"。仅在 agent 接入时被调用，不影响人类游玩。
+    parti.exposeToAgent?.((state) => ({
+      summary: '多人计数器：点击 +1 会让共享计数增加，并累计你自己的点击次数。',
+      count: state.count,
+      yourClicks: (state.clicks || {})[parti.playerId] || 0,
+      availableActions: [
+        { name: 'increment', payload: '无（省略即可）', effect: 'count +1' },
+      ],
+    }));
+
     // 进入房间即标记 ready（计数器无需等待）
     parti.ready();
   </script>

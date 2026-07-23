@@ -148,16 +148,18 @@ export function createPeerJoin(
   transportConfig: TransportConfig,
   handlers: PeerJoinHandlers = {},
   credential?: string,
+  playerName?: string,
 ): PeerJoin {
   const roomId = pkg.manifest.id;
   const user = loadLocalUser();
+  const name = playerName?.trim() ? playerName.trim().slice(0, 24) : user.name;
 
   const client = new ReconnectingClient({
     roomId,
     packageHash: pkg.packageHash,
     hostPeerId,
     transportConfig,
-    playerName: user.name,
+    playerName: name,
     clientId: user.id,
     ...(credential !== undefined ? { credential } : {}),
     ...(handlers.onStatus ? { onStatus: handlers.onStatus } : {}),

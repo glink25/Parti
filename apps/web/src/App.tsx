@@ -86,7 +86,7 @@ function AppLayout() {
 
   const route = hash.replace(/^#/, '');
   const parts = route.split('/').filter(Boolean); // e.g. ['local','counter']
-  const isPlayerRoute = (parts[0] === 'peer' || parts[0] === 'online') && parts[1] === 'join';
+  const isPlayerRoute = (parts[0] === 'peer' || parts[0] === 'online') && (parts[1] === 'join' || parts[1] === 'agent');
   const isLobbyRoute = parts.length === 0;
 
   let view;

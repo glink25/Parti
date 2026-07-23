@@ -157,6 +157,13 @@ export interface UISandboxBridgeOptions {
   onOrientationStatusChange?: (status: OrientationStatus) => void;
   /** iframe 的点击无法把 transient activation 传给 Safari 时，请宿主显示真实按钮。 */
   onOrientationHostGestureRequired?: () => void;
+  /**
+   * 本客户端是否供 AI agent 游玩。为 true 时随 init 通知 iframe 进入 agent 模式，
+   * 房间的 parti.exposeToAgent 转述函数才会被调用。
+   */
+  agent?: boolean;
+  /** 收到房间转述的 agent guide 时回调，宿主页据此暴露给 window.__partiAgent。 */
+  onAgentGuide?: (guide: unknown) => void;
 }
 
 export class UISandboxBridge {
@@ -227,6 +234,9 @@ export class UISandboxBridge {
       case 'log':
         this.opts.onLog?.(msg.args);
         break;
+      case 'agent-guide':
+        this.opts.onAgentGuide?.(msg.guide);
+        break;
     }
   }
 
@@ -238,6 +248,7 @@ export class UISandboxBridge {
       type: 'init',
       playerId: this.port.getPlayerId(),
       state: this.port.getState(),
+      ...(this.opts.agent ? { agent: true } : {}),
     });
     this.orientation.announce();
   }

@@ -196,6 +196,45 @@
       renderMessages(state);
     });
 
+    // 可选：为 AI agent 提供"转述"。仅在 agent 接入时被调用，不影响人类游玩。
+    // 只回传最近若干条消息，避免历史过长白白消耗 token。
+    parti.exposeToAgent?.((state) => {
+      const RECENT = 30;
+      const players = Object.entries(state.players).map(([id, p]) => ({
+        id,
+        name: p.name,
+        you: id === parti.playerId,
+      }));
+      const recentMessages = state.messages.slice(-RECENT).map((msg) =>
+        msg.type === 'system'
+          ? { type: 'system', text: msg.text, time: formatTime(msg.ts) }
+          : {
+              type: 'chat',
+              from: msg.authorId === parti.playerId ? '我' : msg.authorName,
+              mine: msg.authorId === parti.playerId,
+              text: msg.text,
+              time: formatTime(msg.ts),
+            },
+      );
+      return {
+        summary:
+          '多人文字聊天室。用 send 操作发送一条消息，所有人都能看到消息以及加入/离开的系统提示。这是自由聊天，没有回合或胜负。',
+        online: players.length,
+        players,
+        yourId: parti.playerId,
+        totalMessages: state.messages.length,
+        recentMessages, // 仅最近 ' + RECENT + ' 条；需要更早历史时再读 getState()
+        availableActions: [
+          {
+            name: 'send',
+            payload: '{ text: string }',
+            note: 'text 去除首尾空白后长度需为 1~500；为空或超长会被忽略。一次发一条。',
+          },
+        ],
+        tip: '聊天更新可能频繁，建议用 drainEvents()/stateVersion 判断是否有新消息，再决定是否回读，避免频繁整读。',
+      };
+    });
+
     function sendMessage() {
       const text = inputEl.value.trim();
       if (!text) return;

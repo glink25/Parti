@@ -29,7 +29,8 @@ import {
   type LobbyRoomInput,
   type LobbyStatusKey,
 } from '../lib/lobbyApi';
-import { buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes';
+import { buildAgentInviteUrl, buildInviteUrl, parsePeerRoute } from '../lib/peerRoutes';
+import { AgentRoomView } from './AgentRoomView';
 import { loadLocalUser } from '../lib/localUser';
 import { useLocale } from '@/i18n/LocaleProvider';
 import { formatFetchPackageError, formatResolveError, formatRoomError } from '@/i18n/formatErrors';
@@ -59,6 +60,16 @@ import {
 
 export function PeerRoomView() {
   const route = parsePeerRoute(window.location.hash);
+  if (route.mode === 'agent') {
+    return (
+      <AgentRoomView
+        roomId={route.roomId}
+        hostPeerId={route.hostPeerId}
+        transportConfig={route.transportConfig}
+        initialCredential={route.credential}
+      />
+    );
+  }
   if (route.mode === 'join') {
     return (
       <PeerJoinView
@@ -400,6 +411,14 @@ function PeerHostSession({
     settings.password,
     transportConfig,
   );
+  const agentInviteUrl = buildAgentInviteUrl(
+    location.origin,
+    location.pathname,
+    roomId,
+    state.hostPeerId,
+    settings.password,
+    transportConfig,
+  );
   const roomTitle = settings.title.trim() || pkg.manifest.name;
 
   async function copyInvite(): Promise<void> {
@@ -417,6 +436,7 @@ function PeerHostSession({
     lobbyError,
     visibilityMode: transportConfig.adapter === 'lan' ? 'lan' : 'online',
     inviteUrl,
+    agentInviteUrl,
     copied,
     transportConfig,
     onCopyInvite: () => void copyInvite(),
@@ -637,6 +657,14 @@ function PeerJoinView({
     credential,
     transportConfig,
   );
+  const agentInviteUrl = buildAgentInviteUrl(
+    location.origin,
+    location.pathname,
+    roomId,
+    hostPeerId,
+    credential,
+    transportConfig,
+  );
 
   async function copyInvite(): Promise<void> {
     const ok = await copyTextToClipboard(inviteUrl);
@@ -659,6 +687,7 @@ function PeerJoinView({
     lobbyError: null,
     visibilityMode: transportConfig.adapter === 'lan' ? 'lan' : 'online',
     inviteUrl,
+    agentInviteUrl,
     copied,
     transportConfig,
     onCopyInvite: () => void copyInvite(),

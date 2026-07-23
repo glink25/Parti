@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIcon, CircleIcon, CopyIcon, QrCodeIcon, RefreshCwIcon, WandSparklesIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, CircleIcon, CopyIcon, QrCodeIcon, RefreshCwIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
 import type { HostRoomSettings } from '@/lib/roomSettings';
@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { InviteJoinHelpDialog } from '@/components/InviteJoinHelpDialog';
 import { cn } from '@/lib/utils';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { buildAgentPrompt } from '@/lib/agentPrompt';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ENABLE_REPLAYS } from '@/lib/featureFlags';
 import type { TransportConfig } from '@/lib/transportConfig';
@@ -27,6 +29,7 @@ export type RoomControlsProps = {
   lobbyError: string | null;
   visibilityMode: 'online' | 'lan';
   inviteUrl: string;
+  agentInviteUrl: string;
   copied: boolean;
   transportConfig: TransportConfig;
   onCopyInvite: () => void;
@@ -71,8 +74,19 @@ function SensorPermissionCard({ control }: { control: SensorPermissionControl })
 }
 
 function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControlsProps; showAdmissionStatus?: boolean }) {
-  const { settings, admission, inviteUrl, copied, transportConfig, onCopyInvite, onOpenQr } = props;
+  const { settings, admission, inviteUrl, agentInviteUrl, copied, transportConfig, onCopyInvite, onOpenQr } = props;
   const [helpOpen, setHelpOpen] = useState(false);
+  const [aiCopied, setAiCopied] = useState(false);
+
+  async function copyAgentPrompt(): Promise<void> {
+    const roomTitle = settings.title.trim() || inviteUrl;
+    const prompt = buildAgentPrompt({ agentUrl: agentInviteUrl, roomTitle });
+    const ok = await copyTextToClipboard(prompt);
+    if (!ok) return;
+    setAiCopied(true);
+    window.setTimeout(() => setAiCopied(false), 1800);
+  }
+
   return (
     <Card className="gap-3 rounded-[18px] border-border bg-[linear-gradient(150deg,var(--surface-2),var(--surface))]">
       <CardHeader>
@@ -96,6 +110,15 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
               <QrCodeIcon data-icon="inline-start" /><FormattedMessage id="peer.invite.qr" />
             </Button>
           </div>
+        </div>
+        <div className="mt-2.5">
+          <Button type="button" variant="outline" className="w-full" onClick={() => void copyAgentPrompt()}>
+            <BotIcon data-icon="inline-start" />
+            <FormattedMessage id={aiCopied ? 'peer.invite.inviteAiCopied' : 'peer.invite.inviteAi'} />
+          </Button>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+            <FormattedMessage id="peer.invite.inviteAiHint" />
+          </p>
         </div>
         <div className='flex justify-between items-center'>
           {showAdmissionStatus && (
