@@ -28,5 +28,6 @@ export type PartiApi = {
   onEvent(event: string, handler: (payload: unknown) => void): () => void;
   action(action: string, payload?: unknown): Promise<{ ok: true }>;
   ready(): void; leave(): void; log(...args: unknown[]): void;
+  exposeToAgent?(describe: (state: unknown) => unknown): void;
 };
 declare global { const parti: PartiApi; }

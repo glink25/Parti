@@ -9,6 +9,7 @@ interface Parti {
   ready(): void;
   leave(): void;
   log(...args: unknown[]): void;
+  exposeToAgent?(describe: (state: unknown) => unknown): void;
 }
 
 declare const parti: Parti;

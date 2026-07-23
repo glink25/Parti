@@ -72,6 +72,8 @@ export class DoudizhuScene {
 
     window.addEventListener('pagehide', this.destroy, { once: true });
     document.addEventListener('visibilitychange', this.visibility);
+    // AI agent 转述：本玩家视角，读 this.state + this.hand。迁移自旧 worker describe()/doudizhuObserve()。
+    parti.exposeToAgent?.(() => buildDoudizhuGuide(this.state, this.hand, parti.playerId));
     parti.ready();
     void parti.action('syncHand');
   }
@@ -530,4 +532,76 @@ export class DoudizhuScene {
     const player = this.state.players[playerId];
     return player.id === parti.playerId ? '你' : player.name;
   }
+}
+
+// ===== AI agent 转述（迁移自旧 worker 侧 describe()/doudizhuObserve()，改为客户端本玩家视角）=====
+const DOUDIZHU_GUIDE = {
+  summary: '三人斗地主。叫分决出地主，地主拿 3 张底牌对抗两名农民；先出完手牌的一方获胜。',
+  objective: '地主先出完手牌则地主胜，任一农民先出完则农民胜；按叫分与炸弹/火箭、春天等倍数结算得分。',
+  actions: [
+    { name: 'setReady', description: '大厅/结算后准备开始下一局。', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] }, examples: [{ ready: true }] },
+    { name: 'bid', description: '叫地主阶段轮到你时出价。score=0 表示不叫，1-3 分且必须高于当前最高分。', payloadSchema: { type: 'object', properties: { score: { type: 'integer', minimum: 0, maximum: 3 } }, required: ['score'] }, examples: [{ score: 2 }, { score: 0 }] },
+    { name: 'playCards', description: '出牌阶段轮到你时打出一组合法牌型。首出可自由出，跟牌需同型更大或用炸弹/火箭。', payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { type: 'string' } } }, required: ['cardIds'] } },
+    { name: 'pass', description: '出牌阶段跟牌时选择不出（首出或上一手是自己时不能过）。', payloadSchema: { type: 'null' } },
+    { name: 'syncHand', description: '请求重发自己的手牌。', payloadSchema: { type: 'null' } },
+  ],
+  glossary: {
+    phase: 'waiting=等待满3人, ready=可准备, bidding=叫地主, playing=出牌中, settlement=结算',
+    role: 'landlord=地主, farmer=农民, null=未定',
+    currentPlayerId: '当前该行动的玩家 id。',
+    bidState: '叫分状态：highestScore 当前最高分，highestPlayerId 最高分玩家，currentPlayerId 当前叫分玩家。',
+    lastPlay: '上一手有效出牌 {playerId, cards, analysis}；analysis.label 为牌型名。',
+    landlordCardsVisible: '地主确定后亮出的 3 张底牌。',
+    handCounts: '各玩家剩余手牌数（键为 playerId）。',
+    'round.multiplier': '当前倍数（炸弹/火箭/春天翻倍）。',
+  },
+} as const;
+
+function doudizhuAllPlayers(state: GameState): PlayerState[] {
+  return state.seats.map((id) => (id ? state.players[id] : null)).filter((player): player is PlayerState => Boolean(player));
+}
+
+function buildDoudizhuGuide(state: GameState | null, hand: Card[], playerId: string | null) {
+  const g = DOUDIZHU_GUIDE;
+  if (!state || !playerId) return { ...g, phase: 'connecting', narrative: '正在连接牌桌…', isYourTurn: false, availableActions: [] };
+  const me = state.players[playerId];
+  if (!me) {
+    return { ...g, phase: state.phase, narrative: '你当前不在牌桌上，正在旁观。', isYourTurn: false, availableActions: [], waitingFor: '等待入座' };
+  }
+  const handStr = hand.length ? hand.map((card) => `${card.label}#${card.id}`).join(' ') : '（无）';
+  const roleLabel = me.role === 'landlord' ? '地主' : me.role === 'farmer' ? '农民' : '未定';
+  const counts = doudizhuAllPlayers(state).map((p) => `${p.name}${p.id === state.dealer ? '(地主)' : ''}:${state.handCounts[p.id] ?? 0}张`).join('，');
+  const base = `你（${me.name}，${roleLabel}）手牌：${handStr}。各家剩余：${counts}。`;
+  const playersCount = doudizhuAllPlayers(state).length;
+
+  if (state.phase === 'waiting' || state.phase === 'ready' || state.phase === 'settlement') {
+    const canReady = playersCount === 3 && (state.phase === 'ready' || state.phase === 'settlement');
+    const actions: Array<Record<string, unknown>> = canReady ? [{ name: 'setReady', hint: me.ready ? '已准备，可取消' : '准备开始', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] } }] : [];
+    return { ...g, phase: state.phase, narrative: `${base} ${state.message}`, isYourTurn: canReady && !me.ready, availableActions: actions, waitingFor: canReady ? undefined : '等待三名玩家加入' };
+  }
+
+  if (state.phase === 'bidding') {
+    const bid = state.bidState;
+    if (!bid || bid.currentPlayerId !== playerId) {
+      const cur = bid?.currentPlayerId ? state.players[bid.currentPlayerId]?.name ?? '其他玩家' : '其他玩家';
+      return { ...g, phase: 'bidding', narrative: `${base} 当前最高分 ${bid?.highestScore ?? 0}，轮到 ${cur} 叫分。`, isYourTurn: false, availableActions: [], waitingFor: `等待 ${cur} 叫分` };
+    }
+    const scores = [0];
+    for (let s = bid.highestScore + 1; s <= 3; s += 1) scores.push(s);
+    return { ...g, phase: 'bidding', narrative: `${base} 轮到你叫分，当前最高分 ${bid.highestScore}。0=不叫。`, isYourTurn: true, availableActions: [{ name: 'bid', hint: '选择叫分（0 表示不叫）', payloadSchema: { type: 'object', properties: { score: { enum: scores } }, required: ['score'] } }] };
+  }
+
+  if (state.phase === 'playing') {
+    if (state.currentPlayerId !== playerId) {
+      const cur = state.currentPlayerId ? state.players[state.currentPlayerId]?.name ?? '其他玩家' : '其他玩家';
+      return { ...g, phase: 'playing', narrative: `${base} 轮到 ${cur} 出牌。`, isYourTurn: false, availableActions: [], waitingFor: `等待 ${cur} 出牌` };
+    }
+    const isLead = !state.lastPlay || state.lastPlay.playerId === playerId;
+    const lastStr = state.lastPlay ? `${state.players[state.lastPlay.playerId]?.name ?? '?'} 出了 ${state.lastPlay.analysis.label}` : '无（你首出，可自由出牌）';
+    const actions: Array<Record<string, unknown>> = [{ name: 'playCards', hint: isLead ? '首出：自由选择合法牌型' : '跟牌：需同牌型更大，或用炸弹/火箭', payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { enum: hand.map((card) => card.id) } } }, required: ['cardIds'] } }];
+    if (!isLead) actions.push({ name: 'pass', hint: '本轮不出' });
+    return { ...g, phase: 'playing', narrative: `${base} 上一手：${lastStr}。轮到你出牌。`, isYourTurn: true, availableActions: actions };
+  }
+
+  return { ...g, phase: state.phase, narrative: `${base} ${state.message}`, isYourTurn: false, availableActions: [], waitingFor: '请稍候' };
 }

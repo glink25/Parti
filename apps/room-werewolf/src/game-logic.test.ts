@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_RULES, RECOMMENDED_DECKS, addDeathsWithHeartbreak, canWitchSelfSave, dealRoles,
+  DEFAULT_RULES, RECOMMENDED_DECKS, addDeathsWithHeartbreak, canWitchSelfSave, daySpeechOrder, dealRoles,
   privateRolePayload, resolveNightDeaths, resolveWinner, tallyVotes, validateDeck, voteLeaders,
   type PlayerCard,
 } from './game-logic';
@@ -80,5 +80,18 @@ describe('death chains and victory', () => {
 
   it('does not let an original faction win while third-party lovers survive', () => {
     expect(resolveWinner(cards, ['wolf'], ['villager', 'seer'], DEFAULT_RULES)).toBeNull();
+  });
+});
+
+describe('day speech order', () => {
+  it('starts from the sheriff and wraps in seat order, skipping the dead', () => {
+    expect(daySpeechOrder(['a', 'b', 'c', 'd'], ['b'], 'c')).toEqual(['c', 'd', 'a']);
+    expect(daySpeechOrder(['a', 'b', 'c', 'd'], [], 'a')).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('falls back to the first living player when start is missing or dead', () => {
+    expect(daySpeechOrder(['a', 'b', 'c'], ['a'], 'a')).toEqual(['b', 'c']);
+    expect(daySpeechOrder(['a', 'b', 'c'], [], null)).toEqual(['a', 'b', 'c']);
+    expect(daySpeechOrder(['a'], ['a'], null)).toEqual([]);
   });
 });

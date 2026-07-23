@@ -19,6 +19,7 @@ export type PartiApi = {
   ready(): void;
   leave(): void;
   log(...args: unknown[]): void;
+  exposeToAgent?(describe: (state: unknown) => unknown): void;
 };
 
 declare global {

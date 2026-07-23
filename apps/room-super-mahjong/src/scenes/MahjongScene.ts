@@ -27,7 +27,9 @@ export class MahjongScene {
     parti.onEvent('mahjong:notice',value=>this.announce((value as {message:string}).message,C.gold)),
     parti.onEvent('mahjong:action-fx',value=>this.actionFx(value as ActionFx)),
     parti.onEvent('mahjong:settlement',value=>this.announce((value as {message:string}).message,C.gold)),
-  );window.addEventListener('pagehide',this.destroy,{once:true});document.addEventListener('visibilitychange',this.visibility);parti.ready();void parti.action('syncPrivate')}
+  );window.addEventListener('pagehide',this.destroy,{once:true});document.addEventListener('visibilitychange',this.visibility);parti.exposeToAgent?.(()=>this.agentGuide());parti.ready();void parti.action('syncPrivate')}
+  // AI agent 转述：本玩家视角，读 this.state + this.privateState（自己的手牌/可响应项）。迁移自旧 worker describe()/mahjongObserve()。
+  private agentGuide(){return buildMahjongGuide(this.state,this.privateState,parti.playerId)}
   private receive(state:GameState){if(state.phase==='playing'&&this.lastPhase!=='playing'&&this.lastPhase!=='reaction')this.roundStartScores=state.seats.map(seat=>seat?.score??0);if(this.lastPhase&&state.phase!==this.lastPhase&&(state.phase==='settlement'||state.phase==='matchEnd')){this.settlementStartedAt=performance.now();this.announce(state.message,C.gold)}this.lastPhase=state.phase;this.state=state}
   update(){this.ratio=mainCanvas.width/Math.max(1,mainCanvas.clientWidth);const previous=this.activeAnimation;this.activeAnimation=this.animations.update(performance.now());if(previous?.kind==='draw'&&this.activeAnimation?.id!==previous.id)this.presentedHand=[...this.privateState.hand];if((previous?.kind==='win'||previous?.kind==='drawGame')&&this.activeAnimation?.id!==previous.id)this.settlementStartedAt=performance.now();if(this.pendingDrawEvent&&performance.now()-this.pendingDrawAt>500){this.pendingDrawEvent=null;this.pendingDraw=null;this.presentedHand=[...this.privateState.hand]}if(this.pendingDraw&&performance.now()-this.pendingDrawAt>1600&&!this.animations.presentationAnimations().some(item=>item.kind==='draw')){this.pendingDraw=null;this.presentedHand=[...this.privateState.hand]}const x=mousePosScreen.x/this.ratio,y=mousePosScreen.y/this.ratio;const hit=[...this.hits].reverse().find(item=>inside(item,x,y));mainCanvas.style.cursor=hit?'pointer':'';if(hit&&mouseWasPressed(0)&&!this.animations.isInputBlocked())hit.onClick()}
   render(){const w=mainCanvas.width/this.ratio,h=mainCanvas.height/this.ratio,ctx=mainContext;ctx.save();ctx.setTransform(this.ratio,0,0,this.ratio,0,0);ctx.clearRect(0,0,w,h);this.hits=[];this.background(w,h);if(!this.state){this.center('正在连接牌桌…',w,h/2,22,C.white);ctx.restore();return}if(this.state.phase==='lobby')this.lobby(w,h);else this.table(w,h);this.animationFx(w,h);this.flashFx(w,h);ctx.restore()}
@@ -75,3 +77,92 @@ export class MahjongScene {
 }
 function inside(hit:Rect,x:number,y:number){return x>=hit.x&&x<=hit.x+hit.w&&y>=hit.y&&y<=hit.y+hit.h}
 function clip(value:string,width:number){const max=Math.max(8,Math.floor(width/13));return value.length>max?`${value.slice(0,max-1)}…`:value}
+
+// ===== AI agent 转述（迁移自旧 worker 侧 describe()/mahjongObserve()，改为客户端本玩家视角）=====
+const MAHJONG_GUIDE = {
+  summary: '四人麻将（万/饼/条 + 万能红中 z）。通过摸牌、吃、碰、杠凑成合法牌型胡牌，多局累计得分最高者胜。',
+  objective: '在自己回合摸牌或吃碰他人打出的牌，凑成 4 组面子 + 1 对将牌（或七对等特殊牌型）胡牌得分；多局后累计得分最高者获胜。',
+  actions: [
+    { name: 'setReady', description: '大厅内准备/取消准备。', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] }, examples: [{ ready: true }] },
+    { name: 'startMatch', description: '房主在所有真人准备后开始比赛。', payloadSchema: { type: 'null' } },
+    { name: 'discard', description: '轮到自己时打出一张手牌。万能红中(kind=z)不能打出。', payloadSchema: { type: 'object', properties: { tileId: { type: 'string', description: '手牌中某张牌的 id' } }, required: ['tileId'] } },
+    { name: 'passReaction', description: 'reaction 阶段放弃对他人打出牌的吃/碰/杠/胡响应。', payloadSchema: { type: 'null' } },
+    { name: 'chi', description: 'reaction 阶段吃上家打出的牌：从手牌选 2 张与之组成顺子。', payloadSchema: { type: 'object', properties: { tileIds: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 2 } }, required: ['tileIds'] } },
+    { name: 'peng', description: 'reaction 阶段碰（手中已有两张同样的牌）。', payloadSchema: { type: 'null' } },
+    { name: 'gang', description: 'reaction 阶段杠他人打出的牌无需参数；playing 阶段自己回合明/暗杠需 {kind}。', payloadSchema: { type: 'object', properties: { kind: { type: 'string' } } } },
+    { name: 'declareWin', description: 'reaction 阶段胡他人打出的牌，或 playing 阶段自己回合自摸胡牌。', payloadSchema: { type: 'null' } },
+    { name: 'nextRound', description: '房主在小局结算后进入下一局。', payloadSchema: { type: 'null' } },
+    { name: 'restartMatch', description: '房主在结算/整场结束后重开比赛。', payloadSchema: { type: 'null' } },
+    { name: 'syncPrivate', description: '请求重发自己的私有手牌信息。', payloadSchema: { type: 'null' } },
+  ],
+  glossary: {
+    phase: 'lobby=大厅, dealing=发牌, playing=出牌中, reaction=等待吃碰杠胡响应, settlement=小局结算, matchEnd=整场结束',
+    seat: '座位号 0-3。',
+    currentSeat: '当前该出牌/摸牌的座位。',
+    reaction: '某人打出牌后其他人可吃/碰/杠/胡的待响应信息；awaitingSeats 为仍需表态的座位。',
+    lastDiscard: '最近被打出的牌 {seat, tile}。',
+    melds: '各座位已亮出的吃/碰/杠组合。',
+    handCount: '各座位手牌数量（不含具体牌面）。',
+    'tile.kind': 'm/p/s 加 1-9 表示万/饼/条，z 表示万能红中。',
+    score: '各座位累计得分。',
+  },
+} as const;
+
+function mahjongOccupied(state: GameState): SeatState[] {
+  return state.seats.filter((seat): seat is SeatState => Boolean(seat));
+}
+
+function buildMahjongGuide(state: GameState | null, priv: PrivateState, playerId: string | null) {
+  const g = MAHJONG_GUIDE;
+  if (!state || !playerId) return { ...g, phase: 'connecting', narrative: '正在连接牌桌…', isYourTurn: false, availableActions: [] };
+  const seatState = state.seats.find((seat) => seat?.id === playerId) ?? null;
+  if (!seatState) return { ...g, phase: state.phase, narrative: '你当前不在座位上，正在旁观牌局。', isYourTurn: false, availableActions: [], waitingFor: '等待入座' };
+  const seat = seatState.seat;
+  const handStr = priv.hand.length ? priv.hand.map((tile) => `${tile.kind}#${tile.id}`).join(' ') : '（无）';
+  const scores = mahjongOccupied(state).map((s) => `${s.name}(座${s.seat}):${s.score}`).join('，');
+  const base = `你是座位 ${seat}（${seatState.name}）。你的手牌：${handStr}。牌墙剩余 ${state.wallCount}。得分：${scores}。`;
+
+  if (state.phase === 'lobby') {
+    const actions: Array<Record<string, unknown>> = [{ name: 'setReady', hint: seatState.ready ? '你已准备，可取消准备' : '准备开始', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] } }];
+    if (state.hostId === playerId) actions.push({ name: 'startMatch', hint: '所有真人准备后开始比赛' });
+    return { ...g, phase: 'lobby', narrative: `${base} ${state.message}`, isYourTurn: !seatState.ready, availableActions: actions, waitingFor: seatState.ready ? '等待其他玩家准备或房主开局' : undefined };
+  }
+
+  if (state.phase === 'reaction' && state.reaction) {
+    if (!state.reaction.awaitingSeats.includes(seat)) {
+      return { ...g, phase: 'reaction', narrative: `${base} 座位 ${state.reaction.discarderSeat} 打出 ${state.reaction.tile.kind}，等待其他玩家响应。`, isYourTurn: false, availableActions: [], waitingFor: '等待吃碰杠胡响应' };
+    }
+    const actions: Array<Record<string, unknown>> = [{ name: 'passReaction', hint: '放弃响应' }];
+    const opts = priv.reactionOptions;
+    if (opts.includes('win')) actions.push({ name: 'declareWin', hint: '胡这张牌' });
+    if (opts.includes('gang')) actions.push({ name: 'gang', hint: '杠这张牌', payloadSchema: { type: 'null' } });
+    if (opts.includes('peng')) actions.push({ name: 'peng', hint: '碰这张牌' });
+    if (opts.includes('chi')) actions.push({ name: 'chi', hint: `吃：从手牌中选 2 张与打出牌组成顺子。可选组合(按 kind)：${priv.chiOptions.map((combo) => combo.join('+')).join(' 或 ')}`, payloadSchema: { type: 'object', properties: { tileIds: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 2 } }, required: ['tileIds'] } });
+    return { ...g, phase: 'reaction', narrative: `${base} 座位 ${state.reaction.discarderSeat} 打出 ${state.reaction.tile.kind}，你可以响应。`, isYourTurn: true, availableActions: actions, recentEvents: [`座位 ${state.reaction.discarderSeat} 打出 ${state.reaction.tile.kind}`] };
+  }
+
+  if (state.phase === 'playing') {
+    if (state.currentSeat !== seat) {
+      const cur = state.currentSeat != null ? state.seats[state.currentSeat]?.name ?? '其他玩家' : '其他玩家';
+      return { ...g, phase: 'playing', narrative: `${base} 轮到 ${cur} 行动。`, isYourTurn: false, availableActions: [], waitingFor: `等待 ${cur} 出牌` };
+    }
+    const discardable = priv.hand.filter((tile) => tile.kind !== 'z').map((tile) => tile.id);
+    const actions: Array<Record<string, unknown>> = [{ name: 'discard', hint: '打出一张手牌（红中 z 不可打）', payloadSchema: { type: 'object', properties: { tileId: { enum: discardable } }, required: ['tileId'] } }];
+    if (priv.canWin) actions.push({ name: 'declareWin', hint: '自摸胡牌' });
+    const gangKinds = [...priv.concealedGangKinds, ...priv.addedGangKinds];
+    if (gangKinds.length) actions.push({ name: 'gang', hint: '自己回合明/暗杠', payloadSchema: { type: 'object', properties: { kind: { enum: gangKinds } }, required: ['kind'] } });
+    return { ...g, phase: 'playing', narrative: `${base} 轮到你出牌。${priv.canWin ? '你已可以自摸胡牌。' : ''}`, isYourTurn: true, availableActions: actions };
+  }
+
+  if (state.phase === 'settlement' || state.phase === 'matchEnd') {
+    const isHost = state.hostId === playerId;
+    const actions: Array<Record<string, unknown>> = [];
+    if (isHost) {
+      if (state.phase === 'settlement') actions.push({ name: 'nextRound', hint: '进入下一局' });
+      actions.push({ name: 'restartMatch', hint: '重开比赛' });
+    }
+    return { ...g, phase: state.phase, narrative: `${base} ${state.message}`, isYourTurn: isHost, availableActions: actions, waitingFor: isHost ? undefined : '等待房主继续' };
+  }
+
+  return { ...g, phase: state.phase, narrative: `${base} ${state.message}`, isYourTurn: false, availableActions: [], waitingFor: '请稍候' };
+}

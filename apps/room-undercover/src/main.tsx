@@ -8,10 +8,14 @@ import './styles.css';
 type DealMode = 'classic' | 'custom';
 type AppMode = 'online' | 'share';
 type PublicPlayer = { id: string; name: string; role: 'host' | 'player' };
+type ChatMessage = { id: string; playerId: string; name: string; text: string; at: number; kind: 'chat' | 'speech' | 'system' };
 type RoomState = {
-  phase: 'waiting' | 'active' | 'finished'; hostId: string | null; players: PublicPlayer[];
-  selectedMode: DealMode; selectedIncludeBlank: boolean; roundMode: DealMode | null; selectedCategories: Category[]; round: number;
+  phase: 'waiting' | 'speaking' | 'transition' | 'voting' | 'finished'; hostId: string | null; players: PublicPlayer[];
+  selectedMode: DealMode; selectedIncludeBlank: boolean; roundMode: DealMode | null; selectedCategories: Category[]; round: number; voteRound: number;
   dealtPlayerIds: string[]; eliminatedPlayerIds: string[];
+  speakingOrder: string[]; speakingIndex: number; currentSpeakerId: string | null; spokenPlayerIds: string[];
+  votes: Record<string, string>; voteCandidates: string[]; revoteTied: boolean; lastEliminatedId: string | null;
+  chat: ChatMessage[];
   revealedWords: { civilian: string; undercover: string } | null; winner: Winner | null;
   resultHadBlank: boolean; resultHadUndercover: boolean; notice: string | null;
 };
@@ -62,6 +66,76 @@ function DealTable({ settings, modes, playerCountRange, notice, onChange, onDeal
   </div>;
 }
 
+// AI agent 转述：运行在本玩家视角的 UI 内，只读本玩家可见信息（自己的词从私密 card 事件拿）。
+// 内容与逻辑迁移自旧 worker 侧 describe()/undercoverObserve()，改为读客户端本地状态。
+const UNDERCOVER_GUIDE = {
+  summary: '谁是卧底：多数是「平民」拿到同一个词，少数「卧底」拿到相近词，可能有「白板」无词。轮流发言描述自己的词、再投票淘汰可疑者。',
+  objective: '平民/白板要找出并投出所有卧底；卧底要隐藏身份活到与平民人数相等。发言只能通过聊天室进行——描述你的词但不能直接说出它。',
+  actions: [
+    { name: 'speak', description: '发言阶段轮到你时发表一条描述（结构化发言，进入公共聊天）。', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] }, examples: [{ text: '我的词是一种常见饮品，早上常喝。' }] },
+    { name: 'vote', description: '投票阶段投出你怀疑的卧底。targetId 为候选玩家 id，传空字符串表示弃票。', payloadSchema: { type: 'object', properties: { targetId: { type: 'string' } }, required: ['targetId'] } },
+    { name: 'chat', description: '任意讨论阶段发送自由聊天消息（存活玩家）。', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] } },
+    { name: 'round:deal', description: '（房主）发牌开始新一局。', payloadSchema: { type: 'object', properties: { civilianWord: { type: 'string' }, undercoverWord: { type: 'string' } } } },
+  ],
+  glossary: {
+    phase: 'waiting=等待发牌, speaking=轮流发言, transition=转场过渡, voting=投票, finished=结束',
+    currentSpeakerId: '发言阶段当前应发言的玩家 id。',
+    speakingOrder: '本轮发言顺序（存活玩家）。',
+    voteCandidates: '投票阶段可被投的候选玩家 id（平票重投时仅为并列者）。',
+    votes: '已投票记录，键为投票者 id，值为目标 id（空串=弃票）。',
+    eliminatedPlayerIds: '已出局玩家 id。',
+    chat: '公共聊天与发言记录（kind: speech=结构化发言, chat=自由聊天, system=系统提示）。',
+    revoteTied: '当前是否为平票后的重投。',
+  },
+} as const;
+
+function undercoverChatDigest(state: RoomState, limit = 12): string[] {
+  return state.chat.slice(-limit).map((msg) => msg.kind === 'system' ? `[系统] ${msg.text}` : `${msg.name}${msg.kind === 'speech' ? '(发言)' : ''}: ${msg.text}`);
+}
+
+function buildUndercoverGuide(state: RoomState | null, card: PrivateCard | null, playerId: string | null) {
+  if (!state || !playerId) return { ...UNDERCOVER_GUIDE, phase: 'connecting', narrative: '正在连接房间…', isYourTurn: false, availableActions: [] };
+  const nameFrom = (id: string) => state.players.find((player) => player.id === id)?.name ?? '玩家';
+  const hasCard = Boolean(card && card.round === state.round);
+  const inGame = state.dealtPlayerIds.includes(playerId);
+  const eliminated = state.eliminatedPlayerIds.includes(playerId);
+  const roster = state.players.map((p) => `${p.name}${state.eliminatedPlayerIds.includes(p.id) ? '(出局)' : ''}`).join('，');
+  const wordLine = hasCard ? (card!.word ? `你的词是「${card!.word}」。` : '你是白板（没有词）。') : '你未参与本局。';
+  const base = `第 ${state.round} 轮。${wordLine} 在场：${roster}。`;
+  const recent = undercoverChatDigest(state);
+  const chatAction = { name: 'chat', hint: '自由发言', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] } };
+  const g = UNDERCOVER_GUIDE;
+
+  if (state.phase === 'waiting') {
+    return { ...g, phase: 'waiting', narrative: `${base} 等待房主发牌。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '等待房主发牌' };
+  }
+  if (state.phase === 'finished') {
+    const winnerLabel = state.winner === 'undercover' ? '卧底胜利' : state.winner === 'blank' ? '白板胜利' : '好人胜利';
+    return { ...g, phase: 'finished', narrative: `${base} ${winnerLabel}。平民词「${state.revealedWords?.civilian ?? ''}」，卧底词「${state.revealedWords?.undercover ?? ''}」。`, isYourTurn: false, availableActions: [], recentEvents: recent };
+  }
+  if (!inGame || eliminated) {
+    return { ...g, phase: state.phase, narrative: `${base} 你${eliminated ? '已出局' : '未参与'}，只能旁观聊天。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '旁观中' };
+  }
+  if (state.phase === 'speaking') {
+    if (state.currentSpeakerId === playerId) {
+      return { ...g, phase: 'speaking', narrative: `${base} 轮到你发言，描述你的词但别直接说出它。`, isYourTurn: true, availableActions: [{ name: 'speak', hint: '发表你的描述', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] } }, chatAction], recentEvents: recent };
+    }
+    const speaker = state.currentSpeakerId ? nameFrom(state.currentSpeakerId) : '其他玩家';
+    return { ...g, phase: 'speaking', narrative: `${base} 轮到 ${speaker} 发言。`, isYourTurn: false, availableActions: [chatAction], recentEvents: recent, waitingFor: `等待 ${speaker} 发言` };
+  }
+  if (state.phase === 'transition') {
+    return { ...g, phase: 'transition', narrative: `${base} 发言结束，即将投票。`, isYourTurn: false, availableActions: [chatAction], recentEvents: recent, waitingFor: '等待进入投票' };
+  }
+  if (state.phase === 'voting') {
+    if (playerId in state.votes) {
+      return { ...g, phase: 'voting', narrative: `${base} 你已投票，等待其他人。`, isYourTurn: false, availableActions: [chatAction], recentEvents: recent, waitingFor: '等待其他玩家投票' };
+    }
+    const candidates = state.voteCandidates.filter((id) => id !== playerId);
+    return { ...g, phase: 'voting', narrative: `${base} ${state.revoteTied ? '平票重投，' : ''}投出你怀疑的卧底。`, isYourTurn: true, availableActions: [{ name: 'vote', hint: '选择目标 id 投票，或传空串弃票', payloadSchema: { type: 'object', properties: { targetId: { enum: [...candidates, ''] } }, required: ['targetId'] } }, chatAction], recentEvents: recent };
+  }
+  return { ...g, phase: state.phase, narrative: base, isYourTurn: false, availableActions: [chatAction], recentEvents: recent };
+}
+
 function App() {
   const [appMode, setAppMode] = useState<AppMode>('online');
   const [state, setState] = useState<RoomState | null>(null);
@@ -69,7 +143,8 @@ function App() {
   const [card, setCard] = useState<PrivateCard | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [dealTableOpen, setDealTableOpen] = useState(false);
-  const [eliminateModalOpen, setEliminateModalOpen] = useState(false);
+  const [speakText, setSpeakText] = useState('');
+  const [chatText, setChatText] = useState('');
   const [sharePlayerCount, setSharePlayerCount] = useState(6);
   const [shareCategories, setShareCategories] = useState<Category[]>(['entertainment', 'daily']);
   const [shareIncludeBlank, setShareIncludeBlank] = useState(false);
@@ -79,32 +154,46 @@ function App() {
   const [manageShareCard, setManageShareCard] = useState<number | null>(null);
   const [shareResult, setShareResult] = useState<EliminationResult | null>(null);
   const usedSharePairs = useRef(new Set<string>());
+  const agentRef = useRef<{ state: RoomState | null; card: PrivateCard | null }>({ state: null, card: null });
 
   useEffect(() => {
     const offState = parti.onState((nextState) => {
       const roomState = nextState as RoomState;
+      agentRef.current.state = roomState;
       setState(roomState); setPlayerId(parti.playerId);
       setCard((current) => current?.round === roomState.round ? current : null); setRevealed(false);
     });
-    const offCard = parti.onEvent('undercover:card', (payload) => { setCard(payload as PrivateCard); setRevealed(false); });
+    const offCard = parti.onEvent('undercover:card', (payload) => { agentRef.current.card = payload as PrivateCard; setCard(payload as PrivateCard); setRevealed(false); });
+    parti.exposeToAgent?.(() => buildUndercoverGuide(agentRef.current.state, agentRef.current.card, parti.playerId));
     parti.ready();
     return () => { offState(); offCard(); };
   }, []);
 
   useEffect(() => {
-    if (!dealTableOpen && !eliminateModalOpen && openShareCard === null && manageShareCard === null) return;
+    if (!dealTableOpen && openShareCard === null && manageShareCard === null) return;
     const close = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setDealTableOpen(false); setEliminateModalOpen(false); setOpenShareCard(null); setManageShareCard(null);
+      setDealTableOpen(false); setOpenShareCard(null); setManageShareCard(null);
     };
     window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close);
-  }, [dealTableOpen, eliminateModalOpen, openShareCard, manageShareCard]);
+  }, [dealTableOpen, openShareCard, manageShareCard]);
 
   const isHost = Boolean(playerId && state?.hostId === playerId);
   const hasCurrentCard = Boolean(card && state && card.round === state.round);
   const isEliminated = Boolean(playerId && state?.eliminatedPlayerIds.includes(playerId));
-  const canEliminateSelf = Boolean(state?.phase === 'active' && playerId && state.dealtPlayerIds.includes(playerId) && !isEliminated);
+  const living = state ? state.dealtPlayerIds.filter((id) => !state.eliminatedPlayerIds.includes(id)) : [];
+  const amLiving = Boolean(playerId && living.includes(playerId));
+  const isMyTurnToSpeak = Boolean(state?.phase === 'speaking' && state.currentSpeakerId === playerId);
+  const hasVoted = Boolean(state && playerId && playerId in state.votes);
+  const nameById = (id: string) => state?.players.find((player) => player.id === id)?.name ?? '玩家';
+  const currentSpeakerName = state?.currentSpeakerId ? nameById(state.currentSpeakerId) : '';
+  const isRoundActive = Boolean(state && state.phase !== 'waiting');
+  const phaseTitle = state?.phase === 'speaking' ? '发言阶段' : state?.phase === 'transition' ? '转场' : state?.phase === 'voting' ? '投票阶段' : state?.phase === 'finished' ? '本局结束' : '';
+  const phaseHint = state?.phase === 'speaking' ? `轮到 ${currentSpeakerName} 发言` : state?.phase === 'transition' ? '发言结束，即将进入投票' : state?.phase === 'voting' ? (state.revoteTied ? '平票重投，仅可在并列者中选择' : '请投出你怀疑的卧底') : '';
   const participantCount = state?.players.filter((player) => state.selectedMode === 'classic' || player.role !== 'host').length ?? 0;
+  function submitSpeak() { const text = speakText.trim(); if (!text) return; void parti.action('speak', { text }); setSpeakText(''); }
+  function submitChat() { const text = chatText.trim(); if (!text) return; void parti.action('chat', { text }); setChatText(''); }
+  function castVote(targetId: string) { void parti.action('vote', { targetId }); }
   function changeRoomDealSettings(change: DealSettingsChange) {
     if ('mode' in change) void parti.action('settings:setMode', { mode: change.mode });
     if ('includeBlank' in change) void parti.action('settings:setIncludeBlank', { enabled: change.includeBlank });
@@ -212,10 +301,30 @@ function App() {
         <div className="section-heading"><div><p className="eyebrow">AT THE TABLE</p><h2>在场玩家</h2></div><b>{state?.players.length ?? 0}/12</b></div>
         <ul className="roster">{state?.players.map((player, index) => <li key={player.id}><span className={`avatar avatar-${index % 5}`}>{player.name.slice(0, 1)}</span><span className="player-name">{player.name}{player.id === playerId && <small>你</small>}</span>{state.eliminatedPlayerIds.includes(player.id) ? <em>已出局</em> : player.role === 'host' ? <em>房主</em> : state.dealtPlayerIds.includes(player.id) ? <i>●</i> : null}</li>)}</ul>
         <div className="table-actions">
-          {isHost && state?.phase === 'active' && <button className="host-button is-secondary" onClick={() => setDealTableOpen(true)}>重新发牌 <span>›</span></button>}
-          {state?.phase === 'active' && hasCurrentCard && <button className="eliminate-button" disabled={!canEliminateSelf} onClick={() => setEliminateModalOpen(true)}>{isEliminated ? '已出局' : '我出局了'}</button>}
+          {isHost && isRoundActive && <button className="host-button is-secondary" onClick={() => setDealTableOpen(true)}>重新发牌 <span>›</span></button>}
         </div>
       </aside>
+      {isRoundActive && state && <section className="play-panel panel">
+        <div className="section-heading"><div><p className="eyebrow">DISCUSSION</p><h2>{phaseTitle}</h2></div>{state.phase === 'voting' && <span>{Object.keys(state.votes).length}/{living.length} 已投</span>}</div>
+        {phaseHint && <p className="phase-hint">{phaseHint}{isEliminated ? ' · 你已出局，仅可旁观' : ''}</p>}
+        {isMyTurnToSpeak && <div className="speak-box">
+          <textarea value={speakText} maxLength={200} placeholder="轮到你发言，描述你的词（别直接说出来）" onChange={(event) => setSpeakText(event.target.value)} />
+          <button className="deal-button" disabled={!speakText.trim()} onClick={submitSpeak}><span>发言</span></button>
+        </div>}
+        {state.phase === 'voting' && amLiving && !hasVoted && <div className="vote-box">
+          <p>投出你怀疑的卧底：</p>
+          <div className="vote-grid">
+            {state.voteCandidates.filter((id) => id !== playerId).map((id) => <button key={id} className="vote-option" onClick={() => castVote(id)}>{nameById(id)}</button>)}
+            <button className="vote-option is-abstain" onClick={() => castVote('')}>弃票</button>
+          </div>
+        </div>}
+        {state.phase === 'voting' && hasVoted && <p className="phase-hint">你已投票，等待其他玩家。</p>}
+        <div className="chat-log">{state.chat.map((msg) => <div key={msg.id} className={`chat-msg is-${msg.kind}`}>{msg.kind === 'system' ? <em>{msg.text}</em> : <><b>{msg.name}{msg.kind === 'speech' ? '（发言）' : ''}：</b><span>{msg.text}</span></>}</div>)}</div>
+        <div className="chat-input">
+          <input value={chatText} maxLength={200} placeholder={amLiving ? '自由聊天…' : '出局后仅可旁观'} disabled={!amLiving} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitChat(); }} />
+          <button disabled={!amLiving || !chatText.trim()} onClick={submitChat}>发送</button>
+        </div>
+      </section>}
     </section>}
 
     {dealTableOpen && <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setDealTableOpen(false)}><section className="modal host-modal" role="dialog" aria-modal="true" aria-labelledby="deal-table-title">
@@ -223,7 +332,6 @@ function App() {
       <DealTable settings={dealTableSettings} modes={dealTableModes} playerCountRange={dealTablePlayerRange} notice={appMode === 'online' ? state?.notice : null} onChange={changeDealSettings} onDeal={submitDeal} />
     </section></div>}
 
-    {eliminateModalOpen && <div className="modal-backdrop"><section className="modal confirm-modal" role="dialog" aria-modal="true"><div className="modal-icon">?</div><h2>确认已经出局？</h2><p>无论是被投票还是自爆，确认后都不能撤销，你的阵营仍然保密。</p><div className="modal-actions"><button onClick={() => setEliminateModalOpen(false)}>取消</button><button className="danger" onClick={() => { setEliminateModalOpen(false); void parti.action('round:eliminateSelf'); }}>确认出局</button></div></section></div>}
     {openShare && <div className="modal-backdrop"><section className="modal share-card-modal" role="dialog" aria-modal="true" aria-labelledby="share-word"><span className="share-number">玩家 {openShare.number}</span><p>{openShare.word ? '你的词语' : '你是白板'}</p><strong id="share-word">{openShare.word || '空白牌'}</strong>{openShare.word ? <small>记住序号和词语，不要让别人看到</small> : <small>没有词，也不会因说中词里的字而自爆。<br />请保持镇定，假装一切尽在掌握。</small>}<button className="deal-button" onClick={rememberShareCard}><span>我记住了</span></button></section></div>}
     {managedShare && <div className="modal-backdrop"><section className="modal share-action-modal" role="dialog" aria-modal="true" aria-labelledby="share-action-title"><span className="share-number">玩家 {managedShare.number}</span><h2 id="share-action-title">这张牌怎么了？</h2><p>重新查看会再次展示秘密词语；无论投票还是自爆，确认出局后不能撤销。</p><div className="share-action-buttons"><button onClick={() => { setManageShareCard(null); setOpenShareCard(managedShare.number); }}>忘了，再看一次</button><button className="danger" onClick={eliminateShareCard}>确认出局</button></div><button className="text-button" onClick={() => setManageShareCard(null)}>取消</button></section></div>}
   </main>;

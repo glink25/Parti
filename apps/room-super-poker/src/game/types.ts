@@ -14,5 +14,5 @@ export type VariantPublicState = {
 };
 export type GameState = { schema: 1; phase: Phase; variantId: VariantId; variants: VariantMeta[]; hostId: string|null; seats: Array<SeatState|null>; currentPlayerId: string|null; lastPlay: TablePlay|null; variant: VariantPublicState; settlement: Settlement|null; message: string; actionSeq: number };
 export type PrivateState = { hand: Card[]; canPass: boolean; canDraw: boolean; needsChoice: boolean };
-export type PartiApi = { playerId:string|null; getState():unknown; onState(handler:(state:unknown)=>void):()=>void; onEvent(event:string,handler:(payload:unknown)=>void):()=>void; action(action:string,payload?:unknown):Promise<{ok:true}>; ready():void; leave():void; log(...args:unknown[]):void };
+export type PartiApi = { playerId:string|null; getState():unknown; onState(handler:(state:unknown)=>void):()=>void; onEvent(event:string,handler:(payload:unknown)=>void):()=>void; action(action:string,payload?:unknown):Promise<{ok:true}>; ready():void; leave():void; log(...args:unknown[]):void; exposeToAgent?(describe:(state:unknown)=>unknown):void };
 declare global { const parti: PartiApi; }

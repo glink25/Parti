@@ -143,3 +143,16 @@ export function addDeathsWithHeartbreak(
 export function canWitchSelfSave(rule: SelfSaveRule, night: number): boolean {
   return rule === 'always' || (rule === 'first-night' && night === 1);
 }
+
+/**
+ * 白天发言顺序：按座位（发牌）顺序返回存活玩家，从 startId 起环形排列。
+ * startId 为空或已出局时，从第一个存活玩家开始。
+ */
+export function daySpeechOrder(dealtOrder: string[], deadIds: string[], startId: string | null): string[] {
+  const dead = new Set(deadIds);
+  const living = dealtOrder.filter((id) => !dead.has(id));
+  if (living.length === 0) return [];
+  const startIndex = startId ? living.indexOf(startId) : -1;
+  const offset = startIndex >= 0 ? startIndex : 0;
+  return [...living.slice(offset), ...living.slice(0, offset)];
+}

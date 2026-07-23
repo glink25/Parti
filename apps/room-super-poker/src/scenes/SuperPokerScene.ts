@@ -1,5 +1,8 @@
 import { mainCanvas, mainContext, mouseIsDown, mousePosScreen, mouseWasPressed, mouseWasReleased } from 'littlejsengine';
-import type { Card, GameState, PrivateState, SeatState, Suit } from '../game/types';
+import type { Card, GameState, PlayAnalysis, PrivateState, SeatState, Suit } from '../game/types';
+import { enumerateDoudizhu } from '../worker/variants/doudizhu';
+import { enumerateGandengyan } from '../worker/variants/gandengyan';
+import { isChameleonLegal } from '../worker/variants/chameleon';
 
 type Rect={x:number;y:number;w:number;h:number};
 type Hit=Rect&{onClick:()=>void};
@@ -10,7 +13,7 @@ const SUITS:Exclude<Suit,'joker'>[]=['spades','hearts','clubs','diamonds'];
 
 export class SuperPokerScene{
   private state:GameState|null=null;private privateState:PrivateState={hand:[],canPass:false,canDraw:false,needsChoice:false};private selected=new Set<string>();private hits:Hit[]=[];private handHits:HandHit[]=[];private gesture:Gesture|null=null;private ratio=1;private disposers:Array<()=>void>=[];private flash='';private flashUntil=0;private choiceSuit:Exclude<Suit,'joker'>='spades';private choiceRank=1;
-  init(){this.disposers.push(parti.onState(value=>{this.state=value as GameState}),parti.onEvent('poker:private-state',value=>{this.privateState=value as PrivateState;for(const id of [...this.selected])if(!this.privateState.hand.some(c=>c.id===id))this.selected.delete(id);this.gesture=null}),parti.onEvent('poker:notice',value=>this.notice((value as {message:string}).message)),parti.onEvent('poker:action-fx',value=>{const event=value as {label?:string};if(event.label)this.notice(event.label)}),parti.onEvent('poker:settlement',value=>this.notice((value as {title:string}).title)));window.addEventListener('pagehide',this.destroy,{once:true});document.addEventListener('visibilitychange',this.visibility);parti.ready();void parti.action('syncPrivate')}
+  init(){this.disposers.push(parti.onState(value=>{this.state=value as GameState}),parti.onEvent('poker:private-state',value=>{this.privateState=value as PrivateState;for(const id of [...this.selected])if(!this.privateState.hand.some(c=>c.id===id))this.selected.delete(id);this.gesture=null}),parti.onEvent('poker:notice',value=>this.notice((value as {message:string}).message)),parti.onEvent('poker:action-fx',value=>{const event=value as {label?:string};if(event.label)this.notice(event.label)}),parti.onEvent('poker:settlement',value=>this.notice((value as {title:string}).title)));window.addEventListener('pagehide',this.destroy,{once:true});document.addEventListener('visibilitychange',this.visibility);parti.exposeToAgent?.(()=>buildPokerGuide(this.state,this.privateState,parti.playerId));parti.ready();void parti.action('syncPrivate')}
   update(){this.ratio=mainCanvas.width/Math.max(1,mainCanvas.clientWidth);const x=mousePosScreen.x/this.ratio,y=mousePosScreen.y/this.ratio;const card=[...this.handHits].reverse().find(h=>inside(h,x,y)),hit=[...this.hits].reverse().find(h=>inside(h,x,y));mainCanvas.style.cursor=card||hit?'pointer':'';if(this.gesture){if(mouseWasReleased(0)||!mouseIsDown(0))this.gesture=null;else if(card)this.extend(card.index);return}if(!mouseWasPressed(0))return;if(card)this.begin(card);else hit?.onClick()}
   render(){const w=mainCanvas.width/this.ratio,h=mainCanvas.height/this.ratio,c=mainContext;c.save();c.setTransform(this.ratio,0,0,this.ratio,0,0);c.clearRect(0,0,w,h);this.hits=[];this.handHits=[];c.fillStyle=C.table;c.fillRect(0,0,w,h);this.vignette(w,h);if(!this.state){this.center('正在连接房间…',w,h/2,22,C.white);c.restore();return}if(this.state.phase==='lobby')this.lobby(w,h);else this.table(w,h);if(this.flash&&performance.now()<this.flashUntil){this.panel(w/2-180,Math.min(110,h*.17),360,46,'#111827',C.gold,.94);this.center(this.flash,w,Math.min(126,h*.17+16),16,C.white,700)}c.restore()}
   private lobby(w:number,h:number){const state=this.state!,portrait=h>w,compact=h<620;this.text(18,18,'超级扑克',Math.min(30,w/14),C.white,800);this.text(18,55,state.message,13,C.muted);const variants=state.variants,gap=8,cardY=compact?82:94,cardH=compact?82:104,cardW=(w-36-gap*2)/3;variants.forEach((v,i)=>{const x=18+i*(cardW+gap),active=v.id===state.variantId;this.panel(x,cardY,cardW,cardH,active?'#176b54':C.panel,active?C.gold:'#278262');this.centerAt(x+cardW/2,cardY+18,v.name,17,active?C.gold:C.white,800);this.centerAt(x+cardW/2,cardY+42,`${v.minPlayers}${v.minPlayers===v.maxPlayers?'':`–${v.maxPlayers}`} 人`,12,C.muted);if(!portrait&&!compact)this.centerAt(x+cardW/2,cardY+68,v.rules[0]!,10,C.muted);if(state.hostId===parti.playerId)this.hits.push({x,y:cardY,w:cardW,h:cardH,onClick:()=>void parti.action('selectVariant',{variantId:v.id})})});
@@ -34,3 +37,97 @@ export class SuperPokerScene{
   private visibility=()=>{if(document.hidden)this.gesture=null};private destroy=()=>{for(const d of this.disposers.splice(0))d();document.removeEventListener('visibilitychange',this.visibility)}
 }
 function inside(r:Rect,x:number,y:number){return x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h}function clip(value:string,n:number){return value.length>n?value.slice(0,n-1)+'…':value}function suitText(suit:Suit){return{spades:'♠ 黑桃',hearts:'♥ 红心',clubs:'♣ 梅花',diamonds:'♦ 方块',joker:'王'}[suit]}function rankText(rank:number){return rank===1?'A':rank===11?'J':rank===12?'Q':rank===13?'K':String(rank)}
+
+// ===== AI agent 转述（迁移自旧 worker 侧 describe()/pokerObserve()，改为客户端本玩家视角）=====
+function pokerOccupied(state: GameState): SeatState[] {
+  return state.seats.filter((s): s is SeatState => Boolean(s)).sort((a, b) => a.seat - b.seat);
+}
+function pokerFindSeat(state: GameState, playerId: string): SeatState | null {
+  return state.seats.find((s) => s?.id === playerId) ?? null;
+}
+
+function buildPokerGuide(state: GameState | null, priv: PrivateState, playerId: string | null) {
+  if (!state || !playerId) return { summary: '超级扑克（多玩法）。', phase: 'connecting', narrative: '正在连接房间…', isYourTurn: false, availableActions: [] };
+  const meta = state.variants.find((v) => v.id === state.variantId) ?? { name: state.variantId, rules: [] as string[] };
+  const guide = {
+    summary: `超级扑克（多玩法）。当前玩法：${meta.name}。可选：斗地主 / 干瞪眼 / 变色龙。`,
+    objective: `按当前玩法规则先出完手牌或达成胜利条件得分。${meta.name}规则：${meta.rules.join('；')}。`,
+    actions: [
+      { name: 'selectVariant', description: '房主在大厅选择玩法。', payloadSchema: { type: 'object', properties: { variantId: { enum: ['doudizhu', 'gandengyan', 'chameleon'] } }, required: ['variantId'] } },
+      { name: 'addBot', description: '房主在指定座位加入机器人。', payloadSchema: { type: 'object', properties: { seat: { type: 'integer' } }, required: ['seat'] } },
+      { name: 'removeBot', description: '房主移除指定座位的机器人。', payloadSchema: { type: 'object', properties: { seat: { type: 'integer' } }, required: ['seat'] } },
+      { name: 'setReady', description: '大厅内准备/取消准备。', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] }, examples: [{ ready: true }] },
+      { name: 'startGame', description: '房主在所有真人准备后开局。', payloadSchema: { type: 'null' } },
+      { name: 'playCards', description: '多用途出牌动作。斗地主叫分阶段传 {choice:{score:0-3}}（0=不叫）；出牌阶段传 {cardIds:[...]}，变色龙出 J 时另需 {choice:{suit,rank}}。', payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { type: 'string' } }, choice: { type: 'object' } } } },
+      { name: 'pass', description: '跟牌阶段选择不出（斗地主/干瞪眼；变色龙无此动作）。', payloadSchema: { type: 'null' } },
+      { name: 'drawCard', description: '变色龙无牌可出时摸一张。', payloadSchema: { type: 'null' } },
+      { name: 'syncPrivate', description: '请求重发自己的手牌。', payloadSchema: { type: 'null' } },
+      { name: 'returnToLobby', description: '房主在结算后返回大厅。', payloadSchema: { type: 'null' } },
+    ],
+    glossary: {
+      phase: 'lobby=大厅, dealing=发牌, bidding=叫地主, playing=出牌中, settlement=结算',
+      variantId: '当前玩法 doudizhu/gandengyan/chameleon。',
+      currentPlayerId: '当前该行动的玩家 id。',
+      lastPlay: '桌面上一手 {playerId, cards, analysis?, choice?}。',
+      'variant.bid': '斗地主叫分状态。',
+      'variant.activeSuit': '变色龙当前需匹配的花色。',
+      'variant.activeRank': '变色龙当前需匹配的点数。',
+      'variant.multiplier': '斗地主当前倍数。',
+      role: 'landlord=地主, farmer=农民, null=未定（仅斗地主）。',
+    },
+  };
+
+  const seat = pokerFindSeat(state, playerId);
+  if (!seat) return { ...guide, phase: state.phase, narrative: '你当前不在座位上，正在旁观。', isYourTurn: false, availableActions: [], waitingFor: '等待入座' };
+  const hand = priv.hand ?? [];
+  const handStr = hand.length ? hand.map((card) => `${card.label}#${card.id}`).join(' ') : '（无）';
+  const counts = pokerOccupied(state).map((s) => `${s.name}${s.role === 'landlord' ? '(地主)' : ''}:${s.handCount}张`).join('，');
+  const base = `玩法 ${meta.name}。你（${seat.name}）手牌：${handStr}。各家剩余：${counts}。`;
+
+  if (state.phase === 'lobby') {
+    const isHost = state.hostId === playerId;
+    const actions: Array<Record<string, unknown>> = [{ name: 'setReady', hint: seat.ready ? '已准备，可取消' : '准备开始', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] } }];
+    if (isHost) actions.push({ name: 'selectVariant', hint: '选择玩法' }, { name: 'addBot', hint: '加入机器人' }, { name: 'removeBot', hint: '移除机器人' }, { name: 'startGame', hint: '所有真人准备后开局' });
+    return { ...guide, phase: 'lobby', narrative: `${base} ${state.message}`, isYourTurn: !seat.ready, availableActions: actions, waitingFor: seat.ready && !isHost ? '等待房主开局' : undefined };
+  }
+
+  if (state.phase === 'bidding') {
+    const bid = state.variant.bid;
+    if (!bid || state.currentPlayerId !== playerId) {
+      const cur = state.currentPlayerId ? pokerFindSeat(state, state.currentPlayerId)?.name ?? '其他玩家' : '其他玩家';
+      return { ...guide, phase: 'bidding', narrative: `${base} 当前最高分 ${bid?.highestScore ?? 0}，轮到 ${cur} 叫分。`, isYourTurn: false, availableActions: [], waitingFor: `等待 ${cur} 叫分` };
+    }
+    const scores = [0];
+    for (let s = bid.highestScore + 1; s <= 3; s += 1) scores.push(s);
+    return { ...guide, phase: 'bidding', narrative: `${base} 轮到你叫分，当前最高分 ${bid.highestScore}。0=不叫。`, isYourTurn: true, availableActions: [{ name: 'playCards', hint: '叫分：传 {choice:{score}}', payloadSchema: { type: 'object', properties: { choice: { type: 'object', properties: { score: { enum: scores } }, required: ['score'] } }, required: ['choice'] } }] };
+  }
+
+  if (state.phase === 'playing') {
+    if (state.currentPlayerId !== playerId) {
+      const cur = state.currentPlayerId ? pokerFindSeat(state, state.currentPlayerId)?.name ?? '其他玩家' : '其他玩家';
+      return { ...guide, phase: 'playing', narrative: `${base} 轮到 ${cur} 行动。`, isYourTurn: false, availableActions: [], waitingFor: `等待 ${cur} 出牌` };
+    }
+    const lastStr = state.lastPlay && state.lastPlay.playerId !== 'table' ? `${pokerFindSeat(state, state.lastPlay.playerId)?.name ?? '?'} 出了 ${state.lastPlay.analysis?.label ?? ''}` : '无';
+    if (state.variantId === 'chameleon') {
+      const suit = state.variant.activeSuit!, rank = state.variant.activeRank!;
+      const legalCards = hand.filter((card) => isChameleonLegal(card, suit, rank));
+      if (!legalCards.length) return { ...guide, phase: 'playing', narrative: `${base} 当前需匹配 花色/点数=${suit}/${rank}，你无牌可出。`, isYourTurn: true, availableActions: [{ name: 'drawCard', hint: '无牌可出，摸一张' }] };
+      const hasJoker = legalCards.some((card) => card.rank === 11);
+      return { ...guide, phase: 'playing', narrative: `${base} 当前需匹配 花色/点数=${suit}/${rank}。可出：${legalCards.map((c) => `${c.label}#${c.id}`).join(' ')}。`, isYourTurn: true, availableActions: [{ name: 'playCards', hint: hasJoker ? '出一张同花色/同点数的牌；出 J(变色龙) 需附 {choice:{suit,rank}}' : '出一张同花色/同点数的牌', payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { enum: legalCards.map((c) => c.id) }, minItems: 1, maxItems: 1 }, choice: { type: 'object', properties: { suit: { enum: ['spades', 'hearts', 'clubs', 'diamonds'] }, rank: { type: 'integer', minimum: 1, maximum: 13 } } } }, required: ['cardIds'] }, examples: legalCards.slice(0, 4).map((c) => ({ cardIds: [c.id] })) }] };
+    }
+    const previous: PlayAnalysis | null = state.lastPlay?.analysis ?? null;
+    const legal = state.variantId === 'doudizhu' ? enumerateDoudizhu(hand, previous) : enumerateGandengyan(hand, previous);
+    const seatNow = pokerFindSeat(state, playerId);
+    const canPass = Boolean(state.lastPlay && state.lastPlay.playerId !== playerId && seatNow);
+    const actions: Array<Record<string, unknown>> = [{ name: 'playCards', hint: legal.length ? `可出 ${legal.length} 种合法牌型，从手牌选 cardIds` : '当前无更大牌型，可选择不出', payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { enum: hand.map((c) => c.id) } } }, required: ['cardIds'] }, examples: legal.slice(0, 6).map((cards) => ({ cardIds: cards.map((c) => c.id) })) }];
+    if (canPass) actions.push({ name: 'pass', hint: '本轮不出' });
+    return { ...guide, phase: 'playing', narrative: `${base} 上一手：${lastStr}。轮到你出牌。`, isYourTurn: true, availableActions: actions };
+  }
+
+  if (state.phase === 'settlement') {
+    const isHost = state.hostId === playerId;
+    return { ...guide, phase: 'settlement', narrative: `${base} ${state.message}`, isYourTurn: isHost, availableActions: isHost ? [{ name: 'returnToLobby', hint: '返回大厅' }] : [], waitingFor: isHost ? undefined : '等待房主返回大厅' };
+  }
+
+  return { ...guide, phase: state.phase, narrative: `${base} ${state.message}`, isYourTurn: false, availableActions: [], waitingFor: '请稍候' };
+}

@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useState } from 'react';
+import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   DEFAULT_RULES, RECOMMENDED_DECKS, ROLES, addDeathsWithHeartbreak, dealRoles, resolveWinner,
@@ -10,15 +10,18 @@ declare const parti: {
   playerId: string | null; getState(): unknown; onState(handler: (state: unknown) => void): () => void;
   onEvent(event: string, handler: (payload: unknown) => void): () => void;
   action(name: string, payload?: unknown): Promise<{ ok: true }>; ready(): void;
+  exposeToAgent?(describe: (state: unknown) => unknown): void;
 };
 
-type Stage = 'waiting' | 'role-check' | 'cupid' | 'guard' | 'werewolf' | 'witch' | 'seer' | 'sheriff-signup' | 'sheriff-withdraw' | 'sheriff-vote' | 'dawn' | 'hunter' | 'badge-transfer' | 'day-vote' | 'finished';
+type Stage = 'waiting' | 'role-check' | 'cupid' | 'guard' | 'werewolf' | 'witch' | 'seer' | 'sheriff-signup' | 'sheriff-withdraw' | 'sheriff-vote' | 'dawn' | 'hunter' | 'badge-transfer' | 'day-speech' | 'day-vote' | 'finished';
 type Player = { id: string; name: string; role: 'host' | 'player' };
+type ChatMessage = { id: string; playerId: string; name: string; text: string; at: number; kind: 'chat' | 'speech' | 'system' };
 type RoomState = {
   stage: Stage; hostId: string | null; players: Player[]; round: number; day: number; configuredRoles: Role[]; rules: RuleSettings;
   dealtPlayerIds: string[]; deadPlayerIds: string[]; deaths: DeathRecord[]; sheriffId: string | null; sheriffCandidates: string[];
   voteCandidates: string[]; submittedCount: number; requiredCount: number; lastVotes: Array<{ voterId: string; targetId: string; weight: number }>;
-  lastDeaths: string[]; result: { winner: 'werewolves' | 'village' | 'lovers'; reason: string } | null;
+  lastDeaths: string[]; speakingOrder: string[]; speakingIndex: number; currentSpeakerId: string | null; spokenPlayerIds: string[]; chat: ChatMessage[];
+  result: { winner: 'werewolves' | 'village' | 'lovers'; reason: string } | null;
   revealedRoles: Record<string, Role> | null; notice: string | null;
 };
 type PrivateRole = { round: number; role: Role };
@@ -47,6 +50,7 @@ const STAGE_COPY: Record<Stage, { title: string; note: string }> = {
   dawn: { title: '天亮了', note: '上帝正在结算昨夜事件。' },
   hunter: { title: '猎人抉择', note: '所有人都需选择目标或放弃，只有猎人的操作有效。' },
   'badge-transfer': { title: '警徽流转', note: '警长选择移交警徽或将其撕毁。' },
+  'day-speech': { title: '白天发言', note: '存活玩家按顺序轮流发言，轮到你时在下方发言。' },
   'day-vote': { title: '白天放逐', note: '讨论结束后投票；警长票计 1.5 票。' },
   finished: { title: '审判结束', note: '所有身份已揭晓。' },
 };
@@ -91,10 +95,127 @@ function StageAction({ state, submitted, role, playerId, witchInfo, onSubmit, on
   return <div className="submitted"><div className="moon-loader" /><p>上帝正在结算……</p></div>;
 }
 
+// AI agent 转述：运行在本玩家视角 UI 内，只读本玩家可见信息（身份、情侣、狼队、狼人频道来自私密事件）。
+// 内容与逻辑迁移自旧 worker 侧 describe()/werewolfObserve()，改为读客户端本地状态。
+const WEREWOLF_GUIDE = {
+  summary: '狼人杀·月夜审判：狼人夜里袭击，预言家/女巫/猎人/守卫/丘比特等神职与村民白天发言、投票放逐可疑者。',
+  objective: '好人阵营（村民+神职）投出所有狼人即胜；狼人杀光村民或神职即胜；情侣按房规可能成为第三方。夜间行动、白天发言与投票都在房间内进行，AI 通过聊天室获取讨论上下文。',
+  actions: [
+    { name: 'stage:submit', description: '当前阶段的密封提交：夜间行动、警长竞选/退水、警长投票、白天放逐投票、猎人开枪都用它。payload 依阶段而定（见 availableActions）。夜间每个存活玩家都需提交以推进，非行动身份可提交空对象保持匿名。', payloadSchema: { type: 'object' } },
+    { name: 'speak', description: '白天发言阶段轮到你时发表一条发言（进入公共聊天）。', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] } },
+    { name: 'chat', description: '聊天：白天存活玩家公共聊天；夜晚狼人可用 channel="wolf" 在狼人频道交流。', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 }, channel: { enum: ['public', 'wolf'] } }, required: ['text'] } },
+    { name: 'sheriff:badge', description: '（警长）警徽流转阶段移交或撕毁警徽。', payloadSchema: { type: 'object', properties: { targetId: { type: 'string' } } } },
+    { name: 'game:start', description: '（房主）发牌开始。', payloadSchema: { type: 'null' } },
+    { name: 'game:restart', description: '（房主）结束本局回到配置。', payloadSchema: { type: 'null' } },
+  ],
+  glossary: {
+    stage: 'waiting/role-check/cupid/guard/werewolf/witch/seer/sheriff-signup/sheriff-withdraw/sheriff-vote/dawn/day-speech/day-vote/hunter/badge-transfer/finished',
+    round: '第几局。', day: '第几个夜晚/白天。',
+    dealtPlayerIds: '本局参与者 id。', deadPlayerIds: '已死亡玩家 id。',
+    sheriffId: '当前警长 id。', voteCandidates: '当前可投候选 id。',
+    currentSpeakerId: '白天发言阶段当前发言者 id。', chat: '公共聊天与发言记录（kind: speech/chat/system）。',
+    submittedCount: '本阶段已提交人数。', requiredCount: '本阶段需提交人数。',
+  },
+} as const;
+
+type WerewolfAgentCtx = { state: RoomState | null; role: Role | null; pack: string[]; lover: string | null; wolfChat: ChatMessage[]; witchInfo: { killedPlayerId: string | null } | null; submitted: boolean };
+const NIGHT_STAGE_SET = new Set<Stage>(['cupid', 'guard', 'werewolf', 'witch', 'seer']);
+function wwAlive(state: RoomState): string[] { const dead = new Set(state.deadPlayerIds); return state.dealtPlayerIds.filter((id) => !dead.has(id)); }
+function wwName(state: RoomState, id: string): string { return state.players.find((p) => p.id === id)?.name ?? '玩家'; }
+function wwChatDigest(state: RoomState, limit = 12): string[] { return state.chat.slice(-limit).map((m) => m.kind === 'system' ? `[系统] ${m.text}` : `${m.name}${m.kind === 'speech' ? '(发言)' : ''}: ${m.text}`); }
+function wwEnumSchema(ids: string[]) { return { type: 'object', properties: { targetId: { enum: ids } }, required: ['targetId'] }; }
+
+function buildWerewolfGuide(actx: WerewolfAgentCtx, playerId: string | null) {
+  const g = WEREWOLF_GUIDE;
+  const state = actx.state;
+  if (!state || !playerId) return { ...g, phase: 'connecting', narrative: '正在连接房间…', isYourTurn: false, availableActions: [] };
+  const stage = state.stage;
+  const role = actx.role;
+  const inGame = state.dealtPlayerIds.includes(playerId);
+  const dead = state.deadPlayerIds.includes(playerId);
+  const alive = wwAlive(state);
+  const recent = wwChatDigest(state);
+  const chatAction = { name: 'chat', hint: '公共聊天', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] } };
+  const wolfChatAction = { name: 'chat', hint: '狼人频道发言（channel=wolf）', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 }, channel: { enum: ['wolf'] } }, required: ['text', 'channel'] } };
+  const submitted = actx.submitted;
+  const roleLine = role ? `你的身份是「${ROLE_META[role].name}」。` : '';
+  const loverLine = actx.lover ? `你的情侣是 ${wwName(state, actx.lover)}。` : '';
+  const base = `${roleLine}${loverLine} 第 ${state.day} 天（${stage}）。存活：${alive.map((id) => wwName(state, id)).join('、')}。`;
+
+  if (stage === 'waiting') {
+    const isHost = state.hostId === playerId;
+    return { ...g, phase: 'waiting', narrative: `${base} 等待房主发牌。`, isYourTurn: false, availableActions: isHost ? [{ name: 'game:start', hint: '发牌开始（阵容合法时）' }] : [], recentEvents: recent, waitingFor: '等待房主发牌' };
+  }
+  if (stage === 'finished') {
+    const label = state.result?.winner === 'village' ? '好人胜利' : state.result?.winner === 'werewolves' ? '狼人胜利' : state.result?.winner === 'lovers' ? '情侣胜利' : '结束';
+    return { ...g, phase: 'finished', narrative: `${base} ${label}。${state.result?.reason ?? ''}`, isYourTurn: false, availableActions: [], recentEvents: recent };
+  }
+  if (!inGame) {
+    return { ...g, phase: stage, narrative: `${base} 你未参与本局，正在旁观。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '旁观中' };
+  }
+  if (stage === 'hunter') {
+    if (submitted) return { ...g, phase: stage, narrative: `${base} 等待其他玩家提交。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: `等待提交 ${state.submittedCount}/${state.requiredCount}` };
+    if (role === 'hunter') return { ...g, phase: stage, narrative: `${base} 你（猎人）死亡，可开枪带走一人或放弃。`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: '开枪目标 id，或 targetId=null 放弃', payloadSchema: { type: 'object', properties: { targetId: { enum: [...alive, null] } } } }], recentEvents: recent };
+    return { ...g, phase: stage, narrative: `${base} 猎人抉择中，请提交以继续（你无需行动）。`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: '提交空对象保持匿名', payloadSchema: { type: 'object' } }], recentEvents: recent };
+  }
+  if (dead) {
+    return { ...g, phase: stage, narrative: `${base} 你已死亡，只能旁观公共聊天。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '旁观中' };
+  }
+  if (stage === 'role-check') {
+    if (submitted) return { ...g, phase: stage, narrative: `${base} 已确认，等待其他玩家。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: `等待确认 ${state.submittedCount}/${state.requiredCount}` };
+    return { ...g, phase: stage, narrative: `${base} 请确认身份。`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: '确认身份', payloadSchema: { type: 'object', properties: { ready: { const: true } }, required: ['ready'] }, examples: [{ ready: true }] }], recentEvents: recent };
+  }
+  if (NIGHT_STAGE_SET.has(stage)) {
+    const nightActions: Array<Record<string, unknown>> = [];
+    if (submitted) {
+      const acts = role === 'werewolf' ? [wolfChatAction] : [];
+      return { ...g, phase: stage, narrative: `${base} 已提交，等待其他玩家。`, isYourTurn: false, availableActions: acts, recentEvents: recent, waitingFor: `等待夜间行动 ${state.submittedCount}/${state.requiredCount}` };
+    }
+    if (stage === 'cupid' && role === 'cupid') nightActions.push({ name: 'stage:submit', hint: '连接两名玩家为情侣', payloadSchema: { type: 'object', properties: { targets: { type: 'array', items: { enum: alive }, minItems: 2, maxItems: 2 } }, required: ['targets'] } });
+    else if (stage === 'guard' && role === 'guard') nightActions.push({ name: 'stage:submit', hint: '守护一名玩家', payloadSchema: wwEnumSchema(alive) });
+    else if (stage === 'werewolf' && role === 'werewolf') { nightActions.push({ name: 'stage:submit', hint: '选择袭击目标（非狼人）', payloadSchema: wwEnumSchema(alive.filter((id) => !actx.pack.includes(id))) }); nightActions.push(wolfChatAction); }
+    else if (stage === 'witch' && role === 'witch') nightActions.push({ name: 'stage:submit', hint: `${actx.witchInfo?.killedPlayerId ? `今夜被袭击的是 ${wwName(state, actx.witchInfo.killedPlayerId)}。` : ''}使用解药 save 和/或毒药 poisonTargetId`, payloadSchema: { type: 'object', properties: { save: { type: 'boolean' }, poisonTargetId: { enum: [...alive, null] } } } });
+    else if (stage === 'seer' && role === 'seer') nightActions.push({ name: 'stage:submit', hint: '查验一名玩家的阵营', payloadSchema: wwEnumSchema(alive) });
+    else { nightActions.push({ name: 'stage:submit', hint: '此阶段你的身份无需行动，提交空对象保持匿名', payloadSchema: { type: 'object' } }); if (role === 'werewolf') nightActions.push(wolfChatAction); }
+    const wolfNote = role === 'werewolf' ? ` 狼队：${actx.pack.map((id) => wwName(state, id)).join('、')}。狼人频道：${actx.wolfChat.slice(-8).map((m) => `${m.name}:${m.text}`).join(' / ') || '（空）'}` : '';
+    return { ...g, phase: stage, narrative: `${base}${wolfNote}`, isYourTurn: true, availableActions: nightActions, recentEvents: recent };
+  }
+  if (stage === 'sheriff-signup') {
+    if (submitted) return { ...g, phase: stage, narrative: `${base} 已提交。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: `等待 ${state.submittedCount}/${state.requiredCount}` };
+    return { ...g, phase: stage, narrative: `${base} 是否竞选警长？`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: 'join=true 竞选，false 不上警', payloadSchema: { type: 'object', properties: { join: { type: 'boolean' } }, required: ['join'] } }], recentEvents: recent };
+  }
+  if (stage === 'sheriff-withdraw') {
+    if (submitted) return { ...g, phase: stage, narrative: `${base} 已提交。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: `等待 ${state.submittedCount}/${state.requiredCount}` };
+    const isCandidate = state.sheriffCandidates.includes(playerId);
+    return { ...g, phase: stage, narrative: `${base} ${isCandidate ? '你是候选人，是否退水？' : '请提交以继续。'}`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: isCandidate ? 'withdraw=true 退水' : '提交空对象继续', payloadSchema: { type: 'object', properties: { withdraw: { type: 'boolean' } } } }], recentEvents: recent };
+  }
+  if (stage === 'sheriff-vote') {
+    if (state.sheriffCandidates.includes(playerId)) return { ...g, phase: stage, narrative: `${base} 你是候选人，等待其他人投票。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '等待警长投票' };
+    if (submitted) return { ...g, phase: stage, narrative: `${base} 已投票。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: `等待 ${state.submittedCount}/${state.requiredCount}` };
+    return { ...g, phase: stage, narrative: `${base} 从候选人中投出警长。`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: '投票警长', payloadSchema: wwEnumSchema(state.voteCandidates) }], recentEvents: recent };
+  }
+  if (stage === 'day-speech') {
+    if (state.currentSpeakerId === playerId) return { ...g, phase: stage, narrative: `${base} 轮到你发言。`, isYourTurn: true, availableActions: [{ name: 'speak', hint: '发表你的白天发言', payloadSchema: { type: 'object', properties: { text: { type: 'string', maxLength: 200 } }, required: ['text'] } }, chatAction], recentEvents: recent };
+    const speaker = state.currentSpeakerId ? wwName(state, state.currentSpeakerId) : '其他玩家';
+    return { ...g, phase: stage, narrative: `${base} 轮到 ${speaker} 发言。`, isYourTurn: false, availableActions: [chatAction], recentEvents: recent, waitingFor: `等待 ${speaker} 发言` };
+  }
+  if (stage === 'day-vote') {
+    if (submitted) return { ...g, phase: stage, narrative: `${base} 已投票，等待其他玩家。`, isYourTurn: false, availableActions: [chatAction], recentEvents: recent, waitingFor: `等待放逐投票 ${state.submittedCount}/${state.requiredCount}` };
+    return { ...g, phase: stage, narrative: `${base} 投出你要放逐的玩家。`, isYourTurn: true, availableActions: [{ name: 'stage:submit', hint: '放逐投票', payloadSchema: wwEnumSchema(state.voteCandidates) }, chatAction], recentEvents: recent };
+  }
+  if (stage === 'badge-transfer') {
+    if (state.sheriffId === playerId) return { ...g, phase: stage, narrative: `${base} 你是警长，移交或撕毁警徽。`, isYourTurn: true, availableActions: [{ name: 'sheriff:badge', hint: '移交给某人，或 targetId=null 撕毁', payloadSchema: { type: 'object', properties: { targetId: { enum: [...alive.filter((id) => id !== playerId), null] } } } }], recentEvents: recent };
+    return { ...g, phase: stage, narrative: `${base} 等待警长处理警徽。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '等待警徽流转' };
+  }
+  return { ...g, phase: stage, narrative: `${base} 上帝正在结算。`, isYourTurn: false, availableActions: [], recentEvents: recent, waitingFor: '请稍候' };
+}
+
 function App() {
   const [mode, setMode] = useState<'online' | 'box'>('online'); const [state, setState] = useState<RoomState | null>(null); const [playerId, setPlayerId] = useState<string | null>(null);
   const [privateRole, setPrivateRole] = useState<PrivateRole | null>(null); const [pack, setPack] = useState<string[]>([]); const [lover, setLover] = useState<string | null>(null); const [seerResult, setSeerResult] = useState<string | null>(null); const [witchInfo, setWitchInfo] = useState<{ killedPlayerId: string | null } | null>(null);
   const [packVotes, setPackVotes] = useState<Array<{ voterId: string; targetId: string }>>([]);
+  const [wolfChat, setWolfChat] = useState<ChatMessage[]>([]); const [speakText, setSpeakText] = useState(''); const [chatText, setChatText] = useState('');
+  const agentRef = useRef<WerewolfAgentCtx>({ state: null, role: null, pack: [], lover: null, wolfChat: [], witchInfo: null, submitted: false });
   const [roleOpen, setRoleOpen] = useState(false); const [dealOpen, setDealOpen] = useState(false); const [submittedKey, setSubmittedKey] = useState('');
   const [boxCount, setBoxCount] = useState(8); const [boxRoles, setBoxRoles] = useState<Role[]>([...RECOMMENDED_DECKS[8]]); const [boxRules, setBoxRules] = useState<RuleSettings>({ ...DEFAULT_RULES }); const [boxCards, setBoxCards] = useState<LocalCard[]>([]); const [boxOpen, setBoxOpen] = useState<string | null>(null); const [boxDeaths, setBoxDeaths] = useState<DeathRecord[]>([]); const [boxLovers, setBoxLovers] = useState<string[]>([]);
   useEffect(() => {
@@ -106,12 +227,22 @@ function App() {
       parti.onEvent('werewolf:lover', (p) => setLover((p as { playerId: string }).playerId)),
       parti.onEvent('werewolf:seer-result', (p) => { const v = p as { playerId: string; alignment: string }; setSeerResult(`${playerName(state, v.playerId)} · ${v.alignment === 'werewolf' ? '狼人阵营' : '好人阵营'}`); }),
       parti.onEvent('werewolf:witch-night', (p) => setWitchInfo(p as { killedPlayerId: string | null })),
-    ]; parti.ready(); return () => { off(); listeners.forEach((fn) => fn()); };
+      parti.onEvent('werewolf:wolf-chat', (p) => setWolfChat((p as { messages: ChatMessage[] }).messages ?? [])),
+    ]; parti.exposeToAgent?.(() => buildWerewolfGuide(agentRef.current, parti.playerId)); parti.ready(); return () => { off(); listeners.forEach((fn) => fn()); };
   }, []);
   const isHost = Boolean(state && playerId === state.hostId); const stageKey = state ? `${state.round}:${state.day}:${state.stage}:${state.submittedCount}` : '';
   const submitted = submittedKey.startsWith(state ? `${state.round}:${state.day}:${state.stage}` : 'none');
   const localCardsRecord = Object.fromEntries(boxCards.map((c) => [c.id, { role: c.role }])); const boxResult = boxCards.length ? resolveWinner(localCardsRecord, boxDeaths.map((d) => d.playerId), boxLovers, boxRules) : null;
   function submit(payload: unknown) { if (!state) return; setSubmittedKey(`${state.round}:${state.day}:${state.stage}`); void parti.action('stage:submit', payload); }
+  const amWolf = privateRole?.role === 'werewolf';
+  const isNight = Boolean(state && ['cupid', 'guard', 'werewolf', 'witch', 'seer'].includes(state.stage));
+  const amAlive = Boolean(state && playerId && state.dealtPlayerIds.includes(playerId) && !state.deadPlayerIds.includes(playerId));
+  const isMySpeak = Boolean(state?.stage === 'day-speech' && state.currentSpeakerId === playerId);
+  const canPublicChat = Boolean(state && amAlive && !isNight && state.stage !== 'waiting' && state.stage !== 'finished');
+  const canWolfChat = Boolean(state && amAlive && amWolf && isNight);
+  agentRef.current = { state, role: privateRole?.role ?? null, pack, lover, wolfChat, witchInfo, submitted };
+  function submitSpeak() { const text = speakText.trim(); if (!text) return; void parti.action('speak', { text }); setSpeakText(''); }
+  function submitChat(channel: 'public' | 'wolf') { const text = chatText.trim(); if (!text) return; void parti.action('chat', channel === 'wolf' ? { text, channel: 'wolf' } : { text }); setChatText(''); }
   function changeOnlineRoles(roles: Role[]) { if (!state) return; setState({ ...state, configuredRoles: roles }); if (!validateDeck(roles, state.players.length)) void parti.action('settings:setDeck', { roles }); }
   function changeOnlineRules(rules: RuleSettings) { if (!state) return; setState({ ...state, rules }); void parti.action('settings:setRules', rules); }
   function dealBox() { const ids = Array.from({ length: boxCount }, (_, i) => String(i + 1)); const dealt = dealRoles(ids, boxRoles, Math.random); setBoxCards(ids.map((id) => ({ id, role: dealt[id].role, seen: false }))); setBoxDeaths([]); setBoxLovers([]); setDealOpen(false); }
@@ -122,7 +253,8 @@ function App() {
     {mode === 'online' ? <section className="game-layout">
       <article className="moon-panel">
         <div className="moon" /><p className="eyebrow">第 {state?.day ?? 0} 日 · 第 {state?.round ?? 0} 局</p><h2>{state ? STAGE_COPY[state.stage].title : '连接月夜中'}</h2><p>{state ? STAGE_COPY[state.stage].note : '正在等待房间状态'}</p>
-        {state && state.stage !== 'waiting' && state.stage !== 'finished' && <StageAction key={stageKey} state={state} submitted={submitted} role={privateRole?.role ?? null} playerId={playerId} witchInfo={witchInfo} onSubmit={submit} onBadge={(targetId) => void parti.action('sheriff:badge', { targetId })} />}
+        {state?.stage === 'day-speech' && <div className="speak-box">{isMySpeak ? <><div className="night-hint">轮到你发言</div><textarea value={speakText} maxLength={200} placeholder="发表你的白天发言" onChange={(e) => setSpeakText(e.target.value)} /><button className="primary" disabled={!speakText.trim()} onClick={submitSpeak}>发言</button></> : <div className="submitted"><p>{state.currentSpeakerId ? `${playerName(state, state.currentSpeakerId)} 正在发言…` : '发言即将结束'}</p></div>}</div>}
+        {state && state.stage !== 'waiting' && state.stage !== 'finished' && state.stage !== 'day-speech' && <StageAction key={stageKey} state={state} submitted={submitted} role={privateRole?.role ?? null} playerId={playerId} witchInfo={witchInfo} onSubmit={submit} onBadge={(targetId) => void parti.action('sheriff:badge', { targetId })} />}
         {state?.stage === 'waiting' && isHost && <button className="primary" onClick={() => setDealOpen(true)}>打开发牌台</button>}
         {state?.stage === 'waiting' && !isHost && <div className="submitted"><p>等待房主配置身份牌</p></div>}
         {state?.stage === 'finished' && state.result && <div className="result"><strong>{state.result.winner === 'village' ? '好人胜利' : state.result.winner === 'werewolves' ? '狼人胜利' : '情侣胜利'}</strong><p>{state.result.reason}</p>{isHost && <button className="primary" onClick={() => void parti.action('game:restart')}>返回发牌台</button>}</div>}
@@ -132,6 +264,15 @@ function App() {
         {state?.stage === 'werewolf' && privateRole?.role === 'werewolf' && packVotes.length > 0 && <div className="private-note">狼队密票：{packVotes.map((vote) => `${playerName(state, vote.voterId)}→${playerName(state, vote.targetId)}`).join(' · ')}</div>}
       </article>
       <aside className="roster-panel"><div className="panel-head"><div><p className="eyebrow">THE VILLAGE</p><h2>村庄名册</h2></div><b>{state?.players.length ?? 0}/12</b></div><ul>{state?.players.map((p) => <li key={p.id} className={state.deadPlayerIds.includes(p.id) ? 'dead' : ''}><span className="avatar">{p.name.slice(0, 1)}</span><div><strong>{p.name}{p.id === playerId ? ' · 你' : ''}</strong><small>{state.deadPlayerIds.includes(p.id) ? '已死亡' : state.sheriffId === p.id ? '警长' : state.dealtPlayerIds.includes(p.id) ? '存活' : '等待发牌'}</small></div>{state.stage === 'finished' && state.revealedRoles?.[p.id] && <em>{ROLE_META[state.revealedRoles[p.id]].name}</em>}</li>)}</ul>{state?.lastVotes.length ? <div className="vote-record"><strong>最近票型</strong>{state.lastVotes.map((v) => <small key={v.voterId}>{playerName(state, v.voterId)} → {playerName(state, v.targetId)}{v.weight === 1.5 ? ' ×1.5' : ''}</small>)}</div> : null}{state?.notice && <p className="notice">{state.notice}</p>}{isHost && state?.stage !== 'waiting' && <button className="danger outline" onClick={() => void parti.action('game:restart')}>放弃本局并重开</button>}</aside>
+      {state && state.stage !== 'waiting' && <section className="chat-panel roster-panel">
+        <div className="panel-head"><div><p className="eyebrow">TOWN SQUARE</p><h2>{isNight ? '夜晚' : '公共聊天'}</h2></div></div>
+        {canWolfChat && <div className="wolf-chat"><strong>狼人频道</strong><div className="chat-log is-wolf">{wolfChat.length ? wolfChat.map((m) => <div key={m.id} className="chat-msg"><b>{m.name}：</b><span>{m.text}</span></div>) : <em className="chat-empty">狼队还没有留言</em>}</div></div>}
+        <div className="chat-log">{state.chat.length ? state.chat.map((m) => <div key={m.id} className={`chat-msg is-${m.kind}`}>{m.kind === 'system' ? <em>{m.text}</em> : <><b>{m.name}{m.kind === 'speech' ? '（发言）' : ''}：</b><span>{m.text}</span></>}</div>) : <em className="chat-empty">还没有公开发言</em>}</div>
+        <div className="chat-input">
+          <input value={chatText} maxLength={200} placeholder={canWolfChat ? '狼人频道发言…' : canPublicChat ? '公共聊天…' : (isNight ? '夜晚无法公开发言' : '仅存活玩家可发言')} disabled={!canPublicChat && !canWolfChat} onChange={(e) => setChatText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitChat(canWolfChat ? 'wolf' : 'public'); }} />
+          <button className="primary" disabled={(!canPublicChat && !canWolfChat) || !chatText.trim()} onClick={() => submitChat(canWolfChat ? 'wolf' : 'public')}>发送</button>
+        </div>
+      </section>}
     </section> : <section className="box-layout">
       <aside className="box-tools"><p className="eyebrow">ONE DEVICE DECK</p><h2>月夜牌盒</h2><p>轮流验牌，由真人主持流程；这里只记录死亡并判断胜负。</p><div className="count-step"><button onClick={() => { const n = Math.max(6, boxCount - 1); setBoxCount(n); setBoxRoles([...(RECOMMENDED_DECKS[n])]); setBoxCards([]); }}>−</button><strong>{boxCount} 人</strong><button onClick={() => { const n = Math.min(12, boxCount + 1); setBoxCount(n); setBoxRoles([...(RECOMMENDED_DECKS[n])]); setBoxCards([]); }}>＋</button></div><button className="primary" onClick={() => setDealOpen(true)}>发牌台</button></aside>
       <article className="box-deck"><div className="panel-head"><div><p className="eyebrow">SECRET IDENTITIES</p><h2>{boxResult ? '本局结算' : boxCards.length ? '选择你的号码' : '等待发牌'}</h2></div></div>{boxResult ? <div className="result"><strong>{boxResult.winner === 'village' ? '好人胜利' : boxResult.winner === 'werewolves' ? '狼人胜利' : '情侣胜利'}</strong><p>{boxResult.reason}</p><div className="reveal-list">{boxCards.map((c) => <span key={c.id}>#{c.id} {ROLE_META[c.role].name}</span>)}</div></div> : <div className="card-grid">{boxCards.map((c) => { const dead = boxDeaths.some((d) => d.playerId === c.id); return <button key={c.id} className={`number-card ${c.seen ? 'seen' : ''} ${dead ? 'dead' : ''}`} onClick={() => setBoxOpen(c.id)}><small>{dead ? '已死亡' : c.seen ? '已验牌' : '未查看'}</small><strong>{c.id}</strong><span>点击操作</span></button>; })}</div>}</article>

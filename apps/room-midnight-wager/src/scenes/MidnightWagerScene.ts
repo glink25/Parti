@@ -127,6 +127,8 @@ export class MidnightWagerScene {
     );
     window.addEventListener('pagehide', this.destroy, { once: true });
     document.addEventListener('visibilitychange', this.visibility);
+    // AI agent 转述：本玩家视角，读 this.state + this.hand。迁移自旧 worker describe()/wagerObserve()。
+    parti.exposeToAgent?.(() => buildWagerGuide(this.state, this.hand, parti.playerId));
     parti.ready();
     void parti.action('syncPrivate');
   }
@@ -877,4 +879,89 @@ export class MidnightWagerScene {
   private contains(hit: HitRegion, x: number, y: number) {
     return x >= hit.x && x <= hit.x + hit.width && y >= hit.y && y <= hit.y + hit.height;
   }
+}
+
+// ===== AI agent 转述（迁移自旧 worker 侧 describe()/wagerObserve()，改为客户端本玩家视角）=====
+function buildWagerGuide(state: GameState | null, hand: Card[], playerId: string | null) {
+  if (!state || !playerId) return { summary: '午夜赌局。', phase: 'connecting', narrative: '正在连接房间…', isYourTurn: false, availableActions: [] };
+  const guide = {
+    summary: '午夜赌局：吹牛（暗出牌+质疑）+ 俄罗斯轮盘。玩家暗扣声称符合桌面点数的牌，被质疑或触发特殊牌时开枪，活到最后者胜。',
+    objective: `每轮暗出声称是「${state.tableRank ?? '桌面点数'}」的牌；被质疑时若说谎则说谎者开枪，否则质疑者开枪。开枪可能是空枪或致命。活到最后的玩家获胜。当前规则：${state.ruleset}。`,
+    actions: [
+      { name: 'setReady', description: '大厅内准备/取消准备。', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] }, examples: [{ ready: true }] },
+      { name: 'setRuleset', description: '房主在大厅切换规则。', payloadSchema: { type: 'object', properties: { ruleset: { enum: ['classic', 'devil', 'chaos'] } }, required: ['ruleset'] } },
+      { name: 'playCards', description: '轮到你时暗扣 1-3 张牌（chaos 规则每次 1 张），声称它们符合桌面点数。恶魔牌必须单独打出。', payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 3 } }, required: ['cardIds'] } },
+      { name: 'callLiar', description: '轮到你时质疑上家暗出的牌；翻开后由说谎方或误判方开枪。', payloadSchema: { type: 'null' } },
+      { name: 'callDevilsDeal', description: '仅恶魔局：轮到你且牌堆≥4张时发动恶魔交易，翻开最后四张。', payloadSchema: { type: 'null' } },
+      { name: 'pullTrigger', description: '轮盘阶段扣动扳机。自射时无需 targetId；对射时 targetId 指定活着的对手。', payloadSchema: { type: 'object', properties: { targetId: { type: 'string' } } } },
+      { name: 'syncPrivate', description: '请求重发自己的手牌。', payloadSchema: { type: 'null' } },
+      { name: 'abortMatch', description: '房主中止牌局并返回大厅。', payloadSchema: { type: 'null' } },
+    ],
+    glossary: {
+      phase: 'lobby=大厅, playing=暗出/质疑, roulette=开枪, resolution=结算过场, finished=结束',
+      ruleset: 'classic=经典, devil=恶魔局, chaos=混沌局。',
+      tableRank: '本轮桌面点数（A/K/Q）；你声称暗出的牌都是它。',
+      currentPlayerId: '当前该行动的玩家 id。',
+      lastPlay: '上一手 {playerId, count}，只公开张数不公开牌面。',
+      pileCount: '牌堆当前累计张数。',
+      reveal: '翻牌信息（质疑/恶魔/主宰等触发时）。',
+      roulette: '开枪状态：shooterIds 需开枪者，fixedTargets 固定目标，committed 已开枪者。',
+      safePulls: '各玩家已扣下的空枪数（离致命更近）。',
+      handCount: '各玩家剩余手牌数。',
+    },
+  };
+
+  const me = state.players[playerId];
+  if (!me) {
+    return { ...guide, phase: state.phase, narrative: '你当前不在牌桌上，正在旁观。', isYourTurn: false, availableActions: [], waitingFor: '等待入座' };
+  }
+  const handStr = hand.length ? hand.map((card) => `${card.kind}#${card.id}${card.devilMarked ? '(恶魔纹)' : ''}`).join(' ') : '（无）';
+  const livingIds = state.seats.filter((id): id is string => Boolean(id && state.players[id]?.alive));
+  const roster = livingIds.map((id) => `${state.players[id]!.name}:${state.players[id]!.handCount}张/空枪${state.players[id]!.safePulls}`).join('，');
+  const base = `规则 ${state.ruleset}，桌面点数 ${state.tableRank ?? '?'}。你（${me.name}）手牌：${handStr}。牌堆 ${state.pileCount} 张。存活：${roster}。`;
+
+  if (state.phase === 'lobby') {
+    const isHost = state.hostId === playerId;
+    const actions: Array<Record<string, unknown>> = [{ name: 'setReady', hint: me.ready ? '已准备，可取消' : '准备开始', payloadSchema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'] } }];
+    if (isHost) actions.push({ name: 'setRuleset', hint: '切换规则', payloadSchema: { type: 'object', properties: { ruleset: { enum: ['classic', 'devil', 'chaos'] } }, required: ['ruleset'] } });
+    return { ...guide, phase: 'lobby', narrative: `${base} ${state.message}`, isYourTurn: !me.ready, availableActions: actions, waitingFor: me.ready ? '等待其他玩家准备' : undefined };
+  }
+
+  if (state.phase === 'playing') {
+    if (state.currentPlayerId !== playerId) {
+      const cur = state.currentPlayerId ? state.players[state.currentPlayerId]?.name ?? '其他玩家' : '其他玩家';
+      return { ...guide, phase: 'playing', narrative: `${base} 轮到 ${cur} 行动。`, isYourTurn: false, availableActions: [], waitingFor: `等待 ${cur} 出牌或质疑` };
+    }
+    const limit = state.ruleset === 'chaos' ? 1 : 3;
+    const actions: Array<Record<string, unknown>> = [{ name: 'playCards', hint: `暗扣 1-${limit} 张，声称都是 ${state.tableRank}`, payloadSchema: { type: 'object', properties: { cardIds: { type: 'array', items: { enum: hand.map((card) => card.id) }, minItems: 1, maxItems: limit } }, required: ['cardIds'] } }];
+    if (state.pileCount > 0 && state.lastPlay && state.lastPlay.playerId !== playerId) actions.push({ name: 'callLiar', hint: `质疑上家暗出的 ${state.lastPlay.count} 张牌` });
+    if (state.ruleset === 'devil' && state.pileCount >= 4) actions.push({ name: 'callDevilsDeal', hint: '发动恶魔交易，翻开最后四张' });
+    return { ...guide, phase: 'playing', narrative: `${base} 轮到你行动。`, isYourTurn: true, availableActions: actions };
+  }
+
+  if (state.phase === 'roulette' && state.roulette) {
+    const roulette = state.roulette;
+    const isShooter = roulette.shooterIds.includes(playerId) && !roulette.committed.includes(playerId);
+    if (!isShooter) {
+      return { ...guide, phase: 'roulette', narrative: `${base} 轮盘阶段，等待开枪。`, isYourTurn: false, availableActions: [], waitingFor: '等待开枪结算' };
+    }
+    const fixed = roulette.fixedTargets[playerId];
+    if (fixed) {
+      return { ...guide, phase: 'roulette', narrative: `${base} 你必须朝 ${state.players[fixed]?.name ?? '自己'} 开枪。`, isYourTurn: true, availableActions: [{ name: 'pullTrigger', hint: '扣动扳机（目标已固定，无需 targetId）', payloadSchema: { type: 'null' } }] };
+    }
+    const targets = livingIds.filter((id) => id !== playerId);
+    return { ...guide, phase: 'roulette', narrative: `${base} 轮到你开枪，选择一名活着的对手。`, isYourTurn: true, availableActions: [{ name: 'pullTrigger', hint: '选择目标开枪', payloadSchema: { type: 'object', properties: { targetId: { enum: targets } }, required: ['targetId'] } }] };
+  }
+
+  if (state.phase === 'resolution') {
+    return { ...guide, phase: 'resolution', narrative: `${base} ${state.message}`, isYourTurn: false, availableActions: [], waitingFor: '等待本轮结算' };
+  }
+
+  if (state.phase === 'finished') {
+    const winner = state.winnerId ? state.players[state.winnerId]?.name : null;
+    const isHost = state.hostId === playerId;
+    return { ...guide, phase: 'finished', narrative: `${base} ${state.draw ? '无人幸存。' : winner ? `${winner} 活到了最后。` : ''}`, isYourTurn: false, availableActions: isHost ? [{ name: 'abortMatch', hint: '返回大厅' }] : [], waitingFor: isHost ? undefined : '等待房主开始新局' };
+  }
+
+  return { ...guide, phase: state.phase, narrative: `${base} ${state.message}`, isYourTurn: false, availableActions: [], waitingFor: '请稍候' };
 }
