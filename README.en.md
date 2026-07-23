@@ -131,9 +131,6 @@ VITE_LOBBY_SERVICE_URL=https://<project-ref>.supabase.co/functions/v1/parti-lobb
 
 # Override the Room Market's GitHub issue registry (default glink25/Parti)
 VITE_MARKET_REGISTRY=<owner>/<repo>
-
-# Optionally inject a GA4 gtag HTML snippet at build time
-GA_MEASUREMENT_SNIPPET=<script>...</script>
 ```
 
 The lobby service is backed by the Supabase Edge Function and migration included in this repository. See the [lobby service documentation](./docs/lobby-service.md) for its API, lease, and CORS contract.

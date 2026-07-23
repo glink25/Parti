@@ -132,9 +132,6 @@ VITE_LOBBY_SERVICE_URL=https://<project-ref>.supabase.co/functions/v1/parti-lobb
 
 # 覆盖房间市场的 GitHub issue 注册表（默认 glink25/Parti）
 VITE_MARKET_REGISTRY=<owner>/<repo>
-
-# 构建时注入可选的 GA4 gtag HTML 片段
-GA_MEASUREMENT_SNIPPET=<script>...</script>
 ```
 
 大厅服务由仓库中的 Supabase Edge Function 和迁移提供。接口、租约与 CORS 约定见[大厅服务文档](./docs/lobby-service.md)。
