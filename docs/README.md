@@ -24,7 +24,7 @@ my-room/
 | [worker-api.md](./worker-api.md) | `defineRoom` / `ctx` / 生命周期 / action 完整参考 | 写房间逻辑时查 |
 | [client-api.md](./client-api.md) | 全局 `parti.*` UI API 完整参考 | 写房间 UI 时查 |
 | [manifest.md](./manifest.md) | `parti.room.json` 字段表 | 配置清单时查 |
-| [agent-access.md](./agent-access.md) | 邀请 AI agent 接入、`parti.exposeToAgent` 转述、`window.__partiAgent` 契约 | 想让 AI 加入房间游玩时读 |
+| [agent-access.md](./agent-access.md) | 让游戏适配 AI 接入与无障碍：写好 `parti.exposeToAgent` 转述、省 token、复用为读屏说明（附接入 / 消费链路与 `window.__partiAgent` 契约） | 想让 AI 更好地玩你的房间、或做无障碍时读 |
 | [room-dev-harness.md](./room-dev-harness.md) | 仓库内 `room-*` / `template-*` 打包与 Harness 接入 | 在本仓库新建或修改 Room 应用时读 |
 | [room-market.md](./room-market.md) | 把房间发布到在线房间市场：release 打包格式、登记与标签规则 | 想让其他用户一键安装你的房间时读 |
 | [protocol-reference.md](./protocol-reference.md) | 底层协议消息 / 错误码（进阶、可选） | 一般无需阅读 |
