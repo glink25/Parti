@@ -24,7 +24,7 @@ function computeQrboxSize(
   viewfinderWidth: number,
   viewfinderHeight: number,
 ): { width: number; height: number } {
-  const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7);
+  const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.85);
   return { width: size || 250, height: size || 250 };
 }
 
@@ -46,15 +46,26 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
 
     async function start(): Promise<void> {
       try {
-        const { Html5Qrcode, Html5QrcodeScannerState } = await import('html5-qrcode');
+        const {
+          Html5Qrcode,
+          Html5QrcodeScannerState,
+          Html5QrcodeSupportedFormats,
+        } = await import('html5-qrcode');
         if (cancelled) return;
 
-        const scanner = new Html5Qrcode(elementId);
+        const scanner = new Html5Qrcode(elementId, {
+          verbose: false,
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        });
         scannerRef.current = scanner;
 
         await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: computeQrboxSize },
+          {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          { fps: 15, qrbox: computeQrboxSize },
           (decodedText) => {
             if (handledRef.current || cancelled) return;
             const route = parseInviteInput(decodedText);

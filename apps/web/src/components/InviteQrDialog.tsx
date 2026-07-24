@@ -6,10 +6,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  INVITE_QR_QUIET_ZONE,
+  INVITE_QR_SIZE,
+  selectInviteQrRenderProfile,
+} from '@/lib/inviteQr';
 import { cn } from '@/lib/utils';
 import { LOGO_URL } from './Logo';
-
-const QR_SIZE = 240;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -40,23 +43,27 @@ function drawRoundedRect(
 
 async function drawInviteQr(canvas: HTMLCanvasElement, inviteUrl: string): Promise<void> {
   const { default: QRCode } = await import('qrcode');
+  const highCorrectionQr = QRCode.create(inviteUrl, { errorCorrectionLevel: 'H' });
+  const profile = selectInviteQrRenderProfile(highCorrectionQr.modules.size);
   await QRCode.toCanvas(canvas, inviteUrl, {
-    width: QR_SIZE,
-    margin: 1,
-    errorCorrectionLevel: 'H',
+    width: INVITE_QR_SIZE,
+    margin: INVITE_QR_QUIET_ZONE,
+    errorCorrectionLevel: profile.errorCorrectionLevel,
     color: { dark: '#211f17', light: '#ffffff' },
   });
+
+  if (!profile.showLogo) return;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   try {
     const logo = await loadImage(LOGO_URL);
-    const logoSize = QR_SIZE * 0.22;
+    const logoSize = INVITE_QR_SIZE * 0.22;
     const pad = logoSize * 0.15;
     const bgSize = logoSize + pad * 2;
-    const bgX = (QR_SIZE - bgSize) / 2;
-    const bgY = (QR_SIZE - bgSize) / 2;
+    const bgX = (INVITE_QR_SIZE - bgSize) / 2;
+    const bgY = (INVITE_QR_SIZE - bgSize) / 2;
 
     ctx.fillStyle = '#ffffff';
     drawRoundedRect(ctx, bgX, bgY, bgSize, bgSize, 8);
@@ -122,14 +129,14 @@ export function InviteQrDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xs">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{intl.formatMessage({ id: 'peer.invite.qrTitle' })}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center gap-3">
           <div
             className={cn(
-              'grid size-[240px] place-items-center overflow-hidden rounded-[14px] border border-border bg-white',
+              'grid w-full max-w-[320px] place-items-center rounded-[14px] border border-border bg-white',
               loading && 'animate-pulse',
             )}
           >
@@ -138,9 +145,9 @@ export function InviteQrDialog({
             ) : (
               <canvas
                 ref={setCanvasEl}
-                width={QR_SIZE}
-                height={QR_SIZE}
-                className="size-[240px]"
+                width={INVITE_QR_SIZE}
+                height={INVITE_QR_SIZE}
+                className="h-auto w-full"
               />
             )}
           </div>
