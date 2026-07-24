@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIcon, BotIcon, CircleIcon, CopyIcon, QrCodeIcon, RefreshCwIcon, WandSparklesIcon } from 'lucide-react';
+import { ActivityIcon, CircleIcon, CopyIcon, QrCodeIcon, RefreshCwIcon, WandSparklesIcon } from 'lucide-react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { RoomAdmissionStatus } from '@parti/core';
 import type { HostRoomSettings } from '@/lib/roomSettings';
@@ -13,9 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { InviteJoinHelpDialog } from '@/components/InviteJoinHelpDialog';
+import { InviteAiWarningDialog } from '@/components/InviteAiWarningDialog';
 import { cn } from '@/lib/utils';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { buildAgentPrompt } from '@/lib/agentPrompt';
+import { isInviteAiWarningDismissed, setInviteAiWarningDismissed } from '@/lib/agentInvitePrefs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ENABLE_REPLAYS } from '@/lib/featureFlags';
 import type { TransportConfig } from '@/lib/transportConfig';
@@ -76,6 +78,7 @@ function SensorPermissionCard({ control }: { control: SensorPermissionControl })
 function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControlsProps; showAdmissionStatus?: boolean }) {
   const { settings, admission, inviteUrl, agentInviteUrl, copied, transportConfig, onCopyInvite, onOpenQr } = props;
   const [helpOpen, setHelpOpen] = useState(false);
+  const [aiWarnOpen, setAiWarnOpen] = useState(false);
   const [aiCopied, setAiCopied] = useState(false);
 
   async function copyAgentPrompt(): Promise<void> {
@@ -85,6 +88,17 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
     if (!ok) return;
     setAiCopied(true);
     window.setTimeout(() => setAiCopied(false), 1800);
+  }
+
+  function handleInviteAiClick(): void {
+    if (isInviteAiWarningDismissed()) void copyAgentPrompt();
+    else setAiWarnOpen(true);
+  }
+
+  function handleInviteAiConfirm(dontShowAgain: boolean): void {
+    if (dontShowAgain) setInviteAiWarningDismissed(true);
+    setAiWarnOpen(false);
+    void copyAgentPrompt();
   }
 
   return (
@@ -111,31 +125,32 @@ function InviteCard({ props, showAdmissionStatus = true }: { props: RoomControls
             </Button>
           </div>
         </div>
-        <div className="mt-2.5">
-          <Button type="button" variant="outline" className="w-full" onClick={() => void copyAgentPrompt()}>
-            <BotIcon data-icon="inline-start" />
-            <FormattedMessage id={aiCopied ? 'peer.invite.inviteAiCopied' : 'peer.invite.inviteAi'} />
-          </Button>
-          <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
-            <FormattedMessage id="peer.invite.inviteAiHint" />
-          </p>
-        </div>
-        <div className='flex justify-between items-center'>
+        <div className='mt-3 flex items-center justify-between gap-2'>
           {showAdmissionStatus && (
-            <div className="mt-3 flex items-center gap-[7px] text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-[7px] text-[10px] text-muted-foreground">
               <span className={cn('size-1.5 rounded-full', admission.joinable ? 'bg-success' : 'bg-danger')} />
               <FormattedMessage id={admission.joinable ? 'peer.invite.joinable' : 'peer.invite.full'} />
             </div>
           )}
-          <button
-            type="button"
-            className="mt-2 text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-            onClick={() => setHelpOpen(true)}
-          >
-            <FormattedMessage id="peer.invite.joinHelpLink" />
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={handleInviteAiClick}
+            >
+              <FormattedMessage id={aiCopied ? 'peer.invite.inviteAiCopied' : 'peer.invite.inviteAi'} />
+            </button>
+            <button
+              type="button"
+              className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={() => setHelpOpen(true)}
+            >
+              <FormattedMessage id="peer.invite.joinHelpLink" />
+            </button>
+          </div>
         </div>
         <InviteJoinHelpDialog open={helpOpen} onOpenChange={setHelpOpen} transportConfig={transportConfig} />
+        <InviteAiWarningDialog open={aiWarnOpen} onOpenChange={setAiWarnOpen} onConfirm={handleInviteAiConfirm} />
       </CardContent>
     </Card>
   );
