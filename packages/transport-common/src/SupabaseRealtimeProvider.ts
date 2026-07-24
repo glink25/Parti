@@ -1,5 +1,6 @@
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
 import type { CommonProviderConnection, CommonProviderMessage, CommonTransportProvider } from './CommonTransportAdapter';
+import { encodeSupabaseMessage, SupabaseMessageReassembler } from './SupabaseMessageFraming';
 
 export interface SupabaseRealtimeProviderOptions { url: string; publishableKey: string }
 
@@ -14,8 +15,16 @@ export class SupabaseRealtimeProvider implements CommonTransportProvider {
       config: { broadcast: { ack: true, self: false }, presence: { key: options.selfId } },
     });
     const present = new Set<string>();
+    const reassembler = new SupabaseMessageReassembler(options.onError);
     channel
-      .on('broadcast', { event: 'parti-message' }, ({ payload }) => options.onMessage(payload as CommonProviderMessage))
+      .on('broadcast', { event: 'parti-message' }, ({ payload }) => {
+        try {
+          const message = reassembler.accept(payload);
+          if (message) options.onMessage(message);
+        } catch (error) {
+          options.onError(`Supabase receive failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      })
       .on('presence', { event: 'sync' }, () => {
         const next = new Set(Object.keys(channel.presenceState()));
         for (const peerId of next) if (!present.has(peerId)) options.onJoin(peerId);
@@ -39,11 +48,34 @@ export class SupabaseRealtimeProvider implements CommonTransportProvider {
       });
     });
     let closed = false;
+    let sendQueue = Promise.resolve();
     return {
-      send: (payload) => { void channel.send({ type: 'broadcast', event: 'parti-message', payload }).then((result) => { if (result !== 'ok') options.onError(result); }); },
+      send: (payload: CommonProviderMessage) => {
+        const operation = sendQueue.then(async () => {
+          if (closed) return;
+          const frames = encodeSupabaseMessage(payload);
+          for (const frame of frames) {
+            const result = await channel.send({
+              type: 'broadcast',
+              event: 'parti-message',
+              payload: frame.payload,
+            });
+            if (result !== 'ok') {
+              const stage = frame.chunkTotal === undefined
+                ? 'direct'
+                : `chunk ${frame.chunkIndex! + 1}/${frame.chunkTotal}`;
+              throw new Error(`${stage}, messageBytes=${frame.encodedBytes}, result=${result}`);
+            }
+          }
+        });
+        sendQueue = operation.catch((error) => {
+          options.onError(`Supabase send failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      },
       close: () => {
         if (closed) return;
         closed = true;
+        reassembler.clear();
         void channel.untrack();
         void client.removeChannel(channel);
       },

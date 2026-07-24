@@ -14,7 +14,7 @@ import {
 import { createPackage, decodeFilesBase64, type RoomPackage } from '@parti/room-packager';
 import { createTransportAdapter, type TransportConfig } from './transportConfig';
 
-const PACKAGE_FETCH_TIMEOUT_MS = 15_000;
+const PACKAGE_FETCH_TIMEOUT_MS = 60_000;
 
 export type FetchPackageErrorCode = 'timeout' | 'disconnected';
 

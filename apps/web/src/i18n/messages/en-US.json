@@ -338,7 +338,7 @@
       "invalidCredential": "Incorrect room password"
     },
     "fetchPackage": {
-      "timeout": "Timed out fetching room package (host may be offline or using an older version)",
+      "timeout": "Timed out fetching room package (the host may be offline, outdated, or the package may exceed the realtime service's transfer limit)",
       "disconnected": "Disconnected from host before receiving the room package"
     },
     "invite": {
