@@ -60,11 +60,7 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
         scannerRef.current = scanner;
 
         await scanner.start(
-          {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
+          { facingMode: 'environment' },
           { fps: 15, qrbox: computeQrboxSize },
           (decodedText) => {
             if (handledRef.current || cancelled) return;
@@ -90,7 +86,8 @@ export default function JoinRoomQrScanner({ onSuccess }: { onSuccess?: () => voi
       } catch (reason) {
         scannerRef.current = null;
         if (cancelled) return;
-        const message = reason instanceof Error && /denied|permission/i.test(reason.message)
+        const errorMessage = reason instanceof Error ? reason.message : String(reason);
+        const message = /denied|permission/i.test(errorMessage)
           ? intlRef.current.formatMessage({ id: 'lobby.join.cameraDenied' })
           : intlRef.current.formatMessage({ id: 'lobby.join.scanFailed' });
         setError(message);
