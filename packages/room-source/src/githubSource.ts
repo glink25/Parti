@@ -38,6 +38,11 @@ export interface ResolvedGitHubRoomRequest {
   owner: string;
   repo: string;
   ref: string;
+  /**
+   * 可变分支在下载前解析出的不可变 commit。保留 `ref` 供 UI 与市场元数据显示，
+   * 但 CDN 读取必须使用此值，避免 `@main` 命中陈旧边缘缓存。
+   */
+  contentRef?: string;
   scope: string;
   explicitRef: boolean;
   refKind?: GitHubRefKind;
@@ -104,8 +109,18 @@ interface GitHubTreeResponse {
   truncated?: boolean;
 }
 
+interface GitHubRefResolution {
+  kind: GitHubRefKind;
+  /** 仅分支 ref 有稳定的 commit 目标；annotated tag 仍使用 tag 名称。 */
+  contentRef?: string;
+}
+
 function rateLimited(response: Response): boolean {
   return response.status === 403 || response.status === 429;
+}
+
+function commitSha(value: unknown): string | undefined {
+  return typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value) ? value : undefined;
 }
 
 function apiHeaders(token?: string): HeadersInit {
@@ -177,15 +192,23 @@ export class GitHubSourceClient {
     return data.default_branch;
   }
 
-  async resolveRefKind(repo: GitHubRepoRef, ref: string): Promise<GitHubRefKind | null> {
+  async resolveRef(repo: GitHubRepoRef, ref: string): Promise<GitHubRefResolution | null> {
     for (const [namespace, kind] of [['heads', 'branch'], ['tags', 'tag']] as const) {
       const url = `https://api.github.com/repos/${repo.owner}/${repo.repo}/git/ref/${namespace}/${encodeURIComponent(ref)}`;
       const response = await this.request(url, { headers: apiHeaders(this.token) });
       if (rateLimited(response)) throw new RoomSourceError('GITHUB_RATE_LIMITED', { status: response.status });
-      if (response.ok) return kind;
+      if (response.ok) {
+        const data = await response.json() as { object?: { sha?: unknown } };
+        const resolved = kind === 'branch' ? commitSha(data.object?.sha) : undefined;
+        return { kind, ...(resolved ? { contentRef: resolved } : {}) };
+      }
       if (response.status !== 404) throw new RoomSourceError('GITHUB_TREE_FAILED', { status: response.status });
     }
     return null;
+  }
+
+  async resolveRefKind(repo: GitHubRepoRef, ref: string): Promise<GitHubRefKind | null> {
+    return (await this.resolveRef(repo, ref))?.kind ?? null;
   }
 
   async refExists(repo: GitHubRepoRef, ref: string): Promise<boolean> {
@@ -195,19 +218,23 @@ export class GitHubSourceClient {
   async resolveUrl(value: string): Promise<ResolvedGitHubRoomRequest> {
     const parsed = parseGitHubRoomUrl(value);
     if (parsed.kind === 'repository') {
+      const ref = await this.defaultBranch(parsed);
+      const resolved = await this.resolveRef(parsed, ref);
+      if (!resolved || resolved.kind !== 'branch') throw new RoomSourceError('GITHUB_REF_NOT_FOUND');
       return {
         owner: parsed.owner,
         repo: parsed.repo,
-        ref: await this.defaultBranch(parsed),
+        ref,
         scope: '.',
         explicitRef: false,
-        refKind: 'branch',
+        refKind: resolved.kind,
+        ...(resolved.contentRef ? { contentRef: resolved.contentRef } : {}),
       };
     }
     for (let length = parsed.refAndPath.length; length >= 1; length -= 1) {
       const ref = parsed.refAndPath.slice(0, length).join('/');
-      const refKind = await this.resolveRefKind(parsed, ref);
-      if (!refKind) continue;
+      const resolved = await this.resolveRef(parsed, ref);
+      if (!resolved) continue;
       const remainder = parsed.refAndPath.slice(length);
       const scopeParts = parsed.kind === 'blob' ? remainder.slice(0, -1) : remainder;
       return {
@@ -216,7 +243,8 @@ export class GitHubSourceClient {
         ref,
         scope: scopeParts.join('/') || '.',
         explicitRef: true,
-        refKind,
+        refKind: resolved.kind,
+        ...(resolved.contentRef ? { contentRef: resolved.contentRef } : {}),
       };
     }
     throw new RoomSourceError('GITHUB_REF_NOT_FOUND');
@@ -275,10 +303,11 @@ export class GitHubSourceClient {
   }
 
   async resolveRepository(request: ResolvedGitHubRoomRequest): Promise<ResolvedRepositoryPackage> {
-    const paths = await this.listPaths(request, request.ref);
+    const contentRef = request.contentRef ?? request.ref;
+    const paths = await this.listPaths(request, contentRef);
     const resolved = await resolveRoomPackageFiles(
       paths,
-      (path) => this.readRepositoryFile(request, request.ref, path),
+      (path) => this.readRepositoryFile(request, contentRef, path),
       request.scope,
     );
     return { request, ...resolved };

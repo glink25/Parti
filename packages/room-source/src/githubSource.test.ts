@@ -37,10 +37,10 @@ describe('GitHub room URLs', () => {
     const client = new GitHubSourceClient({ fetch: vi.fn(async (input) => {
       const url = String(input);
       const found = url.endsWith(`/heads/${encodeURIComponent('feature/room')}`);
-      return new Response(found ? '{}' : '', { status: found ? 200 : 404 });
+      return new Response(found ? JSON.stringify({ object: { sha: 'a'.repeat(40) } }) : '', { status: found ? 200 : 404 });
     }) as typeof fetch });
     await expect(client.resolveUrl('https://github.com/a/room/tree/feature/room/dist')).resolves.toMatchObject({
-      ref: 'feature/room', scope: 'dist', explicitRef: true,
+      ref: 'feature/room', contentRef: 'a'.repeat(40), scope: 'dist', explicitRef: true,
     });
   });
 });
@@ -89,6 +89,41 @@ describe('GitHub repository trees', () => {
       .mockResolvedValueOnce(new Response('', { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ truncated: true, tree: [] }), { status: 200 })) });
     await expect(truncated.listPaths(repo, 'main')).rejects.toMatchObject({ code: 'GITHUB_TREE_TRUNCATED' });
+  });
+
+  it('pins mutable branch downloads to the resolved commit instead of jsDelivr @main', async () => {
+    const sha = 'b'.repeat(40);
+    const treeUrl = `https://data.jsdelivr.com/v1/packages/gh/a/room@${sha}`;
+    const cdnBase = `https://cdn.jsdelivr.net/gh/a/room@${sha}/`;
+    const files: Record<string, string> = {
+      'parti.room.json': JSON.stringify(manifest),
+      'index.html': '<main>room</main>',
+      'room.worker.js': 'export default null;',
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === 'https://api.github.com/repos/a/room') {
+        return new Response(JSON.stringify({ default_branch: 'main' }), { status: 200 });
+      }
+      if (url === 'https://api.github.com/repos/a/room/git/ref/heads/main') {
+        return new Response(JSON.stringify({ object: { sha } }), { status: 200 });
+      }
+      if (url === treeUrl) {
+        return new Response(JSON.stringify({ files: Object.keys(files).map((name) => ({ type: 'file', name })) }), { status: 200 });
+      }
+      if (url.startsWith(cdnBase)) {
+        const path = url.slice(cdnBase.length);
+        return new Response(files[path] ?? '', { status: files[path] === undefined ? 404 : 200 });
+      }
+      return new Response('', { status: 404 });
+    });
+
+    const resolved = await resolveGitHubImport('https://github.com/a/room', new GitHubSourceClient({ fetch: fetchMock as typeof fetch }));
+    expect(resolved.request).toMatchObject({ ref: 'main', contentRef: sha, refKind: 'branch' });
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls).toContain(treeUrl);
+    expect(urls).toContain(`${cdnBase}parti.room.json`);
+    expect(urls.filter((url) => /(?:data|cdn)\.jsdelivr\.net\/.*@main/.test(url))).toEqual([]);
   });
 });
 
